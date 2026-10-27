@@ -84,7 +84,7 @@ describe("saveDraftEdit", () => {
     expect(res).toHaveProperty("styleFlags");
     const upd = calls.find((c) => c.op === "update");
     expect(upd?.filters).toEqual(expect.arrayContaining([["id", "s1"], ["status", "pending_review"]]));
-    expect(revalidated).toEqual(expect.arrayContaining(["/approvals", "/prospects"]));
+    expect(revalidated).toEqual(expect.arrayContaining(["/approvals", "/today", "/prospects"]));
   });
 
   it("reports an error when no row was updated (not pending anymore, or not allowed)", async () => {
@@ -157,5 +157,6 @@ describe("fixDraft", () => {
   it("returns the fixed body on success", async () => {
     sendRow = { id: "s1", body: "x", style_flags: "too long", linkedin_stage: "invite" };
     expect(await fixDraft({}, form({ sendId: "s1" }))).toEqual({ body: "Fixed", styleFlags: null });
+    expect(revalidated).toEqual(expect.arrayContaining(["/approvals", "/today", "/prospects"]));
   });
 });

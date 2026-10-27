@@ -111,6 +111,7 @@ export async function saveDraftEdit(
   // 0 rows = no longer pending (sent/approved/canceled) or RLS hid it — never report a save that didn't land.
   if (!data || data.length === 0) return { error: "That draft was already handled." };
   revalidatePath("/approvals");
+  revalidatePath("/today");
   revalidatePath("/prospects");
   return { body, styleFlags };
 }
@@ -171,6 +172,7 @@ export async function fixDraft(
   if (error) return { error: "Could not save the fix. Only workspace admins can review." };
   if (!written || written.length === 0) return { error: "That draft was already handled." };
   revalidatePath("/approvals");
+  revalidatePath("/today");
   revalidatePath("/prospects");
   return styleFlags
     ? {

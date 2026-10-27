@@ -1,15 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, ExternalLink, Loader2, MoreHorizontal, PenLine, RefreshCw, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { parseStyleFlags } from "./style-flags";
 import { DraftPreview } from "./draft-preview";
-import { applyIfCurrent } from "./peek-result";
+import { applyIfCurrent, nextAfterRemoval } from "./peek-result";
 import { REJECT_REASON_ORDER, REJECT_REASONS, type RejectReason } from "./work-card/reject-reasons";
 import type { QueueRow } from "@/lib/today/rows";
-import { fixDraft, regenerateDraft, saveDraftEdit, type ReviewActionState } from "@/app/(app)/approvals/actions";
+import { fixDraft, regenerateDraft, saveDraftEdit, type RegenerateResult, type ReviewActionState } from "@/app/(app)/approvals/actions";
 import { trackFirstDraftApproved } from "@/lib/analytics/activation";
 import { approveFromToday, rejectDraftWithReason, undoApproveDraft, undoRejectDraft } from "@/app/(app)/today/actions";
 import { TierGlyph } from "@/components/lead-why-now";
@@ -35,10 +35,14 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
  *  never pulls the brain package into the browser bundle. The server slices to the same cap. */
 const STEER_MAX = 280;
 
+/** a thrown action (network drop) reads as an error result, so in-flight state always clears */
+const failed = (): { error: string } => ({ error: "Something went wrong. Try again." });
+
 const REGEN_FIRST_TOUCH_ONLY = "Regenerate works on first-touch drafts only.";
 
 type Outcome = "approved" | "rejected" | "suppressed";
 type DraftText = { body: string; styleFlags: string | null };
+type Inflight = "approve" | "reject" | "suppress" | "save" | "regenerate" | "fix";
 
 export function DraftPeek({
   rows,
@@ -71,18 +75,21 @@ export function DraftPeek({
   const [editBody, setEditBody] = useState("");
   const [steer, setSteer] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [rewriting, setRewriting] = useState<{ id: string; kind: "regenerate" | "fix" } | null>(null);
+  // Per-draft in-flight work, keyed by send id. A slow rewrite on one draft never locks the
+  // others: every gate below reads THIS draft's entry, never a shared transition.
+  const [inflight, setInflight] = useState<Record<string, Inflight>>({});
   const [moreOpen, setMoreOpen] = useState(false);
-  const [pending, start] = useTransition();
   const sheetRef = useRef<HTMLElement>(null);
   const steerRef = useRef<HTMLTextAreaElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
-  // The live open id for async results (Review Focus 1: drop a late result for another draft).
+  // Live values for async results (Review Focus 1: drop a late result for another draft).
   const openIdRef = useRef(openId);
+  const rowsRef = useRef(rows);
   useEffect(() => {
     openIdRef.current = openId;
-  }, [openId]);
+    rowsRef.current = rows;
+  }, [openId, rows]);
 
   // Today remounts the sheet with `key={openDraftId}`; the pane stays mounted across rows, so
   // per-draft UI state resets when the open row changes (render-time reset, no stale frame).
@@ -100,7 +107,11 @@ export function DraftPeek({
     [row, texts]
   );
   const canRegenerate = row?.origin === "sequence";
-  const busy = !!row && rewriting?.id === row.id;
+  const doing: Inflight | undefined = row ? inflight[row.id] : undefined;
+  /** this draft has a call in flight — every action on it waits */
+  const locked = doing !== undefined;
+  /** this draft is being rewritten (regenerate / fix) — the skeleton shows */
+  const busy = doing === "regenerate" || doing === "fix";
 
   // sheet only: remember the opener, focus the sheet, restore on close
   useEffect(() => {
@@ -114,135 +125,165 @@ export function DraftPeek({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const goNext = useCallback(() => {
-    const next = rows[index + 1] ?? rows[index - 1];
-    if (next) onNavigate(next.id);
-    else onClose();
-  }, [rows, index, onNavigate, onClose]);
+  const begin = useCallback((id: string, kind: Inflight) => setInflight((prev) => ({ ...prev, [id]: kind })), []);
+  const end = useCallback(
+    (id: string) =>
+      setInflight((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      }),
+    []
+  );
+
+  /** after `doneId` left the queue: move on from IT, only if it is still the open draft */
+  const goNextFrom = useCallback(
+    (doneId: string) => {
+      const step = nextAfterRemoval(
+        rowsRef.current.map((r) => r.id),
+        doneId,
+        openIdRef.current
+      );
+      if (!step) return;
+      if (step.kind === "open") onNavigate(step.id);
+      else onClose();
+    },
+    [onNavigate, onClose]
+  );
+
+  /** an error for `id` shows only while `id` is still the open draft */
+  const errorFor = useCallback((id: string, message: string) => {
+    if (applyIfCurrent(openIdRef.current, { sendId: id })) setError(message);
+  }, []);
 
   const store = useCallback((sendId: string, t: DraftText) => setTexts((prev) => ({ ...prev, [sendId]: t })), []);
 
-  const approve = useCallback(() => {
-    if (!row || pending || mode === "edit") return;
+  const approve = useCallback(async () => {
+    if (!row || locked || mode === "edit") return;
     const id = row.id;
     const sends = row.sends.held ? "held until the sender is back" : `sends ${row.sends.label}`;
-    start(async () => {
-      const res = await approveFromToday(id);
+    begin(id, "approve");
+    const res = await approveFromToday(id).catch(failed);
+    end(id);
+    if (res.error) {
+      errorFor(id, res.error);
+      return;
+    }
+    // The approval happened server-side whatever the owner is looking at now, so the row always
+    // collapses and the Undo toast always shows; only the navigation is guarded.
+    trackFirstDraftApproved();
+    onRemoved(id, "approved");
+    toast(`Approved · ${sends}`, {
+      duration: 5000,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          void undoApproveDraft(id);
+        },
+      },
+    });
+    goNextFrom(id);
+  }, [row, locked, mode, begin, end, errorFor, onRemoved, goNextFrom]);
+
+  const reject = useCallback(
+    async (reason: RejectReason) => {
+      if (!row || locked) return;
+      const id = row.id;
+      begin(id, "reject");
+      const res = await rejectDraftWithReason(id, reason).catch(failed);
+      end(id);
       if (res.error) {
-        setError(res.error);
+        errorFor(id, res.error);
         return;
       }
-      trackFirstDraftApproved();
-      onRemoved(id, "approved");
-      toast(`Approved · ${sends}`, {
+      onRemoved(id, "rejected");
+      toast("Rejected", {
         duration: 5000,
         action: {
           label: "Undo",
           onClick: () => {
-            void undoApproveDraft(id);
+            void undoRejectDraft(id);
           },
         },
       });
-      goNext();
-    });
-  }, [row, pending, mode, onRemoved, goNext]);
-
-  const reject = useCallback(
-    (reason: RejectReason) => {
-      if (!row || pending) return;
-      const id = row.id;
-      start(async () => {
-        const res = await rejectDraftWithReason(id, reason);
-        if (res.error) {
-          setError(res.error);
-          return;
-        }
-        onRemoved(id, "rejected");
-        toast("Rejected", {
-          duration: 5000,
-          action: {
-            label: "Undo",
-            onClick: () => {
-              void undoRejectDraft(id);
-            },
-          },
-        });
-        goNext();
-      });
+      goNextFrom(id);
     },
-    [row, pending, onRemoved, goNext]
+    [row, locked, begin, end, errorFor, onRemoved, goNextFrom]
   );
 
-  const suppress = useCallback(() => {
-    if (!row || pending || !onSuppress) return;
+  const suppress = useCallback(async () => {
+    if (!row || locked || !onSuppress) return;
     const id = row.id;
-    start(async () => {
-      const res = await onSuppress(id);
-      if (res.error) {
-        setError(res.error);
-        return;
-      }
-      onRemoved(id, "suppressed");
-      toast("Declined · they won't be contacted again");
-      goNext();
-    });
-  }, [row, pending, onSuppress, onRemoved, goNext]);
+    begin(id, "suppress");
+    const res = await onSuppress(id).catch(failed);
+    end(id);
+    if (res.error) {
+      errorFor(id, res.error);
+      return;
+    }
+    onRemoved(id, "suppressed");
+    toast("Declined · they won't be contacted again");
+    goNextFrom(id);
+  }, [row, locked, onSuppress, begin, end, errorFor, onRemoved, goNextFrom]);
 
   const startEdit = useCallback(() => {
-    if (!current) return;
+    if (!current || locked) return;
     setEditBody(current.body);
     setError(null);
     setMode("edit");
-  }, [current]);
+  }, [current, locked]);
 
-  const saveEdit = useCallback(() => {
-    if (!row || pending) return;
+  const startReject = useCallback(() => {
+    if (locked) return;
+    setMode("reject");
+  }, [locked]);
+
+  const saveEdit = useCallback(async () => {
+    if (!row || locked) return;
     const id = row.id;
     const fd = new FormData();
     fd.set("sendId", id);
     fd.set("channel", row.channel);
     fd.set("body", editBody);
-    start(async () => {
-      const res: ReviewActionState = await saveDraftEdit({}, fd);
-      const live = applyIfCurrent(openIdRef.current, { sendId: id, ...res });
-      if (!live) return;
-      if (live.error) {
-        setError(live.error);
-        return;
-      }
-      store(id, { body: live.body ?? editBody, styleFlags: live.styleFlags ?? null });
-      setMode("read");
-      toast("Saved");
-    });
-  }, [row, pending, editBody, store]);
+    begin(id, "save");
+    const res: ReviewActionState = await saveDraftEdit({}, fd).catch(failed);
+    end(id);
+    const live = applyIfCurrent(openIdRef.current, { sendId: id, ...res });
+    if (!live) return;
+    if (live.error) {
+      setError(live.error);
+      return;
+    }
+    store(id, { body: live.body ?? editBody, styleFlags: live.styleFlags ?? null });
+    setMode("read");
+    toast("Saved");
+  }, [row, locked, editBody, begin, end, store]);
 
-  const fix = useCallback(() => {
-    if (!row || pending || !current?.styleFlags) return;
+  const fix = useCallback(async () => {
+    if (!row || locked || !current?.styleFlags) return;
     const id = row.id;
     const fd = new FormData();
     fd.set("sendId", id);
     setError(null);
-    setRewriting({ id, kind: "fix" });
-    start(async () => {
-      const res: ReviewActionState = await fixDraft({}, fd);
-      setRewriting(null);
-      const live = applyIfCurrent(openIdRef.current, { sendId: id, ...res });
-      if (!live) return;
-      if (live.error) {
-        setError(live.error);
-        return;
-      }
-      if (live.body === undefined) {
-        toast("Nothing to fix on this draft.");
-        return;
-      }
-      store(id, { body: live.body, styleFlags: live.styleFlags ?? null });
-      toast(live.notice ?? "Cleaned up — give it a read, then approve.");
-    });
-  }, [row, pending, current, store]);
+    begin(id, "fix");
+    const res: ReviewActionState = await fixDraft({}, fd).catch(failed);
+    end(id);
+    const live = applyIfCurrent(openIdRef.current, { sendId: id, ...res });
+    if (!live) return;
+    if (live.error) {
+      setError(live.error);
+      return;
+    }
+    if (live.body === undefined) {
+      toast("Nothing to fix on this draft.");
+      return;
+    }
+    store(id, { body: live.body, styleFlags: live.styleFlags ?? null });
+    toast(live.notice ?? "Cleaned up — give it a read, then approve.");
+  }, [row, locked, current, begin, end, store]);
 
-  const regenerate = useCallback(() => {
-    if (!row || pending) return;
+  const regenerate = useCallback(async () => {
+    if (!row || locked) return;
     if (!canRegenerate) {
       setError(REGEN_FIRST_TOUCH_ONLY);
       return;
@@ -251,28 +292,28 @@ export function DraftPeek({
     const note = steer.trim().slice(0, STEER_MAX);
     setError(null);
     setMode("read");
-    setRewriting({ id, kind: "regenerate" });
-    start(async () => {
-      const res = await regenerateDraft(id, note);
-      setRewriting(null);
-      const live = applyIfCurrent(openIdRef.current, { sendId: id, ...res });
-      if (!live) return;
-      if (live.error || live.body === undefined) {
-        setError(live.error ?? "Couldn't regenerate right now. Try again.");
-        return;
-      }
-      store(id, { body: live.body, styleFlags: live.styleFlags ?? null });
-      toast("New draft ready — give it a read.");
-    });
-  }, [row, pending, canRegenerate, steer, store]);
+    begin(id, "regenerate");
+    const res: RegenerateResult = await regenerateDraft(id, note).catch(failed);
+    end(id);
+    const live = applyIfCurrent(openIdRef.current, { sendId: id, ...res });
+    if (!live) return;
+    if (live.error || live.body === undefined) {
+      setError(live.error ?? "Couldn't regenerate right now. Try again.");
+      return;
+    }
+    store(id, { body: live.body, styleFlags: live.styleFlags ?? null });
+    toast("New draft ready — give it a read.");
+  }, [row, locked, canRegenerate, steer, begin, end, store]);
 
   // keyboard
   useEffect(() => {
     if (!row) return;
     function onKey(e: KeyboardEvent) {
+      if (e.defaultPrevented) return;
       const target = e.target as HTMLElement | null;
-      // a confirmation dialog owns the keyboard while it is open
-      if (target?.closest?.('[role="alertdialog"]')) return;
+      // a confirmation dialog owns the keyboard while it is open; tabs and selects own their keys
+      if (target?.closest?.('[role="alertdialog"], [role="tab"]')) return;
+      if (target?.tagName === "SELECT") return;
       const typing = target && (target.tagName === "TEXTAREA" || target.tagName === "INPUT" || target.isContentEditable);
       if (e.key === "Escape") {
         if (mode !== "read") {
@@ -295,7 +336,7 @@ export function DraftPeek({
       switch (e.key.toLowerCase()) {
         case "a":
           e.preventDefault();
-          approve();
+          void approve();
           break;
         case "e":
           e.preventDefault();
@@ -303,11 +344,11 @@ export function DraftPeek({
           break;
         case "g":
           e.preventDefault();
-          regenerate();
+          void regenerate();
           break;
         case "r":
           e.preventDefault();
-          setMode("reject");
+          startReject();
           break;
         case "arrowright": {
           const n = rows[index + 1];
@@ -323,7 +364,7 @@ export function DraftPeek({
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [row, rows, index, mode, moreOpen, isSheet, approve, startEdit, regenerate, onClose, onNavigate]);
+  }, [row, rows, index, mode, moreOpen, isSheet, approve, startEdit, startReject, regenerate, onClose, onNavigate]);
 
   if (!row || !current) return null;
 
@@ -398,7 +439,7 @@ export function DraftPeek({
             <span className="font-mono">{row.step}</span> · LinkedIn
           </p>
           {busy ? (
-            <div aria-busy="true" aria-label={rewriting?.kind === "fix" ? "Fixing the draft" : "Rewriting the draft"} className="flex flex-col gap-2.5 rounded-[var(--r-square)] bg-[var(--surface-2)] p-4">
+            <div role="status" aria-busy="true" aria-label={doing === "fix" ? "Fixing the draft" : "Rewriting the draft"} className="flex flex-col gap-2.5 rounded-[var(--r-square)] bg-[var(--surface-2)] p-4">
               {["w-full", "w-11/12", "w-4/5", "w-2/3"].map((w) => (
                 <span key={w} className={cn("h-3 rounded-full bg-[var(--line)] motion-safe:animate-pulse", w)} />
               ))}
@@ -414,8 +455,8 @@ export function DraftPeek({
                 className="w-full resize-y rounded-[var(--r-square)] border border-[var(--line-strong)] bg-[var(--surface)] p-4 text-[14px] leading-[1.55] text-[var(--ink)] outline-none focus:shadow-[var(--focus-ring)]"
               />
               <div className="flex items-center gap-2">
-                <button type="button" onClick={saveEdit} disabled={pending || editOver || !editBody.trim()} className="inline-flex h-9 items-center gap-2 rounded-[var(--r-btn)] bg-[var(--acc)] px-4 text-[14px] font-semibold text-white disabled:opacity-40">
-                  {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" strokeWidth={1.75} />} Save
+                <button type="button" onClick={() => void saveEdit()} disabled={locked || editOver || !editBody.trim()} className="inline-flex h-9 items-center gap-2 rounded-[var(--r-btn)] bg-[var(--acc)] px-4 text-[14px] font-semibold text-white disabled:opacity-40">
+                  {doing === "save" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" strokeWidth={1.75} />} Save
                 </button>
                 <button type="button" onClick={() => setMode("read")} className="inline-flex h-9 items-center rounded-[var(--r-btn)] px-3 text-[14px] font-medium text-[var(--ink-mid)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)]">
                   Cancel
@@ -455,7 +496,7 @@ export function DraftPeek({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
-                  regenerate();
+                  void regenerate();
                 }
               }}
               maxLength={STEER_MAX}
@@ -467,12 +508,12 @@ export function DraftPeek({
             <div className="mt-1.5 flex items-center gap-2">
               <button
                 type="button"
-                onClick={regenerate}
-                disabled={!canRegenerate || pending}
+                onClick={() => void regenerate()}
+                disabled={!canRegenerate || locked}
                 title={canRegenerate ? undefined : REGEN_FIRST_TOUCH_ONLY}
                 className="inline-flex h-8 items-center gap-1.5 rounded-[var(--r-btn)] px-3 text-[13px] font-medium text-[var(--ink)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)] disabled:opacity-40"
               >
-                {busy && rewriting?.kind === "regenerate" ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" strokeWidth={1.75} />}
+                {doing === "regenerate" ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" strokeWidth={1.75} />}
                 Regenerate <kbd className="font-mono text-[11px] text-[var(--ink-dim)]">G</kbd>
               </button>
               <span className="ml-auto font-mono text-[11px] text-[var(--ink-dim)]">
@@ -500,7 +541,7 @@ export function DraftPeek({
         {mode === "reject" ? (
           <div className="flex flex-wrap items-center gap-2">
             {REJECT_REASON_ORDER.map((r) => (
-              <button key={r} type="button" disabled={pending} onClick={() => reject(r)} className="inline-flex h-8 items-center rounded-[var(--r-pill)] px-3 text-[13px] font-medium text-[var(--ink)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)]">
+              <button key={r} type="button" disabled={locked} onClick={() => void reject(r)} className="inline-flex h-8 items-center rounded-[var(--r-pill)] px-3 text-[13px] font-medium text-[var(--ink)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)]">
                 {REJECT_REASONS[r]}
               </button>
             ))}
@@ -510,19 +551,19 @@ export function DraftPeek({
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={approve} disabled={pending || mode === "edit"} className="inline-flex h-10 items-center gap-2 rounded-[var(--r-btn)] bg-[var(--acc)] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--acc-ink)] disabled:opacity-40 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]">
-              {pending && !busy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" strokeWidth={1.75} />}
+            <button type="button" onClick={() => void approve()} disabled={locked || mode === "edit"} className="inline-flex h-10 items-center gap-2 rounded-[var(--r-btn)] bg-[var(--acc)] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--acc-ink)] disabled:opacity-40 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]">
+              {doing === "approve" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" strokeWidth={1.75} />}
               Approve <kbd className="ml-1 rounded bg-[rgb(255_255_255/0.16)] px-1.5 font-mono text-[11px]">A</kbd>
             </button>
-            <button type="button" onClick={startEdit} disabled={busy} className="inline-flex h-9 items-center gap-1.5 rounded-[var(--r-btn)] px-3 text-[14px] font-medium text-[var(--ink)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)] disabled:opacity-40">
+            <button type="button" onClick={startEdit} disabled={locked} className="inline-flex h-9 items-center gap-1.5 rounded-[var(--r-btn)] px-3 text-[14px] font-medium text-[var(--ink)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)] disabled:opacity-40">
               <PenLine className="size-4" strokeWidth={1.75} /> Edit <kbd className="font-mono text-[11px] text-[var(--ink-dim)]">E</kbd>
             </button>
             {current.styleFlags && (
-              <button type="button" onClick={fix} disabled={pending} className="inline-flex h-9 items-center gap-1.5 rounded-[var(--r-btn)] px-3 text-[14px] font-medium text-[var(--ink)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)] disabled:opacity-40">
+              <button type="button" onClick={() => void fix()} disabled={locked} className="inline-flex h-9 items-center gap-1.5 rounded-[var(--r-btn)] px-3 text-[14px] font-medium text-[var(--ink)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)] disabled:opacity-40">
                 <Sparkles className="size-4" strokeWidth={1.75} /> Fix
               </button>
             )}
-            <button type="button" onClick={() => setMode("reject")} className="inline-flex h-9 items-center gap-1.5 rounded-[var(--r-btn)] px-3 text-[14px] font-medium text-[var(--ink-mid)] hover:bg-[var(--surface-2)]">
+            <button type="button" onClick={startReject} disabled={locked} className="inline-flex h-9 items-center gap-1.5 rounded-[var(--r-btn)] px-3 text-[14px] font-medium text-[var(--ink-mid)] hover:bg-[var(--surface-2)] disabled:opacity-40">
               Reject <kbd className="font-mono text-[11px] text-[var(--ink-dim)]">R</kbd>
             </button>
             <div className="ml-auto flex items-center gap-1">
@@ -545,12 +586,12 @@ export function DraftPeek({
                       description={`${row.name} is removed from the queue and added to your do-not-contact list. No agent will reach out to them again.`}
                       confirmLabel="Decline & never contact"
                       destructive
-                      onConfirm={suppress}
+                      onConfirm={() => void suppress()}
                       trigger={(open) => (
                         <button
                           type="button"
                           role="menuitem"
-                          disabled={pending}
+                          disabled={locked}
                           onClick={() => {
                             setMoreOpen(false);
                             open();
