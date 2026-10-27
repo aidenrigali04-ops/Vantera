@@ -798,6 +798,63 @@ describe("UnipileLinkedInInfra", () => {
     });
   });
 
+  describe("listThreadMessages (thread sync)", () => {
+    const CHATS = {
+      object: "ChatList",
+      items: [{ object: "Chat", id: "chat_1", account_id: "c1", account_type: "LINKEDIN", provider_id: "p", attendee_provider_id: "ACoAA_P", name: "Pat", type: 0, timestamp: "2026-10-20T10:00:00.000Z", unread_count: 0, archived: 0, muted_until: null, read_only: 0, pinned: 0 }],
+      cursor: null,
+    };
+    const msg = (o: Record<string, unknown>) => ({
+      object: "Message", provider_id: "pm", sender_id: "x", attachments: [], account_id: "c1", chat_id: "chat_1",
+      chat_provider_id: "pc", reactions: [], seen: 1, seen_by: {}, hidden: 0, deleted: 0, edited: 0, is_event: 0,
+      delivered: 1, behavior: null, original: "", sender_attendee_id: "att", ...o,
+    });
+
+    it("maps the 1:1 chat's messages to echo/reply events keyed by the webhook's message id, oldest first", async () => {
+      const adapter = infra({
+        "/chat_attendees/ACoAA_P/chats": CHATS,
+        "/chats/chat_1/messages": {
+          object: "MessageList",
+          items: [
+            msg({ id: "m3", text: "Thursday works", timestamp: "2026-10-20T12:00:00.000Z", is_sender: 0, sender_id: "ACoAA_P" }),
+            msg({ id: "m2", text: "Happy to walk you through it", timestamp: "2026-10-20T11:00:00.000Z", is_sender: 1, sender_id: "ME" }),
+            msg({ id: "m1", text: "", timestamp: "2026-10-20T10:30:00.000Z", is_sender: 0 }),
+            msg({ id: "m0", text: "joined", timestamp: "2026-10-20T10:00:00.000Z", is_sender: 0, is_event: 1 }),
+            msg({ id: "mx", text: "gone", timestamp: "2026-10-20T10:10:00.000Z", is_sender: 1, deleted: 1 }),
+          ],
+          cursor: null,
+        },
+      });
+      const events = await adapter.listThreadMessages({ connectedAccountId: "c1", attendeeProviderRef: "ACoAA_P", limit: 50 });
+      expect(events).toEqual([
+        {
+          type: "outbound_echo", providerEventId: "m2", connectedAccountRef: "c1",
+          toProfileUrl: "https://www.linkedin.com/in/ACoAA_P", fromProviderRef: "ACoAA_P",
+          fromPublicIdentifier: null, fromName: "Pat", body: "Happy to walk you through it", sentAt: "2026-10-20T11:00:00.000Z",
+        },
+        {
+          type: "reply", providerEventId: "m3", connectedAccountRef: "c1",
+          fromProfileUrl: "https://www.linkedin.com/in/ACoAA_P", fromProviderRef: "ACoAA_P",
+          fromPublicIdentifier: null, fromName: "Pat", body: "Thursday works", receivedAt: "2026-10-20T12:00:00.000Z",
+        },
+      ]);
+    });
+
+    it("no chat with that person yet → no messages (and no messages read)", async () => {
+      const fetchFn = fetchMock({ "/chat_attendees/ACoAA_P/chats": { object: "ChatList", items: [], cursor: null } });
+      const adapter = new UnipileLinkedInInfra({ apiKey: "k", dsn: "api.unipile.example.com:13000", webhookSecret: "w", fetchFn });
+      expect(await adapter.listThreadMessages({ connectedAccountId: "c1", attendeeProviderRef: "ACoAA_P", limit: 50 })).toEqual([]);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    });
+
+    it("ignores a chat that belongs to a different connected account", async () => {
+      const adapter = infra({
+        "/chat_attendees/ACoAA_P/chats": { ...CHATS, items: [{ ...CHATS.items[0], account_id: "other" }] },
+      });
+      expect(await adapter.listThreadMessages({ connectedAccountId: "c1", attendeeProviderRef: "ACoAA_P", limit: 50 })).toEqual([]);
+    });
+  });
+
   describe("setupWebhook", () => {
     it("deletes the stale webhook at our URL and recreates one per source WITH the secret header", async () => {
       const HOOK_URL = "https://app.test/api/webhooks/linkedin";

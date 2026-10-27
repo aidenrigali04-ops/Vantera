@@ -125,6 +125,15 @@ export interface ListFollowersRequest {
   connectedAccountId: string;
   limit: number;
 }
+export interface ThreadMessagesRequest {
+  connectedAccountId: string;
+  /** the counterpart's member provider id (ACoAA…) — the lead's stored provider ref */
+  attendeeProviderRef: string;
+  /** most recent messages to read (one page) */
+  limit: number;
+}
+/** A message in a 1:1 thread, normalized to the same event shapes the webhook produces. */
+export type ThreadMessageEvent = Extract<LinkedInEvent, { type: "reply" | "outbound_echo" }>;
 /** Someone who follows the connected profile — a warm, wordless signal (ML-8). */
 export interface LinkedInFollower {
   profileUrl: string;
@@ -210,6 +219,13 @@ export interface LinkedInInfra {
    * signal counts as connected (a false positive would try to message a non-connection).
    */
   getConnectionState(req: GetProfileRequest): Promise<{ connected: boolean; distance: string | null }>;
+  /**
+   * The recent messages of the connected account's 1:1 thread with one person, oldest first, as
+   * the same reply / outbound_echo events the webhook delivers (same provider message ids). The
+   * webhook-independent backstop: the thread sync replays anything the webhook never delivered.
+   * No thread yet → []. Read volume is bounded by the sync's per-run budget (rule 04).
+   */
+  listThreadMessages(req: ThreadMessagesRequest): Promise<ThreadMessageEvent[]>;
 }
 
 /** Outcome of {@link LinkedInInfra.setupWebhook} — a diagnostic the setup task logs. */

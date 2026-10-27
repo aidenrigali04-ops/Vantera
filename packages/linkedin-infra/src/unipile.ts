@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import type { ConnectedAccount, GetProfileRequest, HostedAuthLink, HostedAuthRedirects, InviteRequest, LinkedInEngager, LinkedInEvent, LinkedInInfra, LinkedInPost, LinkedInProfile, MessageRequest, PostEngagersRequest, ProfilePostsRequest, SearchPostsRequest, SendOutcome, WebhookSetupResult, LinkedInFollower, ListFollowersRequest } from "./types";
+import type { ConnectedAccount, GetProfileRequest, HostedAuthLink, HostedAuthRedirects, InviteRequest, LinkedInEngager, LinkedInEvent, LinkedInInfra, LinkedInPost, LinkedInProfile, MessageRequest, PostEngagersRequest, ProfilePostsRequest, SearchPostsRequest, SendOutcome, WebhookSetupResult, LinkedInFollower, ListFollowersRequest, ThreadMessageEvent, ThreadMessagesRequest } from "./types";
 
 /** Per-request ceiling for provider calls. */
 const PROVIDER_TIMEOUT_MS = 60_000;
@@ -163,6 +163,10 @@ function ownMessageEcho(p: Record<string, unknown>, eventId: string, connectedAc
     body,
     sentAt,
   };
+}
+
+function eventTime(e: ThreadMessageEvent): string {
+  return e.type === "reply" ? e.receivedAt : e.sentAt;
 }
 
 /** Resolve the new connection's profile URL from a `new_relation` payload across Unipile encodings. */
@@ -720,6 +724,44 @@ export class UnipileLinkedInInfra implements LinkedInInfra {
     } catch {
       return { connected: false, distance: null };
     }
+  }
+
+  async listThreadMessages(req: ThreadMessagesRequest): Promise<ThreadMessageEvent[]> {
+    const account = encodeURIComponent(req.connectedAccountId);
+    const chats = await this.call<{ items?: unknown }>(
+      `/api/v1/chat_attendees/${encodeURIComponent(req.attendeeProviderRef)}/chats?account_id=${account}&limit=5`,
+      { method: "GET" }
+    );
+    // The account filter is a request hint; re-check it so another seat's thread never leaks in.
+    const chat = (Array.isArray(chats.items) ? (chats.items as Record<string, unknown>[]) : []).find(
+      (c) => str(c.account_id) === req.connectedAccountId && str(c.id)
+    );
+    if (!chat) return [];
+    const limit = Math.min(250, Math.max(1, req.limit));
+    const data = await this.call<{ items?: unknown }>(
+      `/api/v1/chats/${encodeURIComponent(str(chat.id)!)}/messages?limit=${limit}`,
+      { method: "GET" }
+    );
+    const ref = req.attendeeProviderRef;
+    const profileUrl = profileUrlFromId(ref);
+    const name = str(chat.name);
+    const events: ThreadMessageEvent[] = [];
+    for (const raw of Array.isArray(data.items) ? (data.items as Record<string, unknown>[]) : []) {
+      // message_id is the webhook's key too — the shared idempotency key across both paths
+      const id = str(raw.id) ?? str(raw.message_id);
+      const body = str(raw.text);
+      const at = str(raw.timestamp);
+      if (!id || !body || !at) continue;
+      if (raw.is_event === 1 || raw.is_event === true || raw.deleted === 1 || raw.deleted === true) continue;
+      const identity = { fromProviderRef: ref, fromPublicIdentifier: null, fromName: name };
+      if (isOwnMessage(raw)) {
+        events.push({ type: "outbound_echo", providerEventId: id, connectedAccountRef: req.connectedAccountId, toProfileUrl: profileUrl, ...identity, body, sentAt: at });
+      } else {
+        events.push({ type: "reply", providerEventId: id, connectedAccountRef: req.connectedAccountId, fromProfileUrl: profileUrl, ...identity, body, receivedAt: at });
+      }
+    }
+    // the provider pages newest-first; a thread replays in the order it was written
+    return events.sort((a, b) => eventTime(a).localeCompare(eventTime(b)));
   }
 
   async setupWebhook(requestUrl: string): Promise<WebhookSetupResult> {

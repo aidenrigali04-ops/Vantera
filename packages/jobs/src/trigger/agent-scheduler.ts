@@ -1,4 +1,4 @@
-import { logger, schedules, tasks } from "@trigger.dev/sdk";
+import { idempotencyKeys, logger, schedules, tasks } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
 import { createPgStore } from "../pipeline/pg-store";
 import { isHeldForOnboarding } from "../pipeline/onboarding-hold";
@@ -10,7 +10,8 @@ import { computeNextRunAt } from "../pipeline/schedule";
  * dispatches its own run task.
  *
  * Also fires the account-health reconcile, the reply-backlog safeguard, the lifecycle-outreach
- * tick, the trial-ending heads-up, and the pull-back email each run (plain tasks piggybacking
+ * tick, the trial-ending heads-up, the pull-back email each run, and the hourly LinkedIn thread
+ * sync (plain tasks piggybacking
  * this cron: the plan's schedule quota is at 10/10 — an 11th schedule fails every deploy).
  */
 export const agentScheduler = schedules.task({
@@ -37,6 +38,12 @@ export const agentScheduler = schedules.task({
     await tasks.trigger("lifecycle-outreach", {});
     await tasks.trigger("trial-ending", {});
     await tasks.trigger("pullback-email", {});
+    // hourly: the key dedupes the four ticks inside one UTC hour down to a single run. GLOBAL
+    // scope — a raw string key inside a task is scoped to this tick's run and would dedupe nothing.
+    const threadSyncKey = await idempotencyKeys.create(`thread-sync:${now.toISOString().slice(0, 13)}`, {
+      scope: "global",
+    });
+    await tasks.trigger("thread-sync", {}, { idempotencyKey: threadSyncKey });
     logger.info("agent scheduler tick", { due: due.length });
     return { triggered: due.length };
   },

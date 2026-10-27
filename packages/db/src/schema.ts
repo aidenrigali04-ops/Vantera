@@ -231,6 +231,9 @@ export const leads = pgTable(
     // Written at send time (resolved for the provider call anyway) and backfilled whenever a
     // fallback match succeeds; the PRIMARY reply-attribution key from then on. Service-role only.
     linkedinProviderRef: text("linkedin_provider_ref"),
+    // 0073: when this lead's LinkedIn thread was last reconciled against the provider (the
+    // webhook-independent thread sync rotates oldest-first). Service-role only.
+    linkedinThreadSyncedAt: timestamp("linkedin_thread_synced_at", { withTimezone: true }),
     // 0034: sticky sender — the LinkedIn account assigned to send this lead's whole
     // sequence (multi-sender distribution, rule 04/13). Null until the first invite.
     linkedinAccountId: uuid("linkedin_account_id").references(() => linkedinAccounts.id, {
@@ -802,6 +805,34 @@ export const replies = pgTable(
     index("replies_lead_idx").on(t.leadId),
     index("replies_campaign_idx").on(t.campaignId),
     index("replies_outreach_send_idx").on(t.outreachSendId),
+  ]
+);
+
+// 0073: messages the account owner typed natively in LinkedIn, mirrored into the lead's thread.
+// Deliberately not scheduled_sends — they are not Vantera sends and must never count as one.
+export const nativeMessages = pgTable(
+  "native_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id").notNull(),
+    channel: text("channel", { enum: ["linkedin"] }).notNull().default("linkedin"),
+    providerMessageRef: text("provider_message_ref").notNull(),
+    body: text("body").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("native_messages_provider_message_ref_idx").on(t.accountId, t.providerMessageRef),
+    index("native_messages_lead_idx").on(t.leadId, t.sentAt),
+    index("native_messages_account_sent_idx").on(t.accountId, t.sentAt.desc()),
+    foreignKey({
+      columns: [t.leadId, t.accountId],
+      foreignColumns: [leads.id, leads.accountId],
+      name: "native_messages_lead_same_account",
+    }).onDelete("cascade"),
   ]
 );
 
