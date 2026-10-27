@@ -60,9 +60,10 @@ export function DealSizeForm({ tile, className }: { tile: ActionTileSpec; classN
               name="dealValue"
               inputMode="numeric"
               autoComplete="off"
-              placeholder="5,000"
+              placeholder="2,500"
               aria-invalid={error ? true : undefined}
               aria-describedby={`${inputId}-hint`}
+              title="Whole dollars"
               className={cn(
                 "h-7 w-full rounded-[var(--r-btn)] bg-[var(--surface-2)] pl-5 pr-2 font-mono text-[13px] text-[var(--ink)] ring-1 ring-[var(--line)] placeholder:text-[var(--ink-dim)]",
                 FOCUS_RING,
@@ -81,7 +82,7 @@ export function DealSizeForm({ tile, className }: { tile: ActionTileSpec; classN
           </button>
         </span>
         <span id={`${inputId}-hint`} role={error ? "alert" : undefined} className={cn("block truncate text-[12px] leading-4", error ? "text-[var(--danger)]" : "text-[var(--ink-dim)]")}>
-          {error ?? tile.meta}
+          {error ?? `${tile.meta} · whole dollars`}
         </span>
       </span>
     </form>

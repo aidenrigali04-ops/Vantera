@@ -130,6 +130,12 @@ describe("tilesFor — the deal-size ask", () => {
     expect(t.map((x) => x.kind)).toEqual(["deal_size"]);
     expect(primaryFor(t)).toBeNull();
   });
+  it("the primary skips an inline-form ask and mirrors the next real tile", () => {
+    const t = tilesFor(inputs({ drafts: 0, repliesWaiting: 0 }), extras({ avgDealValueCents: null, repliesTotal: 1, crmHandoff: { leadName: "Maya" } }));
+    expect(t.map((x) => x.kind)).toEqual(["deal_size", "crm_handoff"]);
+    expect(primaryFor(t)).toEqual({ label: "Route wins to your CRM", count: null, href: "/settings/integrations" });
+    expect(primaryFor(t.slice(0, 1))).toBeNull();
+  });
 });
 
 describe("primaryFor", () => {

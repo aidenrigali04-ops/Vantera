@@ -66,8 +66,11 @@ export async function setDealValue(formData: FormData): Promise<{ ok: true } | {
     .select("id");
   if (error) return { ok: false, message: "Could not save that. Please try again." };
   if (!data || data.length === 0) return { ok: false, message: "Only an admin can set this." };
+  // every surface that reads avg_deal_value_cents
   revalidatePath("/today");
   revalidatePath("/dashboard");
+  revalidatePath("/settings");
+  revalidatePath("/prospects");
   return { ok: true };
 }
 

@@ -10,7 +10,7 @@ describe("parseDealValue", () => {
   });
   it("rejects empty, zero, decimals and words", () => {
     for (const raw of ["", "  ", "0", "12.5", "abc", "-5"]) {
-      expect(parseDealValue(raw)).toEqual({ ok: false, message: "Enter a dollar amount." });
+      expect(parseDealValue(raw)).toEqual({ ok: false, message: "Enter a whole-dollar amount." });
     }
   });
   it("accepts the bounds", () => {

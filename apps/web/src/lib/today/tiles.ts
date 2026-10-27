@@ -320,10 +320,16 @@ function dedupe(tiles: ActionTileSpec[]): ActionTileSpec[] {
   });
 }
 
-/** The primary (ink) button mirrors the top tile; hidden when the row is empty. The deal-size
- *  ask is an inline form on its tile — never the primary. */
+/** An ask answered by a form on its own tile (the deal-size input) — never mirrored into the
+ *  primary/greeting button, which can only navigate or resume. */
+export function isInlineForm(tile: ActionTileSpec): boolean {
+  return tile.inline === "deal_size";
+}
+
+/** The primary (ink) button mirrors the top tile (skipping inline-form asks); hidden when
+ *  nothing is left. */
 export function primaryFor(tiles: ActionTileSpec[]): { label: string; count: number | null; href: string; inline?: "resume" } | null {
-  const top = tiles.find((t) => t.kind !== "deal_size");
+  const top = tiles.find((t) => !isInlineForm(t));
   if (!top) return null;
   switch (top.kind) {
     case "drafts":
