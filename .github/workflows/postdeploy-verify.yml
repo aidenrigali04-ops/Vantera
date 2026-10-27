@@ -19,15 +19,50 @@ jobs:
         # www is the canonical live host — the apex 308-redirects to it at the Vercel domain
         # level, and curl without -L never follows, so polling apex is permanently red.
         # -L stays as belt-and-braces in case the redirect direction ever flips.
+        #
+        # When VERCEL_TOKEN is set, a stale domain is DIAGNOSED instead of guessed at: the
+        # production deployment for this SHA is looked up, and a failed BLOCKING deployment check
+        # (an integration's check — 2026-10 incident: a "Trigger.dev Build" check from a Vercel
+        # integration linked to the wrong project blocked every promotion for a week) or a failed
+        # build fails this job immediately with the exact cause.
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: team_2414VGOTAUQdYdR9HpyDBwyb
+          VERCEL_PROJECT_ID: prj_NcqSD8fGZsbO01OJ5onpKJNP8deh
         run: |
           SHA="${{ github.event.workflow_run.head_sha }}"
           echo "expecting $SHA on https://www.vanterasystem.dev/api/version"
+          api() { curl -fsS --max-time 15 -H "Authorization: Bearer $VERCEL_TOKEN" "https://api.vercel.com$1"; }
+          diagnose() {
+            [ -n "$VERCEL_TOKEN" ] || return 0
+            dep=$(api "/v6/deployments?teamId=$VERCEL_TEAM_ID&projectId=$VERCEL_PROJECT_ID&target=production&sha=$SHA&limit=5" \
+              | jq -r '[.deployments[] | select(.source != "redeploy")][0] // empty | "\(.uid) \(.state)"') || return 0
+            [ -n "$dep" ] || return 0
+            read -r dep_id dep_state <<< "$dep"
+            if [ "$dep_state" = "ERROR" ] || [ "$dep_state" = "CANCELED" ]; then
+              echo "::error::Vercel production build for $SHA is $dep_state ($dep_id) — fix the build; nothing to promote."
+              exit 1
+            fi
+            blocked=$(api "/v1/deployments/$dep_id/checks?teamId=$VERCEL_TEAM_ID" \
+              | jq -r '.checks[]? | select(.blocking == true and .status == "completed"
+                  and (.conclusion | IN("succeeded","neutral","skipped") | not)) | "\(.name) (\(.conclusion))"') || return 0
+            if [ -n "$blocked" ]; then
+              echo "::error::Vercel is holding $dep_id off the production domain — blocking deployment check failed: $blocked. A Vercel integration's check must never gate promotion (rule 10): fix or disconnect that integration, then promote $dep_id."
+              exit 1
+            fi
+          }
           for i in $(seq 1 40); do
             live=$(curl -fsSL --max-time 10 https://www.vanterasystem.dev/api/version | jq -r .sha || echo "")
             if [ "$live" = "$SHA" ]; then echo "live ✓"; exit 0; fi
-            echo "attempt $i: live=$live — waiting 30s"; sleep 30
+            echo "attempt $i: live=$live — waiting 30s"
+            # builds take ~1 min; from the 4th attempt on, a READY-but-unserved deployment has a cause
+            if [ "$i" -ge 4 ]; then diagnose; fi
+            sleep 30
           done
-          echo "::error::production never served $SHA — Vercel alias likely pinned; run vercel promote"
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::warning::VERCEL_TOKEN secret not set — can't name the cause. Check the deployment's Checks tab in Vercel."
+          fi
+          echo "::error::production never served $SHA — check the Vercel deployment's blocking checks, or a pinned alias (run vercel promote)"
           exit 1
 
   verify-jobs:
