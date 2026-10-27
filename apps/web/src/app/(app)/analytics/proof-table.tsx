@@ -31,17 +31,23 @@ function Th({ children, first, last }: { children: React.ReactNode; first?: bool
   );
 }
 
-function GroupRow({ label }: { label: string }) {
+/** One <tbody> per group; the header cell names the row group for assistive tech. */
+function GroupBody({ label, rows, prefix }: { label: string; rows: ProofRow[]; prefix: string }) {
   return (
-    <tr className="border-t border-[var(--line)] first:border-t-0">
-      <th
-        scope="colgroup"
-        colSpan={COLUMNS.length + 1}
-        className="px-3 pb-1.5 pt-4 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:px-4"
-      >
-        {label}
-      </th>
-    </tr>
+    <tbody className="border-t border-[var(--line)] first-of-type:border-t-0">
+      <tr>
+        <th
+          scope="rowgroup"
+          colSpan={COLUMNS.length + 1}
+          className="px-3 pb-1.5 pt-4 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:px-4"
+        >
+          {label}
+        </th>
+      </tr>
+      {rows.map((r) => (
+        <Row key={`${prefix}-${r.key}`} row={r} />
+      ))}
+    </tbody>
   );
 }
 
@@ -76,8 +82,11 @@ export function ProofTable({
   return (
     <section>
       <Eyebrow>Where prospects come from</Eyebrow>
-      <div className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface)]">
-        <table className="w-full table-fixed text-sm">
+      {/* Phones scroll the table sideways; from lg the container stays overflow-visible so the
+          sticky thead keeps working against the page's lg scroll region. */}
+      <div className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] max-lg:overflow-x-auto lg:overflow-visible">
+        <table className="w-full min-w-[600px] table-fixed text-sm">
+          <caption className="sr-only">Where prospects come from</caption>
           <thead className="sticky top-0 z-10 text-[11px] uppercase tracking-wide text-muted-foreground">
             <tr>
               <Th first>Source</Th>
@@ -88,16 +97,10 @@ export function ProofTable({
               ))}
             </tr>
           </thead>
-          <tbody>
-            {groups.map((g) => [
-              <GroupRow key={`g-${g.group}`} label={g.label} />,
-              ...g.rows.map((r) => <Row key={`${g.group}-${r.key}`} row={r} />),
-            ])}
-            {agents.length > 0 && [
-              <GroupRow key="g-agents" label="Agents" />,
-              ...agents.map((r) => <Row key={`agent-${r.key}`} row={r} />),
-            ]}
-          </tbody>
+          {groups.map((g) => (
+            <GroupBody key={g.group} label={g.label} rows={g.rows} prefix={g.group} />
+          ))}
+          {agents.length > 0 && <GroupBody label="Agents" rows={agents} prefix="agent" />}
         </table>
       </div>
       <p className="mt-2.5 text-xs text-muted-foreground">

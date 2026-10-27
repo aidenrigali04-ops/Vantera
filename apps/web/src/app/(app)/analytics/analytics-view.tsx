@@ -35,11 +35,11 @@ export function AnalyticsView({ proof, roi, hasValue, outreach }: Props) {
       {/* Where outreach leaks + the single biggest opportunity. Null until there's outreach. */}
       <OutreachDiagnosis vm={outreach} />
 
-      {found === 0 ? (
+      {!show.funnel ? (
         <EmptyLeads />
       ) : (
         <div className="space-y-6">
-          {show.funnel && <ProofFunnel funnel={proof.funnel} nonMonotonic={proof.nonMonotonic} />}
+          <ProofFunnel funnel={proof.funnel} nonMonotonic={proof.nonMonotonic} />
           {show.sources && <ProofTable sources={proof.sources} agents={proof.agents} capped={proof.capped} />}
           {show.dollars ? <DollarsStrip roi={roi} /> : show.dollarsHint && <DollarsHint missing={show.dollarsHint} />}
         </div>
