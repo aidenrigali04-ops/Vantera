@@ -127,8 +127,14 @@ async function queueView(supabase: Supabase, page: number, per: number, draft: s
 
   // An empty queue after real reviews is a finish line, not a blank page: it gets its own
   // "all caught up" state with the next places to go (only read when the queue is empty).
+  // "All caught up" is a page-1 verdict only: an emptied later page (its last row was handled,
+  // drafts still sit on earlier pages) just says so — the client adds the link back to page 1.
   let emptyState: React.ReactNode = null;
-  if (q.rows.length === 0) {
+  if (q.rows.length === 0 && page > 1) {
+    emptyState = (
+      <Panel className="py-10 text-center text-sm text-muted-foreground">This page is empty.</Panel>
+    );
+  } else if (q.rows.length === 0) {
     const { count: reviewed } = await supabase
       .from("scheduled_sends")
       .select("id", { count: "exact", head: true })

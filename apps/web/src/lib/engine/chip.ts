@@ -34,6 +34,11 @@ export function chipFor(s: EngineState, now: Date): ChipState {
   const healthy = healthySenders(s.senders);
   if (healthy.some((x) => x.invitesToday + x.messagesToday > 0)) {
     const sent = healthy.reduce((n, x) => n + x.invitesToday, 0);
+    if (sent === 0) {
+      // a messages-only day: never "0 of N invites today"
+      const messages = healthy.reduce((n, x) => n + x.messagesToday, 0);
+      return base("running", "Sending", `${messages} ${messages === 1 ? "message" : "messages"} today`, null);
+    }
     const allowed = healthy.reduce((n, x) => n + capUsage(x).invitesAllowed, 0);
     return base("running", "Sending", `${sent} of ${allowed} invites today`, null);
   }

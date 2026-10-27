@@ -15,6 +15,7 @@ export type TileKind =
   | "sender_disconnected"
   | "sender_restricted"
   | "payment_failed"
+  | "subscription_ended"
   | "drafts"
   | "replies"
   | "needs_human"

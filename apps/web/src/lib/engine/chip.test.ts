@@ -63,6 +63,19 @@ describe("chipFor — precedence", () => {
     expect(c).toMatchObject({ dot: "running", label: "Sending", detail: `7 of ${capUsage(s).invitesAllowed} invites today` });
   });
 
+  it("5b. a messages-only day reads as messages, never '0 of N invites'", () => {
+    const one = chipFor(state({ senders: [senderFixture({ invitesToday: 0, messagesToday: 1 })], agents: [liveScout] }), now);
+    expect(one).toMatchObject({ dot: "running", label: "Sending", detail: "1 message today" });
+    const many = chipFor(
+      state({
+        senders: [senderFixture({ id: "a", invitesToday: 0, messagesToday: 3 }), senderFixture({ id: "b", invitesToday: 0, messagesToday: 2 })],
+        agents: [liveScout],
+      }),
+      now
+    );
+    expect(many.detail).toBe("5 messages today");
+  });
+
   it("6. a live Prospect/Intent agent → finding prospects with the next run", () => {
     const c = chipFor(state({ agents: [liveScout] }), now);
     expect(c).toMatchObject({

@@ -51,7 +51,7 @@ Nothing shows here for a new account; it appears once there's real evidence (rou
 
 Open any prospect and tell your agent what you think with **Good fit** or **Not a fit**. Any workspace member can do this.
 
-- **Not a fit** (you can add a reason, which is optional) keeps that person out of your outreach — your agent won't draft a message for them — and teaches the scoring to rank similar people lower.
+- **Not a fit** (you can add a reason, which is optional) keeps that person out of your outreach — your agent won't draft a message for them, and a draft already waiting in Approvals is withdrawn (when a workspace admin marks it; otherwise an admin can reject it there) — and teaches the scoring to rank similar people lower.
 - **Good fit** teaches it to look for more people like this one.
 - Changed your mind? **Undo** clears it, and a "Not a fit" prospect becomes eligible for outreach again.
 

@@ -51,7 +51,7 @@ describe("blockersFor", () => {
   });
 
   it("never returns a non-blocker kind", () => {
-    const allowed = new Set(["sender_disconnected", "sender_restricted", "payment_failed", "sender_missing", "engine_paused"]);
+    const allowed = new Set(["sender_disconnected", "sender_restricted", "payment_failed", "subscription_ended", "sender_missing", "engine_paused"]);
     const tiles = blockersFor(
       state({
         senders: [],
@@ -61,5 +61,24 @@ describe("blockersFor", () => {
       now
     );
     expect(tiles.every((t) => allowed.has(t.kind))).toBe(true);
+  });
+
+  it("a canceled or never-started subscription → subscription_ended (Restart → billing), before the pause", () => {
+    for (const status of ["canceled", "none"] as const) {
+      const tiles = blockersFor(
+        state({ billing: { status, plan: "none", pastDueSince: null, canceledAt: null }, pausedAt: now.toISOString() }),
+        now
+      );
+      expect(tiles.map((t) => t.kind)).toEqual(["subscription_ended", "engine_paused"]);
+      expect(tiles[0]).toMatchObject({ title: "Subscription ended", href: "/settings/billing", priority: 0, tone: "billing" });
+      expect(tiles[0]?.meta).toMatch(/^Restart/);
+    }
+  });
+
+  it("active, trialing and past-due workspaces show no subscription_ended tile", () => {
+    for (const status of ["active", "trialing", "past_due"] as const) {
+      const kinds = blockersFor(state({ billing: { status, plan: "growth", pastDueSince: null, canceledAt: null } }), now).map((t) => t.kind);
+      expect(kinds).not.toContain("subscription_ended");
+    }
   });
 });

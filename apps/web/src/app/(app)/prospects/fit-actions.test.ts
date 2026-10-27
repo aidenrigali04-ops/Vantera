@@ -1,23 +1,41 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Recording Supabase fake — the builder surface setLeadFit uses.
-type Call = { table: string; op: string; values?: Record<string, unknown>; opts?: Record<string, unknown> };
+type Call = {
+  table: string;
+  op: string;
+  values?: Record<string, unknown>;
+  opts?: Record<string, unknown>;
+  filters: Array<[string, unknown]>;
+};
 const calls: Call[] = [];
+const revalidated: string[] = [];
+let canceledRows: unknown = [{ id: "s1" }];
+let cancelError: unknown = null;
 
 function makeClient() {
   return {
     auth: { getUser: async () => ({ data: { user: { id: "user-1" } } }) },
     from(table: string) {
-      const call: Call = { table, op: "select" };
+      const call: Call = { table, op: "select", filters: [] };
       const settle = () => {
         calls.push(call);
         if (table === "accounts") return Promise.resolve({ data: { id: "acc1" }, error: null });
+        if (table === "scheduled_sends") return Promise.resolve({ data: canceledRows, error: cancelError });
         return Promise.resolve({ data: null, error: null });
       };
       const builder: Record<string, unknown> = {
         select: () => builder,
         limit: () => builder,
-        eq: () => builder,
+        eq: (col: string, val: unknown) => {
+          call.filters.push([col, val]);
+          return builder;
+        },
+        update: (v: Record<string, unknown>) => {
+          call.op = "update";
+          call.values = v;
+          return builder;
+        },
         delete: () => {
           call.op = "delete";
           return builder;
@@ -37,7 +55,7 @@ function makeClient() {
 }
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => makeClient() }));
-vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+vi.mock("next/cache", () => ({ revalidatePath: (p: string) => revalidated.push(p) }));
 
 const { setLeadFit } = await import("./fit-actions");
 
@@ -48,8 +66,13 @@ function form(fields: Record<string, string>): FormData {
 }
 const upsert = () => calls.find((c) => c.table === "lead_feedback" && c.op === "upsert");
 
+const cancel = () => calls.find((c) => c.table === "scheduled_sends" && c.op === "update");
+
 beforeEach(() => {
   calls.length = 0;
+  revalidated.length = 0;
+  canceledRows = [{ id: "s1" }];
+  cancelError = null;
 });
 
 describe("setLeadFit reason", () => {
@@ -80,5 +103,26 @@ describe("setLeadFit reason", () => {
     const res = await setLeadFit({}, form({ leadId: "l1", verdict: "clear" }));
     expect(res).toEqual({ verdict: null });
     expect(calls.some((c) => c.table === "lead_feedback" && c.op === "delete")).toBe(true);
+  });
+});
+
+describe("setLeadFit not_fit withdraws a queued draft", () => {
+  it("cancels this lead's pending_review drafts and revalidates the queues", async () => {
+    const res = await setLeadFit({}, form({ leadId: "l1", verdict: "not_fit" }));
+    expect(res).toEqual({ verdict: "not_fit" });
+    expect(cancel()?.values).toEqual({ status: "canceled" });
+    expect(cancel()?.filters).toEqual(expect.arrayContaining([["lead_id", "l1"], ["status", "pending_review"]]));
+    expect(revalidated).toEqual(expect.arrayContaining(["/prospects", "/approvals", "/today"]));
+  });
+
+  it("0 rows canceled (nothing queued, or a non-admin member) is normal — the verdict still saves", async () => {
+    canceledRows = [];
+    expect(await setLeadFit({}, form({ leadId: "l1", verdict: "not_fit" }))).toEqual({ verdict: "not_fit" });
+  });
+
+  it("good_fit and clear never touch the queue", async () => {
+    await setLeadFit({}, form({ leadId: "l1", verdict: "good_fit" }));
+    await setLeadFit({}, form({ leadId: "l1", verdict: "clear" }));
+    expect(cancel()).toBeUndefined();
   });
 });
