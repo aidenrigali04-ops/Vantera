@@ -12,6 +12,8 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { RunNowButton } from "./run-now";
 import { runLine, type AgentRunRow, type Attention } from "./agent-health";
 import { useUntil } from "@/lib/use-until";
+import { MiniFunnel } from "./mini-funnel";
+import type { MiniStage } from "./card-funnel";
 
 /* Each agent gets the landing's pastel icon tile (components/landing/frame.tsx TONES). */
 const KIND_TILE = {
@@ -48,6 +50,8 @@ export function AgentCard({
   nextRunLabel,
   nextRunTitle = null,
   lastRanLabel = null,
+  funnel = null,
+  funnelEmpty,
 }: {
   agent: AgentRow;
   roleLabel: string;
@@ -64,6 +68,10 @@ export function AgentCard({
   nextRunTitle?: string | null;
   /** server-formatted "5h ago" of last_run_at */
   lastRanLabel?: string | null;
+  /** UX-3: this agent's own mini funnel (card-funnel.ts), computed server-side */
+  funnel?: MiniStage[] | null;
+  /** shown under the funnel when every stage is zero */
+  funnelEmpty?: string;
 }) {
   const [state, action] = useActionState<AgentActionState, FormData>(setAgentStatus, {});
   const [modeState, switchMode, switchingMode] = useActionState<AgentActionState, FormData>(
@@ -177,6 +185,14 @@ export function AgentCard({
             </div>
           ))}
         </div>
+        {funnel && funnel.length > 0 && (
+          <MiniFunnel
+            stages={funnel}
+            label={`${agent.name} funnel`}
+            empty={funnelEmpty}
+            className="border-t border-[var(--hairline)] pt-3"
+          />
+        )}
         {(agent.kind === "scout" || agent.kind === "intent") && (
           <div className="flex flex-col gap-1">
             {/* T4: the work itself — what the last recorded run actually did. */}

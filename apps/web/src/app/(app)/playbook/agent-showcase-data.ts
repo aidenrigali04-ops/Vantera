@@ -2,6 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { agentAttention, runLine, type AgentRunRow, type Attention } from "./agent-health";
 import { fmtDayTime, fmtUntil } from "@/lib/today/metrics";
 import { safeZone } from "@/lib/today/sender-facts";
+import { loadCardFunnels } from "./card-funnel-data";
+import type { CardFunnels, MiniStage } from "./card-funnel";
+import { buildActivityFeed, type ActivityItem } from "./activity-feed";
 
 export type ShowcaseKind = "scout" | "copy" | "intent";
 
@@ -37,6 +40,20 @@ export type ShowcaseAgent = {
   lastRanLabel: string | null;
   /** T4: the last few recorded runs, newest first, server-formatted */
   runHistory: { agoLabel: string; line: string }[];
+  /** UX-3: this agent's own mini funnel (card-funnel.ts) */
+  funnel: MiniStage[];
+  funnelEmpty: string;
+};
+
+/** UX-3: the narrated account-wide activity feed, server-formatted. */
+export type ShowcaseActivity = ActivityItem & { agoLabel: string };
+
+export type AgentShowcaseData = { agents: ShowcaseAgent[]; activity: ShowcaseActivity[] };
+
+const FUNNEL_EMPTY: Record<ShowcaseKind, string> = {
+  scout: "No prospects found yet",
+  intent: "No run yet",
+  copy: "Nothing sent yet",
 };
 
 type AgentDbRow = {
@@ -106,8 +123,14 @@ function agoLabel(iso: string): string {
 function toShowcaseAgent(
   row: AgentDbRow,
   counts: { sourced: number; qualified: number; drafts: number },
-  health: { attention: Attention; runHistory: { agoLabel: string; line: string }[] }
+  base: {
+    attention: Attention;
+    runHistory: { agoLabel: string; line: string }[];
+    funnels: CardFunnels;
+  }
 ): ShowcaseAgent {
+  const { funnels, ...rest } = base;
+  const health = { ...rest, funnel: funnels[row.kind], funnelEmpty: FUNNEL_EMPTY[row.kind] };
   const icpNames = (row.agent_icps ?? [])
     .sort((a, b) => a.position - b.position)
     .map((l) => l.icps?.name)
@@ -218,11 +241,11 @@ function toShowcaseAgent(
   };
 }
 
-/** Loads both agents (whichever exist) plus the real pipeline counts behind them. */
-export async function loadAgentShowcase(): Promise<ShowcaseAgent[]> {
+/** Loads the agents (whichever exist), the real pipeline counts behind them, and the activity feed. */
+export async function loadAgentShowcase(): Promise<AgentShowcaseData> {
   const supabase = await createClient();
 
-  const [{ data: agents }, { count: sourced }, { count: qualified }, { count: drafts }, { data: runRows }, { count: liActive }] =
+  const [{ data: agents }, { count: sourced }, { count: qualified }, { count: drafts }, { data: runRows }, { count: liActive }, funnels, { data: account }] =
     await Promise.all([
       supabase
         .from("agents")
@@ -254,6 +277,8 @@ export async function loadAgentShowcase(): Promise<ShowcaseAgent[]> {
         .from("linkedin_accounts")
         .select("id", { count: "exact", head: true })
         .eq("status", "active"),
+      loadCardFunnels(supabase), // UX-3: the one proof read for this request
+      supabase.from("accounts").select("website_scanned_at").maybeSingle<{ website_scanned_at: string | null }>(),
     ]);
 
   const counts = { sourced: sourced ?? 0, qualified: qualified ?? 0, drafts: drafts ?? 0 };
@@ -264,7 +289,17 @@ export async function loadAgentShowcase(): Promise<ShowcaseAgent[]> {
     runsByAgent.set(r.agent_id, list);
   }
 
-  return ((agents as AgentDbRow[] | null) ?? []).map((row) => {
+  const rows = (agents as AgentDbRow[] | null) ?? [];
+  // No timestamp records when the buyer profile was drafted, so that item stays out (null).
+  const activity = buildActivityFeed({
+    websiteScannedAt: account?.website_scanned_at ?? null,
+    icpDraftedAt: null,
+    agents: rows.map((r) => ({ kind: r.kind, deployed_at: r.deployed_at })),
+    runs: runRows ?? [],
+    now: new Date(),
+  }).map((i) => ({ ...i, agoLabel: agoLabel(i.at) }));
+
+  const showcase = rows.map((row) => {
     const runs = runsByAgent.get(row.id) ?? [];
     return toShowcaseAgent(row, counts, {
       attention: agentAttention({
@@ -275,6 +310,8 @@ export async function loadAgentShowcase(): Promise<ShowcaseAgent[]> {
         lastRun: runs[0] ?? null,
       }),
       runHistory: runs.map((r) => ({ agoLabel: agoLabel(r.started_at), line: runLine(r) })),
+      funnels,
     });
   });
+  return { agents: showcase, activity };
 }

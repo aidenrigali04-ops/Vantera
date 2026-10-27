@@ -1,0 +1,51 @@
+import type { ProofModel, ProofRow } from "@/lib/proof/types";
+
+/** One step of a Playbook card's mini funnel; pct is vs the previous stage (null when it is 0). */
+export type MiniStage = { label: string; count: number; pct: number | null };
+
+/** The latest completed intent run's `agent_runs.summary`, or null before any run. */
+export type RunFacts = {
+  intentSummary: { observed?: number; intent?: number; qualified?: number } | null;
+};
+
+export type CardFunnels = { scout: MiniStage[]; intent: MiniStage[]; copy: MiniStage[] };
+
+const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+
+function chain(steps: [label: string, count: number][]): MiniStage[] {
+  return steps.map(([label, count], i) => {
+    const prev = i === 0 ? null : steps[i - 1][1];
+    return { label, count, pct: prev === null || prev === 0 ? null : Math.round((count / prev) * 100) };
+  });
+}
+
+/**
+ * Per-agent mini funnels for the Playbook cards. Every stage is per-agent and honest:
+ * Scout reads its own attribution row (found → contacted → replied), Outreach reads the
+ * outreach row, and Intent reads the latest run's own summary — the account-wide
+ * "qualified" stage is never passed off as one agent's work.
+ */
+export function cardFunnels(proof: ProofModel, runs: RunFacts): CardFunnels {
+  const row = (key: string): ProofRow | undefined => proof.agents.find((r) => r.key === key);
+  const scout = row("agent:scout");
+  const out = row("agent:outreach");
+  const s = runs.intentSummary;
+  return {
+    scout: chain([
+      ["Found", num(scout?.found)],
+      ["Contacted", num(scout?.contacted)],
+      ["Replied", num(scout?.replied)],
+    ]),
+    intent: chain([
+      ["Observed", num(s?.observed)],
+      ["Intent", num(s?.intent)],
+      ["Qualified", num(s?.qualified)],
+    ]),
+    copy: chain([
+      ["Contacted", num(out?.contacted)],
+      ["Accepted", num(out?.accepted)],
+      ["Replied", num(out?.replied)],
+      ["Interested", num(out?.interested)],
+    ]),
+  };
+}

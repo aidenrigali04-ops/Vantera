@@ -5,7 +5,7 @@ import { AgentShowcase } from "../agent-showcase";
 export const metadata = { title: "Prospect sourcing" };
 
 export default async function ScoutAgentPage() {
-  const agents = await loadAgentShowcase();
+  const { agents, activity } = await loadAgentShowcase();
   if (!agents.some((a) => a.kind === "scout")) redirect("/playbook");
-  return <AgentShowcase agents={agents} initialKind="scout" />;
+  return <AgentShowcase agents={agents} activity={activity} initialKind="scout" />;
 }
