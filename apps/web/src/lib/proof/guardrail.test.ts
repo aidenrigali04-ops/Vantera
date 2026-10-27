@@ -9,6 +9,7 @@ describe("proof own-rows guardrail (rule 02)", () => {
   });
 
   it.each(["load.ts", "build.ts", "sources.ts"])("%s never names an account id (RLS scopes)", (f) => {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- f is one of three fixed sibling filenames above
     const src = readFileSync(join(__dirname, f), "utf8");
     expect(src).not.toMatch(/account_?id/i);
   });

@@ -108,6 +108,14 @@ describe("sources", () => {
     expect(rowOf(i, "intent:removed").found).toBe(1);
     expect(rowOf(i, "intent:removed").group).toBe("intent");
   });
+  it("unlisted target: removed with a present watch, unattributed with watch null", () => {
+    const obs = { leads: [lead("A")], observations: [{ lead_id: "A", watch_target: "old" }] };
+    expect(rowOf({ ...empty(), ...obs, watch }, "intent:removed").found).toBe(1);
+    const m = buildProof({ ...empty(), ...obs, watch: null });
+    for (const r of m.sources.filter((x) => x.group === "intent")) expect(r.found).toBe(0);
+    expect(m.sources.find((r) => r.key === "none")!.found).toBe(1);
+    expect(watchCategory("old", null)).toBeNull();
+  });
   it("watchCategory normalises", () => {
     expect(watchCategory(" REVENUE ops ", watch)).toBe("keywords");
     expect(watchCategory("ai", watch)).toBe("hashtags");

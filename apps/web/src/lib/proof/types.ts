@@ -1,4 +1,6 @@
 export const PROOF_ROW_CAP = 5000;
+/** PostgREST max-rows (Supabase default; prod has no role override) — reads page at this size. */
+export const PROOF_PAGE_SIZE = 1000;
 export type ProofStageKey =
   | "found" | "qualified" | "contacted" | "accepted"
   | "replied" | "interested" | "meetings" | "closed";

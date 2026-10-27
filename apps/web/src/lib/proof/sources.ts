@@ -38,9 +38,10 @@ export function watchCategory(
   target: string | null,
   watch: ProofInput["watch"]
 ): Category | null {
-  if (target === null) return null;
+  // No config (no intent agent, or its read failed) attributes nothing: "removed" is only
+  // meaningful against a PRESENT watch list.
+  if (target === null || !watch) return null;
   const t = norm(target);
-  if (!watch) return "removed";
   if (watch.keywords.some((k) => norm(k) === t)) return "keywords";
   if (watch.competitors.some((k) => norm(k) === t)) return "competitors";
   const tag = (s: string) => norm(s).replace(/^#/, "");
@@ -95,7 +96,7 @@ export function sourceRows(input: ProofInput, sets: LeadSets): ProofRow[] {
   const withObs = new Set<string>();
   for (const o of input.observations) {
     if (!ids.has(o.lead_id)) continue;
-    // A null target is not a watch row: skip it (lead falls to its signal rows or "none").
+    // A null target, or no watch config, is not a watch row: skip it (lead falls to its signal rows or "none").
     const cat = watchCategory(o.watch_target, input.watch);
     if (cat === null) continue;
     withObs.add(o.lead_id);
