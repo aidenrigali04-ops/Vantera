@@ -18,7 +18,7 @@ LinkedIn outreach goes out in two steps, so drafts come in pairs: a **connection
 
 - **Approve** (**A**) — the draft is cleared to send.
 - **Edit** (**E**) — change the message. The style check re-runs automatically.
-- **Regenerate** (**G**) — the agent writes a fresh version. Type a note in the box first to steer it, for example "Make it shorter, lead with the hiring signal" (up to 280 characters), or leave it empty for a new take. Regenerate works on drafts the agent wrote as part of a sequence (including follow-ups); reply and hand-written drafts show why it's off.
+- **Regenerate** (**G**) — the agent writes a fresh version. Type a note in the box first to steer it, for example "Make it shorter, lead with the hiring signal" (up to 280 characters), or leave it empty for a new take. Regenerate works on first-touch drafts (the invite and its first message); follow-ups, replies and hand-written drafts show why it's off.
 - **Reject** (**R**) — drop the draft. Pick a quick reason (*Wrong person*, *Bad timing*, *Weak message*, or *Other*); rejections teach your agent who and what to avoid.
 - **Decline & never contact** — in the draft's overflow menu. It drops the draft and adds the contact to your suppression list so no agent messages them again.
 

@@ -30,7 +30,7 @@ Click any prospect to open a **side peek** without losing your place in the list
 - **Why this rank** — what lifted or lowered the score.
 - **Why this prospect** — the AI's rationale, pain points, and buying triggers.
 - **Company** — firmographics and their LinkedIn profile.
-- **Message** — the queued draft. Read it, edit it while it's waiting for review, or regenerate it with a note to steer the rewrite, right from the peek.
+- **Message** — the queued draft. Read it, edit it while it's waiting for review, or, for a first-touch draft (the invite and its first message), regenerate it with a note to steer the rewrite, right from the peek.
 - **Fit** — **Good fit** or **Not a fit**, with an optional reason (see below).
 - **CRM** — the connection status and any record created.
 - **Notes** — a link to the full brief, where notes live.

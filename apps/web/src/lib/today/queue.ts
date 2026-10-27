@@ -1,4 +1,5 @@
 import { CONNECTION_NOTE_MAX_CHARS, FOLLOWUP_MAX_CHARS } from "@vantera/agent-brains";
+import { isRegenerable } from "@/lib/copy/regenerable";
 import { fmtRelative, fmtSendSlot, initials, nextSendWindow } from "./metrics";
 import type { QueueRow, QueueStep } from "./rows";
 import { healthySenders } from "./state";
@@ -28,6 +29,8 @@ export interface QueueSendIn {
   style_flags: string | null;
   linkedin_stage: "invite" | "message" | null;
   origin: "sequence" | "reply_response" | "manual" | null;
+  /** the recipe stamp (`brain` names the brain that drafted it); null on hand-written drafts */
+  recipe?: unknown;
   created_at: string;
   leads: QueueLeadIn | null;
 }
@@ -111,6 +114,7 @@ export function buildQueueRows(args: {
       styleFlags: d.style_flags,
       channel: "linkedin",
       origin: d.origin ?? "sequence",
+      regenerable: isRegenerable(d.recipe),
       evidence: [
         ...(lead?.ai_insights?.triggers ?? []).slice(0, 2).map((t) => ({ text: t })),
         ...(lead?.ai_insights?.pain_points ?? []).slice(0, 2).map((t) => ({ text: t })),

@@ -31,6 +31,8 @@ export interface QueueRow {
   styleFlags: string | null;
   channel: "linkedin";
   origin: "sequence" | "reply_response" | "manual";
+  /** true only for first-touch drafts (the invite and its first message) — gates Regenerate */
+  regenerable: boolean;
   /** the peek's evidence bullets (≤ 4): signals + the rank's pain points / triggers */
   evidence: Array<{ text: string; href?: string }>;
   /** the rank's one-line rationale */

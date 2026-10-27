@@ -14,6 +14,7 @@ import {
 import { getModel } from "@vantera/ai";
 import { createClient } from "@/lib/supabase/server";
 import { buildFirstTouchDraftInput } from "@/lib/copy/first-touch-input";
+import { isRegenerable } from "@/lib/copy/regenerable";
 import { normalizeSuppressionValue } from "@/lib/suppression";
 import { parseDraftEdit } from "./validation";
 
@@ -203,18 +204,19 @@ export async function regenerateDraft(sendId: string, steer: string): Promise<Re
 
   const { data: send } = await supabase
     .from("scheduled_sends")
-    .select("id, lead_id, linkedin_stage, origin, status")
+    .select("id, lead_id, linkedin_stage, status, recipe")
     .eq("id", sendId)
     .eq("status", "pending_review")
     .maybeSingle<{
       id: string;
       lead_id: string;
       linkedin_stage: "invite" | "message" | null;
-      origin: string | null;
       status: string;
+      recipe: unknown;
     }>();
   if (!send) return { error: "That draft was already handled." };
-  if (send.origin !== "sequence") return { error: "Regenerate works on first-touch drafts only." };
+  // Only the first-touch brain's drafts: follow-ups and replies are thread-aware (I1).
+  if (!isRegenerable(send.recipe)) return { error: "Only first-touch drafts can be regenerated." };
 
   const input = await buildFirstTouchDraftInput(supabase, send.lead_id);
   if (!input) return { error: "Couldn't load this prospect's context." };

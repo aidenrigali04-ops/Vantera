@@ -69,7 +69,7 @@ beforeEach(() => {
   calls.length = 0;
   revalidated.length = 0;
   updatedRows = [{ id: "s1" }];
-  sendRow = { id: "s1", lead_id: "l1", linkedin_stage: "invite", origin: "sequence", status: "pending_review" };
+  sendRow = { id: "s1", lead_id: "l1", linkedin_stage: "invite", origin: "sequence", status: "pending_review", recipe: { brain: "first_touch" } };
   regen.mockReset();
   buildInput.mockReset();
   buildInput.mockResolvedValue({ lead: {}, insights: {}, context: {} });
@@ -108,9 +108,19 @@ describe("approveDraft", () => {
 });
 
 describe("regenerateDraft", () => {
-  it("refuses non-first-touch drafts", async () => {
-    sendRow = { ...sendRow!, origin: "reply_response" };
-    expect(await regenerateDraft("s1", "")).toEqual({ error: "Regenerate works on first-touch drafts only." });
+  it("refuses reply responses (no first-touch recipe)", async () => {
+    sendRow = { ...sendRow!, origin: "reply_response", recipe: { brain: "reply" } };
+    expect(await regenerateDraft("s1", "")).toEqual({ error: "Only first-touch drafts can be regenerated." });
+    expect(regen).not.toHaveBeenCalled();
+  });
+  it("refuses sequence follow-ups even though their origin is 'sequence'", async () => {
+    sendRow = { ...sendRow!, linkedin_stage: "message", recipe: { brain: "sequence_followup" } };
+    expect(await regenerateDraft("s1", "")).toEqual({ error: "Only first-touch drafts can be regenerated." });
+    expect(regen).not.toHaveBeenCalled();
+  });
+  it("refuses hand-written drafts (no recipe)", async () => {
+    sendRow = { ...sendRow!, origin: "manual", recipe: null };
+    expect(await regenerateDraft("s1", "")).toEqual({ error: "Only first-touch drafts can be regenerated." });
     expect(regen).not.toHaveBeenCalled();
   });
   it("errors when the draft is not pending", async () => {

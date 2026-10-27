@@ -21,6 +21,7 @@ import { HOT_MIN_SCORE } from "./lead-value";
 import { cn } from "@/lib/utils";
 import { parseReadout, reasonsForLead, whatsWorking } from "@/lib/learning/readout";
 import { fitVerdictFromRows } from "@/lib/learning/fit";
+import { isRegenerable } from "@/lib/copy/regenerable";
 import { WhatsWorkingStrip } from "./whats-working";
 import { PageHeader, SEGMENT_TRACK, segmentClass } from "@/components/app/surface";
 
@@ -233,7 +234,7 @@ export default async function LeadsPage({
       .order("observed_at", { ascending: false }),
     supabase
       .from("scheduled_sends")
-      .select("id, lead_id, body, status, linkedin_stage, origin, style_flags")
+      .select("id, lead_id, body, status, linkedin_stage, origin, style_flags, recipe")
       .in("lead_id", ids)
       .in("status", ["pending_review", "approved", "scheduled"])
       .order("created_at", { ascending: false }),
@@ -253,12 +254,13 @@ export default async function LeadsPage({
   }
   type Draft = NonNullable<LeadRow["queued_draft"]>;
   const draftByLead = new Map<string, Draft>();
-  for (const d of draftsRes.error ? [] : ((draftsRes.data ?? []) as (Draft & { lead_id: string })[])) {
+  type DraftRaw = Omit<Draft, "regenerable"> & { lead_id: string; recipe: unknown };
+  for (const d of draftsRes.error ? [] : ((draftsRes.data ?? []) as DraftRaw[])) {
     // newest first → keep the first seen per lead
     if (!draftByLead.has(d.lead_id)) {
-      const { lead_id: _leadId, ...draft } = d;
+      const { lead_id: _leadId, recipe, ...draft } = d;
       void _leadId;
-      draftByLead.set(d.lead_id, draft);
+      draftByLead.set(d.lead_id, { ...draft, regenerable: isRegenerable(recipe) });
     }
   }
   const withReasons = <T extends { id: string }>(rows: T[]) =>

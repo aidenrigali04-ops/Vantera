@@ -24,6 +24,7 @@ function send(id: string, o: Partial<QueueSendIn> & { score?: number; acct?: str
     style_flags: null,
     linkedin_stage: o.linkedin_stage ?? "invite",
     origin: o.origin ?? "sequence",
+    recipe: o.recipe === undefined ? { brain: "first_touch" } : o.recipe,
     created_at: "2026-10-26T10:00:00Z",
     leads: {
       id: `lead-${id}`,
@@ -42,6 +43,21 @@ function send(id: string, o: Partial<QueueSendIn> & { score?: number; acct?: str
 const base = { signals: [], downSenderIds: new Set<string>(), now, timeZone: "UTC", senders };
 
 describe("buildQueueRows", () => {
+  it("marks only first-touch drafts regenerable (follow-ups, replies, hand-written are not)", () => {
+    const rows = buildQueueRows({
+      ...base,
+      limit: null,
+      sends: [
+        send("ft"),
+        send("fu", { linkedin_stage: "message", recipe: { brain: "sequence_followup" } }),
+        send("re", { origin: "reply_response", linkedin_stage: "message", recipe: { brain: "reply" } }),
+        send("hw", { origin: "manual", recipe: null }),
+      ],
+    });
+    const by = new Map(rows.map((r) => [r.id, r.regenerable]));
+    expect(Object.fromEntries(by)).toEqual({ ft: true, fu: false, re: false, hw: false });
+  });
+
   it("labels how long ago each draft was written (server-formatted, the client never touches Date)", () => {
     const rows = buildQueueRows({ ...base, limit: null, sends: [send("a")] });
     expect(rows[0].drafted).toBe("5h");

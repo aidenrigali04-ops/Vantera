@@ -157,7 +157,7 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
     supabase
       .from("scheduled_sends")
       .select(
-        "id, lead_id, body, style_flags, linkedin_stage, origin, created_at, leads(id, first_name, last_name, title, company_name, location, ai_score, ai_rationale, ai_insights, linkedin_url, status, linkedin_account_id)"
+        "id, lead_id, body, style_flags, linkedin_stage, origin, recipe, created_at, leads(id, first_name, last_name, title, company_name, location, ai_score, ai_rationale, ai_insights, linkedin_url, status, linkedin_account_id)"
       )
       .eq("status", "pending_review")
       .order("created_at", { ascending: true })

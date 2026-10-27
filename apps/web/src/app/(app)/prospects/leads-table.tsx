@@ -75,6 +75,8 @@ export interface LeadRow {
     linkedin_stage: string | null;
     origin: string | null;
     style_flags: unknown;
+    /** first-touch drafts only (the invite and its first message) — gates Regenerate */
+    regenerable: boolean;
   } | null;
   fit_reason?: string | null;
   why_now?: WhyNowCell;
@@ -802,7 +804,7 @@ export function LeadsTable({
           fullProfileHref={`/prospects/${peek.lead.id}`}
           initialSection={peek.section}
           onRegenerate={
-            peek.lead.queued_draft?.origin === "sequence" && peek.lead.queued_draft.status === "pending_review"
+            peek.lead.queued_draft?.regenerable && peek.lead.queued_draft.status === "pending_review"
               ? (id, steer) => regenerateDraft(id, steer)
               : undefined
           }

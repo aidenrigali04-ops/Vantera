@@ -9,6 +9,7 @@ import { DraftPreview } from "./draft-preview";
 import { applyIfCurrent, nextAfterRemoval, type AfterRemoval } from "./peek-result";
 import { REJECT_REASON_ORDER, REJECT_REASONS, type RejectReason } from "./work-card/reject-reasons";
 import type { QueueRow } from "@/lib/today/rows";
+import { regenerateOffReason } from "@/lib/copy/regenerable";
 import { fixDraft, regenerateDraft, saveDraftEdit, type RegenerateResult, type ReviewActionState } from "@/app/(app)/approvals/actions";
 import { trackFirstDraftApproved } from "@/lib/analytics/activation";
 import { approveFromToday, rejectDraftWithReason, undoApproveDraft, undoRejectDraft } from "@/app/(app)/today/actions";
@@ -37,8 +38,6 @@ const STEER_MAX = 280;
 
 /** a thrown action (network drop) reads as an error result, so in-flight state always clears */
 const failed = (): { error: string } => ({ error: "Something went wrong. Try again." });
-
-const REGEN_FIRST_TOUCH_ONLY = "Regenerate works on first-touch drafts only.";
 
 type Outcome = "approved" | "rejected" | "suppressed";
 type DraftText = { body: string; styleFlags: string | null };
@@ -106,7 +105,8 @@ export function DraftPeek({
     () => (row ? (texts[row.id] ?? { body: row.body, styleFlags: row.styleFlags }) : null),
     [row, texts]
   );
-  const canRegenerate = row?.origin === "sequence";
+  const regenOff = row ? regenerateOffReason(row) : null;
+  const canRegenerate = row !== null && regenOff === null;
   const doing: Inflight | undefined = row ? inflight[row.id] : undefined;
   /** this draft has a call in flight — every action on it waits */
   const locked = doing !== undefined;
@@ -297,7 +297,7 @@ export function DraftPeek({
   const regenerate = useCallback(async () => {
     if (!row || locked) return;
     if (!canRegenerate) {
-      setError(REGEN_FIRST_TOUCH_ONLY);
+      setError(regenOff ?? "Only first-touch drafts can be regenerated.");
       return;
     }
     const id = row.id;
@@ -315,7 +315,7 @@ export function DraftPeek({
     }
     store(id, { body: live.body, styleFlags: live.styleFlags ?? null });
     toast("New draft ready — give it a read.");
-  }, [row, locked, canRegenerate, steer, begin, end, store]);
+  }, [row, locked, canRegenerate, regenOff, steer, begin, end, store]);
 
   // keyboard
   useEffect(() => {
@@ -496,7 +496,7 @@ export function DraftPeek({
           )}
 
           {/* steer + regenerate */}
-          <div className="mt-4" title={canRegenerate ? undefined : REGEN_FIRST_TOUCH_ONLY}>
+          <div className="mt-4" title={regenOff ?? undefined}>
             <label htmlFor={`steer-${row.id}`} className="mb-1.5 block text-[12px] font-medium text-[var(--ink-dim)]">
               Steer a rewrite (optional)
             </label>
@@ -522,7 +522,7 @@ export function DraftPeek({
                 type="button"
                 onClick={() => void regenerate()}
                 disabled={!canRegenerate || locked}
-                title={canRegenerate ? undefined : REGEN_FIRST_TOUCH_ONLY}
+                title={regenOff ?? undefined}
                 className="inline-flex h-8 items-center gap-1.5 rounded-[var(--r-btn)] px-3 text-[13px] font-medium text-[var(--ink)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)] disabled:opacity-40"
               >
                 {doing === "regenerate" ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" strokeWidth={1.75} />}
