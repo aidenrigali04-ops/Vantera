@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // updateIntentAgent: RLS-scoped update of the account's one intent row. An RLS-refused write
 // (non-admin) returns 0 rows, not an error — that must surface as the admin-only message.
 let updated: unknown = [{ id: "a1" }];
+let dbError: unknown = null;
 const revalidated: string[] = [];
 const filters: Array<[string, unknown]> = [];
 const payloads: Record<string, unknown>[] = [];
@@ -20,7 +21,7 @@ vi.mock("@/lib/supabase/server", () => ({
     auth: { getUser: async () => ({ data: { user: { id: "u1" } } }) },
     from: (table: string) => {
       const b: Record<string, unknown> = {
-        select: () => (table === "agents" ? Promise.resolve({ data: updated, error: null }) : b),
+        select: () => (table === "agents" ? Promise.resolve({ data: updated, error: dbError }) : b),
         limit: () => b,
         maybeSingle: async () => ({ data: { id: "acct1", onboarding_icp: null } }),
         update: (payload: Record<string, unknown>) => (payloads.push(payload), b),
@@ -50,6 +51,7 @@ function form(overrides: Record<string, string> = {}) {
 
 beforeEach(() => {
   updated = [{ id: "a1" }];
+  dbError = null;
   revalidated.length = 0;
   filters.length = 0;
   payloads.length = 0;
@@ -84,6 +86,14 @@ describe("updateIntentAgent", () => {
   it("a non-admin (0 rows back) gets the admin-only error and nothing revalidates", async () => {
     updated = [];
     expect(await updateIntentAgent({}, form())).toEqual({ error: "Only an admin can change this agent." });
+    expect(revalidated).toEqual([]);
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it("a database error reads as a retry, not as the admin message", async () => {
+    updated = null;
+    dbError = { message: "boom" };
+    expect(await updateIntentAgent({}, form())).toEqual({ error: "Could not save changes. Please try again." });
     expect(revalidated).toEqual([]);
     expect(redirectMock).not.toHaveBeenCalled();
   });

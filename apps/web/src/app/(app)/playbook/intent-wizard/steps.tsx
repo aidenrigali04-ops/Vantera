@@ -137,6 +137,7 @@ export function ReviewStep({
   runAtTime,
   timezone,
   editing,
+  paused,
 }: {
   name: string;
   watchCount: number;
@@ -146,6 +147,7 @@ export function ReviewStep({
   runAtTime: string;
   timezone: string;
   editing: boolean;
+  paused: boolean;
 }) {
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
@@ -158,7 +160,11 @@ export function ReviewStep({
       <dt className="text-muted-foreground">Schedule</dt>
       <dd>Every {cadence === "daily" ? "day" : cadence === "intraday" ? "6 hours" : "week"} at {runAtTime} ({timezone})</dd>
       <dt className="text-muted-foreground">{editing ? "Next run" : "First run"}</dt>
-      <dd>within 15 minutes of {editing ? "saving" : "deploy"}</dd>
+      <dd>
+        {editing && paused
+          ? "Runs resume when you unpause the agent."
+          : `within 15 minutes of ${editing ? "saving" : "deploy"}`}
+      </dd>
     </dl>
   );
 }

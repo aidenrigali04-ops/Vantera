@@ -15,7 +15,16 @@ const STEPS = ["Name", "Watch", "Schedule", "Deploy"] as const;
 /** The saved agent, when the wizard edits a deployed Intent agent instead of deploying one. */
 export type IntentWizardEdit = IntentFormValues;
 
-export function IntentWizard({ scoutName, edit }: { scoutName: string; edit?: IntentWizardEdit }) {
+export function IntentWizard({
+  scoutName,
+  edit,
+  paused = false,
+}: {
+  scoutName: string;
+  edit?: IntentWizardEdit;
+  /** edit only: a paused agent doesn't run on save — the review step says so */
+  paused?: boolean;
+}) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState(edit?.name ?? "");
   const [creators, setCreators] = useState<string[]>(edit?.watch.creators ?? []);
@@ -164,6 +173,7 @@ export function IntentWizard({ scoutName, edit }: { scoutName: string; edit?: In
             runAtTime={runAtTime}
             timezone={timezone}
             editing={Boolean(edit)}
+            paused={paused}
           />
         )}
 

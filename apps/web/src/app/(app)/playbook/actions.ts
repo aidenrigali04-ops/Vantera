@@ -477,7 +477,8 @@ export async function updateIntentAgent(
     .eq("account_id", account.id)
     .eq("kind", "intent")
     .select("id");
-  if (error || !rows || rows.length === 0) return { error: "Only an admin can change this agent." };
+  if (error) return { error: "Could not save changes. Please try again." };
+  if (!rows || rows.length === 0) return { error: "Only an admin can change this agent." };
 
   revalidatePath("/playbook");
   revalidatePath("/playbook/intent");
