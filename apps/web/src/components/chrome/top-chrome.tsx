@@ -1,7 +1,7 @@
 "use client";
 
 import type { AppNotification } from "@/components/notifications/notifications-bell";
-import type { ChipState, EngineGroups } from "@/lib/engine/chip";
+import type { ChipState, EngineGroups } from "@/lib/engine/chip-state";
 import { AvatarTile } from "./avatar-tile";
 import { CommandPalette } from "./command-palette";
 import { EnginePopover, type GroupAction } from "./engine-popover";

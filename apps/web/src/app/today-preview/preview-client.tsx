@@ -33,8 +33,8 @@ export function PreviewClient({ state, tab }: { state: PreviewStateKey; tab: "qu
         resumeEngine={noopEngine}
         chip={
           view.paused
-            ? { dot: "paused", label: "Paused by you", detail: "Resume", href: null, nextRunAt: null, nextRunTitle: null }
-            : { dot: "running", label: "Sending", detail: "12 of 25 invites today", href: null, nextRunAt: null, nextRunTitle: null }
+            ? { dot: "paused", label: "Paused by you", detail: "Resume", href: null, nextRunAt: null, untilLabel: null, nextRunTitle: null }
+            : { dot: "running", label: "Sending", detail: "12 of 25 invites today", href: null, nextRunAt: null, untilLabel: null, nextRunTitle: null }
         }
         groups={{ sourcing: view.paused ? "paused" : "live", outreach: view.paused ? "paused" : "live" }}
         setAgentGroup={noopEngine}

@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef } from "react";
-import type { ChipDot, ChipState } from "@/lib/engine/chip";
+import { chipDetail, type ChipDot, type ChipState } from "@/lib/engine/chip-state";
 import { useUntil } from "@/lib/use-until";
 import { cn } from "@/lib/utils";
 import { CHROME_FOCUS, CHROME_MOTION, CHROME_PILL } from "./tile";
@@ -37,8 +37,8 @@ export function ChipDotGlyph({ dot, className }: { dot: ChipDot; className?: str
 
 /** The chip's detail, re-ticked every 60s when it is a "next run …" countdown. */
 export function useChipDetail(chip: ChipState): string | null {
-  const until = useUntil(chip.nextRunAt, chip.detail ?? "");
-  return chip.nextRunAt ? `next run ${until}` : chip.detail;
+  const until = useUntil(chip.nextRunAt, chip.untilLabel ?? "");
+  return chipDetail(chip, until);
 }
 
 export type StatusChipProps = {

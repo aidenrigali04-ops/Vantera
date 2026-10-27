@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { agentAttention, runLine, type AgentRunRow } from "./agent-health";
 import { fmtDayTime, fmtUntil } from "@/lib/today/metrics";
+import { safeZone } from "@/lib/today/sender-facts";
 
 export type ShowcaseKind = "scout" | "copy" | "intent";
 
@@ -100,16 +101,6 @@ function agoLabel(iso: string): string {
   const hrs = Math.round(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.round(hrs / 24)}d ago`;
-}
-
-/** The agent's configured timezone when valid, else UTC (fmtDayTime throws on a bad zone). */
-function safeZone(tz: string | null | undefined): string {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: tz ?? "UTC" });
-    return tz ?? "UTC";
-  } catch {
-    return "UTC";
-  }
 }
 
 function toShowcaseAgent(

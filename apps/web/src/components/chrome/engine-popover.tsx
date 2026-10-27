@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState, useTransition } from "
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Pause, Play } from "lucide-react";
-import type { ChipState, EngineGroups, GroupState } from "@/lib/engine/chip";
+import type { ChipState, EngineGroups, GroupState } from "@/lib/engine/chip-state";
 import { cn } from "@/lib/utils";
 import { StatusChip, useChipDetail } from "./status-chip";
 import { CHROME_FOCUS, CHROME_MENU, CHROME_MENU_ITEM, CHROME_MOTION } from "./tile";
@@ -147,6 +147,7 @@ export function EnginePopover({
               state={groups[group]}
               busy={busy === group}
               disabled={busy !== null}
+              lockedHint={paused ? "Resume everything first" : null}
               onToggle={(next) => run(group, () => setAgentGroup(group, next))}
             />
           ))}
@@ -197,6 +198,7 @@ function GroupSwitch({
   state,
   busy,
   disabled,
+  lockedHint,
   onToggle,
 }: {
   title: string;
@@ -204,16 +206,22 @@ function GroupSwitch({
   state: GroupState;
   busy: boolean;
   disabled: boolean;
+  /** set while the engine is paused: the switch is locked and this explains why */
+  lockedHint: string | null;
   onToggle: (next: "live" | "paused") => void;
 }) {
   const on = state === "live";
   const none = state === "none";
   const labelId = useId();
+  const hintId = useId();
+  const hint = none ? `${sub} · not set up` : lockedHint ? `${sub} · ${lockedHint}` : sub;
   return (
     <div className="flex min-h-12 items-center gap-3 rounded-[var(--r-btn)] px-2.5 py-1.5">
       <div id={labelId} className="min-w-0 flex-1">
         <p className="text-sm text-[var(--ink)]">{title}</p>
-        <p className="truncate text-[12px] text-[var(--ink-dim)]">{none ? `${sub} · not set up` : sub}</p>
+        <p id={hintId} className="truncate text-[12px] text-[var(--ink-dim)]">
+          {hint}
+        </p>
       </div>
       <button
         type="button"
@@ -221,8 +229,9 @@ function GroupSwitch({
         data-engine-control
         aria-checked={on}
         aria-labelledby={labelId}
+        aria-describedby={hintId}
         aria-busy={busy || undefined}
-        disabled={disabled || none}
+        disabled={disabled || none || lockedHint !== null}
         onClick={() => onToggle(on ? "paused" : "live")}
         className={cn(
           "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full disabled:cursor-default disabled:opacity-50",

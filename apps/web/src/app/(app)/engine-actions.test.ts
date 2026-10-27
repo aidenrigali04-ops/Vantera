@@ -99,6 +99,7 @@ describe("pauseEngine", () => {
     const [agents] = updates("agents");
     expect(agents?.values).toEqual({ status: "paused" });
     expect(agents?.filters).toContainEqual(["eq", "status", "live"]);
+    expect(agents?.filters).toContainEqual(["eq", "account_id", "acct-1"]);
 
     expect(revalidated).toContainEqual(["/", "layout"]);
     expect(revalidated).toContainEqual(["/today", undefined]);
@@ -120,6 +121,13 @@ describe("pauseEngine", () => {
     expect(revalidated).toHaveLength(0);
   });
 
+  it("account paused but the agents write failed → a specific partial-failure error", async () => {
+    admin([{ id: "a1", kind: "scout", status: "live" }]);
+    const base = respond;
+    respond = (c) => (c.table === "agents" && c.op === "update" ? { data: null, error: { message: "boom" } } : base(c));
+    expect((await pauseEngine()).error).toBe("Paused the account but couldn't pause the agents — try again.");
+  });
+
   it("no session → error, no writes", async () => {
     user = null;
     admin([]);
@@ -139,7 +147,15 @@ describe("resumeEngine", () => {
     const [agents] = updates("agents");
     expect(agents?.values).toEqual({ status: "live" });
     expect(agents?.filters).toContainEqual(["eq", "status", "paused"]);
+    expect(agents?.filters).toContainEqual(["eq", "account_id", "acct-1"]);
     expect(revalidated).toContainEqual(["/", "layout"]);
+  });
+
+  it("account resumed but the agents write failed → a specific partial-failure error", async () => {
+    admin([{ id: "a1", kind: "scout", status: "paused" }]);
+    const base = respond;
+    respond = (c) => (c.table === "agents" && c.op === "update" ? { data: null, error: { message: "boom" } } : base(c));
+    expect((await resumeEngine()).error).toBe("Resumed the account but couldn't resume the agents — try again.");
   });
 
   it("non-admin → error", async () => {
@@ -165,6 +181,8 @@ describe("setAgentGroup", () => {
     const [write] = updates("agents");
     expect(write?.values).toEqual({ status: "paused" });
     expect(write?.filters).toContainEqual(["in", "id", ["s", "i"]]);
+    expect(write?.filters).toContainEqual(["eq", "account_id", "acct-1"]);
+    expect(read?.filters).toContainEqual(["eq", "account_id", "acct-1"]);
 
     expect(revalidated).toEqual(expect.arrayContaining([["/", "layout"], ["/playbook", undefined], ["/today", undefined]]));
   });

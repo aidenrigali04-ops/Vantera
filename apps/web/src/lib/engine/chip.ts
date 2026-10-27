@@ -1,6 +1,7 @@
 import { capUsage, fmtDayTime, fmtUntil } from "@/lib/today/metrics";
 import { downSenders, healthySenders } from "@/lib/today/state";
 import type { EngineState } from "./build";
+import type { ChipDot, ChipState, EngineGroups, GroupState } from "./chip-state";
 
 /**
  * The chrome's run-state chip (UX-2 Task 9) — what the engine is doing right now, in one
@@ -9,32 +10,13 @@ import type { EngineState } from "./build";
  * client receives only this serializable result.
  */
 
-export type ChipDot = "running" | "attention" | "stopped" | "paused";
-
-export interface ChipState {
-  dot: ChipDot;
-  label: string;
-  detail: string | null;
-  href: string | null;
-  /** set only for "Finding prospects": the client re-ticks `next run {fmtUntil}` from it */
-  nextRunAt: string | null;
-  /** absolute next run in the account timezone ("Thu 10:30am") for the hover title */
-  nextRunTitle: string | null;
-}
-
-/** Each popover switch: on, off, or nothing deployed in that group. */
-export type GroupState = "live" | "paused" | "none";
-export interface EngineGroups {
-  /** Prospect + Intent agents */
-  sourcing: GroupState;
-  /** Outreach agent */
-  outreach: GroupState;
-}
+export type { ChipDot, ChipState, EngineGroups, GroupState } from "./chip-state";
+export { chipDetail } from "./chip-state";
 
 const SOURCING = new Set(["scout", "intent"]);
 
 function base(dot: ChipDot, label: string, detail: string | null, href: string | null): ChipState {
-  return { dot, label, detail, href, nextRunAt: null, nextRunTitle: null };
+  return { dot, label, detail, href, nextRunAt: null, untilLabel: null, nextRunTitle: null };
 }
 
 export function chipFor(s: EngineState, now: Date): ChipState {
@@ -62,9 +44,11 @@ export function chipFor(s: EngineState, now: Date): ChipState {
     .sort((a, b) => (a === null ? -1 : b === null ? 1 : new Date(a).getTime() - new Date(b).getTime()));
   if (next.length > 0) {
     const at = next[0] ?? null;
+    const until = fmtUntil(at, now);
     return {
-      ...base("running", "Finding prospects", `next run ${fmtUntil(at, now)}`, null),
+      ...base("running", "Finding prospects", `next run ${until}`, null),
       nextRunAt: at,
+      untilLabel: until,
       nextRunTitle: at ? `Next run ${fmtDayTime(new Date(at), s.timeZone)}` : null,
     };
   }

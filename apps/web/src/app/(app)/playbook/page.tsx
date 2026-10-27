@@ -7,6 +7,7 @@ import { AgentCard, type AgentRow } from "./agent-card";
 import { agentAttention, type AgentRunRow } from "./agent-health";
 import { PageHeader } from "@/components/app/surface";
 import { fmtDayTime, fmtUntil } from "@/lib/today/metrics";
+import { safeZone } from "@/lib/today/sender-facts";
 
 export const metadata = { title: "Playbook" };
 
@@ -19,16 +20,6 @@ function agoLabel(iso: string | null): string | null {
   const hrs = Math.round(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.round(hrs / 24)}d ago`;
-}
-
-/** The agent's configured timezone when valid, else UTC (fmtDayTime throws on a bad zone). */
-function safeZone(tz: string | null | undefined): string {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: tz ?? "UTC" });
-    return tz ?? "UTC";
-  } catch {
-    return "UTC";
-  }
 }
 
 export default async function AgentsPage({

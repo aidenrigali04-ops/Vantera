@@ -16,15 +16,20 @@ export interface SendTodayRaw {
   scheduled_sends: { linkedin_stage: string | null } | null;
 }
 
-/** The account timezone: the Prospect agent's configured zone, else UTC. */
-export function accountTimeZone(agents: Array<{ kind: string; timezone: string | null }>): string {
-  const tz = agents.find((a) => a.kind === "scout")?.timezone ?? agents[0]?.timezone ?? "UTC";
+/** `tz` when it is a valid IANA zone, else UTC (Intl formatters throw on a bad zone). */
+export function safeZone(tz: string | null | undefined): string {
+  if (!tz) return "UTC";
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: tz });
     return tz;
   } catch {
     return "UTC";
   }
+}
+
+/** The account timezone: the Prospect agent's configured zone, else UTC. */
+export function accountTimeZone(agents: Array<{ kind: string; timezone: string | null }>): string {
+  return safeZone(agents.find((a) => a.kind === "scout")?.timezone ?? agents[0]?.timezone ?? "UTC");
 }
 
 /** Per-sender facts (caps, warmup age, status) from the sender rows + today's/this week's sends. */

@@ -44,7 +44,7 @@ async function sessionClient(): Promise<{ supabase: SupabaseClient; accountId: s
   return { supabase, accountId: account.id };
 }
 
-async function setEnginePaused(paused: boolean, failure: string): Promise<EngineResult> {
+async function setEnginePaused(paused: boolean, failure: string, partial: string): Promise<EngineResult> {
   const session = await sessionClient();
   if (!session) return { error: failure };
   const { supabase, accountId } = session;
@@ -62,10 +62,14 @@ async function setEnginePaused(paused: boolean, failure: string): Promise<Engine
   const { error: agentsError } = await supabase
     .from("agents")
     .update({ status: paused ? "paused" : "live" })
+    .eq("account_id", accountId) // defense in depth on top of RLS
     .eq("status", paused ? "live" : "paused")
     .select("id")
     .returns<{ id: string }[]>();
-  if (agentsError) return { error: failure };
+  if (agentsError) {
+    revalidateEngineSurfaces(); // the account half did land — show it
+    return { error: partial };
+  }
 
   revalidateEngineSurfaces();
   return {};
@@ -73,12 +77,20 @@ async function setEnginePaused(paused: boolean, failure: string): Promise<Engine
 
 /** Stop sourcing, drafting, and sending for the session's workspace. */
 export async function pauseEngine(): Promise<EngineResult> {
-  return setEnginePaused(true, `Could not pause the engine. ${ADMIN_ONLY}`);
+  return setEnginePaused(
+    true,
+    `Could not pause the engine. ${ADMIN_ONLY}`,
+    "Paused the account but couldn't pause the agents — try again."
+  );
 }
 
 /** Pick sourcing, drafting, and sending back up. */
 export async function resumeEngine(): Promise<EngineResult> {
-  return setEnginePaused(false, `Could not resume the engine. ${ADMIN_ONLY}`);
+  return setEnginePaused(
+    false,
+    `Could not resume the engine. ${ADMIN_ONLY}`,
+    "Resumed the account but couldn't resume the agents — try again."
+  );
 }
 
 const GROUP_KINDS = { sourcing: ["scout", "intent"], outreach: ["copy"] } as const;
@@ -93,11 +105,12 @@ export async function setAgentGroup(group: "sourcing" | "outreach", status: "liv
   const failure = `Could not update ${group === "sourcing" ? "sourcing" : "outreach"}. ${ADMIN_ONLY}`;
   const session = await sessionClient();
   if (!session) return { error: failure };
-  const { supabase } = session;
+  const { supabase, accountId } = session;
 
   const { data: agents, error: readError } = await supabase
     .from("agents")
     .select("id, status")
+    .eq("account_id", accountId)
     .in("kind", [...GROUP_KINDS[group]])
     .returns<{ id: string; status: string }[]>();
   if (readError) return { error: failure };
@@ -108,6 +121,7 @@ export async function setAgentGroup(group: "sourcing" | "outreach", status: "liv
   const { data: updated, error } = await supabase
     .from("agents")
     .update({ status })
+    .eq("account_id", accountId) // defense in depth on top of RLS
     .in("id", ids)
     .select("id")
     .returns<{ id: string }[]>();

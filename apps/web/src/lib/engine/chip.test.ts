@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { capUsage } from "@/lib/today/metrics";
 import { senderFixture } from "@/lib/today/tiles";
-import { chipFor, groupsFor } from "./chip";
+import { chipDetail, chipFor, groupsFor } from "./chip";
 import type { EngineState } from "./build";
 
 const now = new Date("2026-10-26T15:00:00Z");
@@ -65,7 +65,13 @@ describe("chipFor — precedence", () => {
 
   it("6. a live Prospect/Intent agent → finding prospects with the next run", () => {
     const c = chipFor(state({ agents: [liveScout] }), now);
-    expect(c).toMatchObject({ dot: "running", label: "Finding prospects", detail: "next run in ~3h", nextRunAt: liveScout.nextRunAt });
+    expect(c).toMatchObject({
+      dot: "running",
+      label: "Finding prospects",
+      detail: "next run in ~3h",
+      untilLabel: "in ~3h",
+      nextRunAt: liveScout.nextRunAt,
+    });
     expect(c.nextRunTitle).toBeTruthy();
   });
 
@@ -107,5 +113,23 @@ describe("groupsFor", () => {
     expect(
       groupsFor(state({ agents: [{ kind: "copy", status: "paused", nextRunAt: null, lastRunAt: null }] }))
     ).toEqual({ sourcing: "none", outreach: "paused" });
+  });
+});
+
+describe("chipDetail — the one composition of the detail line", () => {
+  it("with a next run: 'next run' appears exactly once, server label then the re-ticked one", () => {
+    const c = chipFor(state({ agents: [liveScout] }), now);
+    expect(chipDetail(c)).toBe("next run in ~3h");
+    expect(chipDetail(c, "in ~2h")).toBe("next run in ~2h");
+    expect(chipDetail(c)?.match(/next run/g)).toHaveLength(1);
+  });
+
+  it("without a next run: the server detail as-is (or null)", () => {
+    expect(chipDetail(chipFor(state({ pausedAt: now.toISOString() }), now))).toBe("Resume");
+    expect(chipDetail(chipFor(state(), now), "in ~1h")).toBeNull();
+  });
+
+  it("untilLabel is null on every non-countdown chip", () => {
+    expect(chipFor(state({ pausedAt: now.toISOString(), agents: [liveScout] }), now).untilLabel).toBeNull();
   });
 });
