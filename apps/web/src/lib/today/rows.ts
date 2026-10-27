@@ -39,6 +39,8 @@ export interface QueueRow {
   charLimit: number;
   /** prospect's LinkedIn profile, for the evidence links */
   linkedinUrl: string | null;
+  /** how long ago the draft was written, `fmtRelative` (`now` / `12m` / `3h` / `2d`) */
+  drafted: string;
 }
 
 export type ReplyClass = "Interested" | "Neutral" | "Out of office" | "Needs you";

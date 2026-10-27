@@ -32,6 +32,7 @@ const QUEUE: TodayView["queue"]["rows"] = [
     ],
     rationale: "Fit 52 · Intent 31 · Reach 8",
     charLimit: 200,
+    drafted: "2h",
     linkedinUrl: "https://www.linkedin.com/in/sample",
   },
   {
@@ -52,6 +53,7 @@ const QUEUE: TodayView["queue"]["rows"] = [
     evidence: [{ text: "Commented on outbound post" }, { text: "Growth lead, owns the number" }],
     rationale: "Fit 48 · Intent 34 · Reach 6",
     charLimit: 180,
+    drafted: "3h",
     linkedinUrl: null,
   },
   {
@@ -72,6 +74,7 @@ const QUEUE: TodayView["queue"]["rows"] = [
     evidence: [{ text: "Changed role 9 days ago" }],
     rationale: "Fit 45 · Intent 30 · Reach 9",
     charLimit: 200,
+    drafted: "5h",
     linkedinUrl: null,
   },
   {
@@ -92,6 +95,7 @@ const QUEUE: TodayView["queue"]["rows"] = [
     evidence: [],
     rationale: null,
     charLimit: 180,
+    drafted: "1d",
     linkedinUrl: null,
   },
   {
@@ -112,6 +116,7 @@ const QUEUE: TodayView["queue"]["rows"] = [
     evidence: [{ text: "Launched agency 14 days ago" }],
     rationale: "Fit 41 · Intent 27 · Reach 8",
     charLimit: 200,
+    drafted: "1d",
     linkedinUrl: null,
   },
 ];

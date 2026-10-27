@@ -42,6 +42,11 @@ function send(id: string, o: Partial<QueueSendIn> & { score?: number; acct?: str
 const base = { signals: [], downSenderIds: new Set<string>(), now, timeZone: "UTC", senders };
 
 describe("buildQueueRows", () => {
+  it("labels how long ago each draft was written (server-formatted, the client never touches Date)", () => {
+    const rows = buildQueueRows({ ...base, limit: null, sends: [send("a")] });
+    expect(rows[0].drafted).toBe("5h");
+  });
+
   it("orders replies, then invites, then follow-ups, score desc inside", () => {
     const rows = buildQueueRows({
       ...base,

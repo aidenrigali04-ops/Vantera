@@ -118,6 +118,7 @@ export function buildQueueRows(args: {
       rationale: lead?.ai_rationale ?? null,
       charLimit: step === "Invite" ? CONNECTION_NOTE_MAX_CHARS : FOLLOWUP_MAX_CHARS,
       linkedinUrl: lead?.linkedin_url ?? null,
+      drafted: fmtRelative(new Date(d.created_at), now),
     };
   });
 
