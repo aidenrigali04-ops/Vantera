@@ -9,7 +9,7 @@ import { trackFirstDraftApproved } from "@/lib/analytics/activation";
 import { approveFromToday, rejectDraftWithReason, undoApproveDraft, undoRejectDraft } from "@/app/(app)/today/actions";
 import { applyIfCurrent, nextAfterRemoval } from "../peek-result";
 import type { RejectReason } from "../work-card/reject-reasons";
-import { undoToast } from "./peek-footer";
+import { undoToast } from "./toasts";
 import { settleRemoval } from "./settle";
 import { steerNote } from "./steer-box";
 import { failed, type DraftText, type Inflight, type Outcome, type PeekMode } from "./types";

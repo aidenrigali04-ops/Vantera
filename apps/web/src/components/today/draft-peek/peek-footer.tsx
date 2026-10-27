@@ -1,17 +1,11 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, Check, Loader2, MoreHorizontal, PenLine, Sparkles } from "lucide-react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { RejectReason } from "../work-card/reject-reasons";
 import { RejectReasons } from "./reject-reasons";
 import type { Inflight, PeekMode } from "./types";
-
-/** The 5s toast with Undo every queue removal carries (approve / reject). */
-export function undoToast(message: string, onUndo: () => void): void {
-  toast(message, { duration: 5000, action: { label: "Undo", onClick: onUndo } });
-}
 
 /**
  * The peek's action bar: Approve / Edit / Fix (only when the draft carries style flags) /

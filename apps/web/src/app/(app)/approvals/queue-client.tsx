@@ -160,6 +160,12 @@ export function QueueClient({
   // ? toggles the key map (never while typing or inside a dialog)
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // Esc always closes the key map — checked before `defaultPrevented`, because the pane's
+      // DraftPeek binds its keydown first and claims Esc to leave edit / reject mode.
+      if (e.key === "Escape") {
+        setShowKeys(false);
+        return;
+      }
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest?.('[role="alertdialog"]')) return;
@@ -168,8 +174,6 @@ export function QueueClient({
       if (e.key === "?") {
         e.preventDefault();
         setShowKeys((s) => !s);
-      } else if (e.key === "Escape") {
-        setShowKeys(false);
       }
     }
     document.addEventListener("keydown", onKey);
