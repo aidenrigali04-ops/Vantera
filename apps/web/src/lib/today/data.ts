@@ -218,7 +218,10 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
 
   if (!account.data) return null;
   // Fatal reads (blueprint §8): the senders list and the drafts count.
-  if (senders.error) throw new Error(`today: senders read failed: ${senders.error.message}`);
+  if (senders.error) {
+    console.error("today: senders read failed", senders.error);
+    throw new Error("Couldn't load Today.");
+  }
   if (draftsCountRes.error) throw new Error(`today: drafts count failed: ${draftsCountRes.error.message}`);
 
   const agentRows = agents.data ?? [];

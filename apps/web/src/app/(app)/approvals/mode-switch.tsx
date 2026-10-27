@@ -64,7 +64,7 @@ export function ModeSwitch({
       <div role="group" aria-labelledby="send-mode-label" className={cn(SEGMENT_TRACK, pending && "opacity-70")}>
         <ConfirmDialog
           title="Send automatically?"
-          description="Clean drafts go out on their own within your safety limits. Anything the humanizer flags still waits for you in Approvals. You can switch back anytime."
+          description="Clean drafts go out on their own within your safety limits. Anything the style check flags still waits for you in Approvals. You can switch back anytime."
           confirmLabel="Turn on automatic sending"
           onConfirm={() => switchTo("automatic")}
           trigger={(open) => (

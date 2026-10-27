@@ -67,8 +67,11 @@ export async function loadQueuePage(
     // the chrome chip reads, memoized per request.
     loadEngineState(supabase),
   ]);
-  if (draftsRes.error) throw new Error(`queue: drafts read failed: ${draftsRes.error.message}`);
-  if (sendersRes.error) throw new Error(`queue: senders read failed: ${sendersRes.error.message}`);
+  // Log the provider detail server-side; the thrown message is what an error boundary may render.
+  if (draftsRes.error || sendersRes.error) {
+    console.error("queue: read failed", draftsRes.error ?? sendersRes.error);
+    throw new Error("Couldn't load your queue.");
+  }
 
   const tz = accountTimeZone(agentsRes.data ?? []);
   const todayKey = fmtDate(now, tz);

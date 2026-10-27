@@ -220,7 +220,7 @@ export function AgentCard({
                      this page — it confirms (R2 idiom) instead of firing on one ghost click. */
                   <ConfirmDialog
                     title="Send automatically?"
-                    description="Clean drafts go out on their own within your safety limits. Anything the humanizer flags still waits for you in Approvals. You can switch back anytime."
+                    description="Clean drafts go out on their own within your safety limits. Anything the style check flags still waits for you in Approvals. You can switch back anytime."
                     confirmLabel="Turn on automatic sending"
                     onConfirm={() => modeFormRef.current?.requestSubmit()}
                     trigger={(open) => (
