@@ -125,6 +125,7 @@ const SIGNAL_KIND_LABELS: Record<string, string> = {
   legal: "Legal proceedings",
   security: "Security incidents",
   intent: "Buying intent",
+  follow: "Follows",
   other: "Other signals",
 };
 
