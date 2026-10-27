@@ -22,19 +22,29 @@ const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v)
  * Why a LIVE agent needs the owner's attention, or null when it's genuinely healthy.
  * Paused/draft agents never warn — their state is already explicit.
  */
-export function agentAttention(input: {
+export type Attention = { reason: string; cta: { label: string; href: string } } | null;
+
+type AttentionInput = {
   kind: "scout" | "copy" | "intent";
   status: string;
   sendMode?: string | null;
   linkedinActive: number;
   lastRun: AgentRunRow | null;
-}): string | null {
+};
+
+const CONNECT = { label: "Connect LinkedIn", href: "/settings/senders" };
+
+export function agentAttention(input: AttentionInput): Attention {
   const { kind, status, linkedinActive, lastRun } = input;
   if (status !== "live") return null;
+  const runNow = { label: "Run now", href: `/playbook/${kind}` };
 
   if (kind === "copy") {
     if (linkedinActive === 0) {
-      return "No LinkedIn account connected — approved messages can't send. Connect it in Settings → LinkedIn.";
+      return {
+        reason: "No LinkedIn account connected — approved messages can't send.",
+        cta: CONNECT,
+      };
     }
     return null;
   }
@@ -44,39 +54,64 @@ export function agentAttention(input: {
 
   if (kind === "intent") {
     if (lastRun.note === "no_connection" || s.reason === "no_connection") {
-      return "No LinkedIn connection — connect it in Settings → LinkedIn to start watching for intent.";
+      return { reason: "No LinkedIn connection — connect it to start watching for intent.", cta: CONNECT };
     }
     if (lastRun.note === "empty_watchlist" || s.reason === "empty_watchlist") {
-      return "The watchlist is empty — add keywords, competitors, or hashtags so the agent has something to watch.";
+      return {
+        reason: "The watchlist is empty — add keywords, competitors, or hashtags so the agent has something to watch.",
+        cta: { label: "Edit watchlist", href: "/playbook/intent" },
+      };
     }
     if (num(s.targets) > 0 && num(s.sourcingErrors) === num(s.targets)) {
-      return "Every LinkedIn read failed on the last run — your connection likely needs a reconnect.";
+      return {
+        reason: "Every LinkedIn read failed on the last run — your connection likely needs a reconnect.",
+        cta: { label: "Reconnect", href: "/settings/senders" },
+      };
     }
   }
 
   if (lastRun.status === "failed") {
-    return "The last run failed — it retries automatically, but if this repeats your config is worth a look.";
+    return {
+      reason: "The last run failed — it retries automatically, but if this repeats your config is worth a look.",
+      cta: runNow,
+    };
   }
 
   if (kind === "scout") {
     if (lastRun.note === "low_credits" || s.reason === "low_credits") {
-      return "The last run paused on sourcing capacity — it resumes automatically.";
+      return {
+        reason: "The last run paused on sourcing capacity — it resumes automatically.",
+        cta: { label: "Check sourcing capacity", href: "/settings/billing" },
+      };
     }
     if (s.reason === "trial_cap") {
-      return "Sourcing is paused — this trial has reached its lead limit. Outreach can still use prospects already found.";
+      return {
+        reason:
+          "Sourcing is paused — this trial has reached its lead limit. Outreach can still use prospects already found.",
+        cta: { label: "Pick a plan", href: "/settings/billing" },
+      };
     }
     if (s.reason === "preview_full") {
-      return "Sourcing is paused until a LinkedIn account is connected.";
+      return { reason: "Sourcing is paused until a LinkedIn account is connected.", cta: CONNECT };
     }
     if (num(s.criteriaPending) > 0) {
       const n = num(s.criteriaPending);
-      return `${n} ICP${n === 1 ? "" : "s"} couldn't be turned into a search yet — a more concrete description (industry, role, size) fixes it.`;
+      return {
+        reason: `${n} ICP${n === 1 ? "" : "s"} couldn't be turned into a search yet — a more concrete description (industry, role, size) fixes it.`,
+        cta: { label: "Edit ICPs", href: "/playbook/scout/edit" },
+      };
     }
     if (num(s.discoveryTarget) > 0 && num(s.discovered) === 0) {
-      return "The last run searched and found 0 prospects — your ICP may be too narrow for the source. Broadening it helps.";
+      return {
+        reason: "The last run searched and found 0 prospects — your ICP may be too narrow for the source. Broadening it helps.",
+        cta: runNow,
+      };
     }
     if (num(s.rankErrors) > 0 && num(s.qualified) === 0 && num(s.gatePassed) > 0) {
-      return "Scoring failed on the last run — qualified prospects weren't ranked. It retries automatically.";
+      return {
+        reason: "Scoring failed on the last run — qualified prospects weren't ranked. It retries automatically.",
+        cta: runNow,
+      };
     }
     return null;
   }

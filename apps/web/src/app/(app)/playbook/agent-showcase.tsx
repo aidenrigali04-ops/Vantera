@@ -160,9 +160,12 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
 
         {/* T4 operate path: the agent's actual work, run by run — never config-only again. */}
         {agent.attention && (
-          <p className="rounded-[var(--r-btn)] bg-[var(--attention-tint)] px-3 py-2 text-xs font-medium leading-relaxed text-[var(--attention)]">
-            {agent.attention}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--r-btn)] bg-[var(--attention-tint)] px-3 py-2 text-xs font-medium leading-relaxed text-[var(--attention)]">
+            <p className="min-w-0 flex-1">{agent.attention.reason}</p>
+            <Button asChild variant="ghost" size="sm" className="-my-1 shrink-0 text-[var(--attention)]">
+            <Link href={agent.attention.cta.href}>{agent.attention.cta.label}</Link>
+          </Button>
+          </div>
         )}
         {agent.runHistory.length > 0 && (
           <div className="border-t border-[var(--hairline)] pt-4">

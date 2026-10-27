@@ -10,7 +10,7 @@ import { FormError } from "@/components/form-error";
 import { setAgentStatus, updateSendMode, type AgentActionState } from "./actions";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { RunNowButton } from "./run-now";
-import { runLine, type AgentRunRow } from "./agent-health";
+import { runLine, type AgentRunRow, type Attention } from "./agent-health";
 import { useUntil } from "@/lib/use-until";
 
 /* Each agent gets the landing's pastel icon tile (components/landing/frame.tsx TONES). */
@@ -54,7 +54,7 @@ export function AgentCard({
   stats: { label: string; value: number }[];
   index?: number;
   /** T4: why a LIVE agent needs the owner (null = healthy) — computed by agent-health.ts */
-  attention?: string | null;
+  attention?: Attention;
   /** T4: the latest recorded run, for the what-happened line */
   lastRun?: AgentRunRow | null;
   lastRunAgo?: string | null;
@@ -148,9 +148,12 @@ export function AgentCard({
       </div>
 
       {attention && (
-        <p className="rounded-[var(--r-btn)] bg-[var(--attention-tint)] px-3 py-2 text-xs font-medium leading-relaxed text-[var(--attention)]">
-          {attention}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--r-btn)] bg-[var(--attention-tint)] px-3 py-2 text-xs font-medium leading-relaxed text-[var(--attention)]">
+          <p className="min-w-0 flex-1">{attention.reason}</p>
+          <Button asChild variant="ghost" size="sm" className="-my-1 shrink-0 text-[var(--attention)]">
+            <Link href={attention.cta.href}>{attention.cta.label}</Link>
+          </Button>
+        </div>
       )}
 
       {icpNames.length > 0 && (
