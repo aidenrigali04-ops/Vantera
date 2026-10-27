@@ -29,4 +29,4 @@ These limits are set by Vantera and cannot be raised — they're there to keep y
 
 ## Where to switch
 
-Open your Outreach Agent's settings and look for **Send mode**. Changes take effect on the next draft cycle.
+You can switch in two places: the **Autopilot | Review** switch at the top of **Approvals**, or **Send mode** on your Outreach Agent's card in Playbook. Both set the same mode. Choosing Autopilot asks you to confirm first. Changes take effect on the next draft cycle.

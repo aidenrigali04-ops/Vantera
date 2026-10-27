@@ -95,7 +95,7 @@ export function WorkCard({ view, tab, onOpenDraft, onLater, onReject, onResume }
             Updated <span className="font-mono">{view.updatedLabel}</span>
           </span>
           {tab === "queue" && view.queue.total > 0 ? (
-            <TextLink href="/approvals">Open queue ({view.queue.total}) →</TextLink>
+            <TextLink href={view.queue.rows[0] ? `/approvals?draft=${view.queue.rows[0].id}` : "/approvals"}>Open queue ({view.queue.total}) →</TextLink>
           ) : tab === "replies" && view.replies.total > 0 ? (
             <TextLink href="/inbox?filter=waiting">Open inbox ({view.replies.total}) →</TextLink>
           ) : null}
