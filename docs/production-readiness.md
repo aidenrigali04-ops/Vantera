@@ -23,6 +23,8 @@ A "make the channels functional" pass shipped email (Maildoso), LinkedIn, caller
 
 **Environments & CI/CD**
 - [ ] Vercel project linked to the repo; preview deploy per PR; production deploys from `main` only.
+- [ ] No Vercel integration adds a blocking deployment check to production (Project → Settings → Deployment Checks / Integrations). Trigger.dev deploys only via GitHub Actions — the Trigger.dev Vercel integration stays disconnected.
+- [ ] GitHub Actions secret `VERCEL_TOKEN` (read-only scope is enough) so `postdeploy-verify` can name the cause when production doesn't go live.
 - [ ] Supabase **prod project separate from dev**; anon/service keys per env in the right vaults (Vercel / Trigger.dev / GitHub Actions secrets).
 - [x] Drift check that fails if schema ≠ migrations — `.github/workflows/migration-drift.yml`, read-only against prod, secret-gated on `PROD_DB_URL` (owner dependency: set the secret, read-only role preferred).
 - [ ] A job that *applies* `packages/db/migrations/` to prod on merge (Supabase CLI or drizzle-kit) — auto-apply is intentionally out of scope until the drift check has run clean for a while.
