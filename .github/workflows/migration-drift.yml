@@ -75,8 +75,26 @@ jobs:
           # server-version chatter) plus the \restrict/\unrestrict meta-command lines that recent
           # pg_dump builds bracket every dump with — each carries a random per-invocation token,
           # so without stripping them a scratch-vs-scratch dump never diffs clean either.
+          # Column order inside CREATE TABLE is not schema: prod and a clean replay can legitimately
+          # differ when a column was added by a migration that landed in a different order (e.g.
+          # accounts.sender_name vs trial_ends_at). Sort the column lines of each table block so
+          # only real differences (names, types, defaults, constraints) survive.
+          normalize() { python3 -c '
+          import re, sys
+          out, cols = [], None
+          for line in sys.stdin:
+              line = line.rstrip("\n")
+              if re.match(r"^CREATE (UNLOGGED )?TABLE ", line):
+                  out.append(line); cols = []; continue
+              if cols is not None and line.startswith(");"):
+                  out.extend(sorted(cols)); out.append(line); cols = None; continue
+              if cols is not None:
+                  cols.append(line.rstrip(",")); continue
+              out.append(line)
+          print("\n".join(out))
+          '; }
           dump() { pg_dump "$1" --schema-only --schema=public --no-owner --no-privileges \
-            | { grep -vE '^(--|SET |SELECT pg_catalog|\\restrict|\\unrestrict)' || true; } | sed -e 's/[[:space:]]*$//' ; }
+            | { grep -vE '^(--|SET |SELECT pg_catalog|\\restrict|\\unrestrict)' || true; } | sed -e 's/[[:space:]]*$//' | normalize ; }
           dump "$SCRATCH" > /tmp/expected.sql
           dump "$PROD"    > /tmp/actual.sql
           if ! diff -u /tmp/expected.sql /tmp/actual.sql > /tmp/drift.diff; then
