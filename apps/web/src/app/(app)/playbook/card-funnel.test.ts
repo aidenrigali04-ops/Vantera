@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProofModel, ProofRow } from "@/lib/proof/types";
-import { cardFunnels } from "./card-funnel";
+import { cardFunnels, funnelEmpty, FUNNEL_EMPTY } from "./card-funnel";
 
 const row = (key: string, o: Partial<ProofRow> = {}): ProofRow => ({
   key, label: key, group: "agent", found: 0, contacted: 0, accepted: 0, replied: 0, interested: 0, closed: 0, ...o,
@@ -55,5 +55,33 @@ describe("cardFunnels", () => {
     });
     expect(f.scout[1].pct).toBeNull();
     expect(f.intent[2]).toEqual({ label: "Qualified", count: 0, pct: null });
+  });
+
+  it("non-monotonic rows give pct over 100, never NaN", () => {
+    const f = cardFunnels(proof([row("agent:scout", { found: 4, contacted: 10, replied: 2 })]), { intentSummary: null });
+    expect(f.scout[1]).toEqual({ label: "Contacted", count: 10, pct: 250 });
+    expect(f.scout.every((s) => s.pct === null || Number.isFinite(s.pct))).toBe(true);
+  });
+
+  it("a missing outreach row beside an existing scout row reads as zeros", () => {
+    const f = cardFunnels(proof([row("agent:scout", { found: 9, contacted: 3, replied: 1 })]), { intentSummary: null });
+    expect(f.scout[0].count).toBe(9);
+    expect(f.copy).toEqual([
+      { label: "Contacted", count: 0, pct: null },
+      { label: "Accepted", count: 0, pct: null },
+      { label: "Replied", count: 0, pct: null },
+      { label: "Interested", count: 0, pct: null },
+    ]);
+  });
+
+  it("intent empty state distinguishes no run from a run that found nothing", () => {
+    const none = cardFunnels(proof([]), { intentSummary: null });
+    const ran = cardFunnels(proof([]), { intentSummary: { observed: 0 } });
+    expect(none.intentRan).toBe(false);
+    expect(ran.intentRan).toBe(true);
+    expect(funnelEmpty("intent", none)).toBe(FUNNEL_EMPTY.intentNoRun);
+    expect(funnelEmpty("intent", ran)).toBe("Last run found nothing");
+    expect(funnelEmpty("scout", ran)).toBe(FUNNEL_EMPTY.scout);
+    expect(funnelEmpty("copy", ran)).toBe(FUNNEL_EMPTY.copy);
   });
 });

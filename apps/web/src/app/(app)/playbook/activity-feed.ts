@@ -1,4 +1,4 @@
-import { runLine, type AgentRunRow } from "./agent-health";
+import { runLine, skipReason, type AgentRunRow } from "./agent-health";
 
 export type ActivityItem = { at: string; text: string; kind: "setup" | "run" };
 
@@ -16,13 +16,11 @@ const LIVE_TEXT = { scout: "Prospect agent live", intent: "Intent agent live", c
 
 function runText(run: ActivityInput["runs"][number]): string {
   if (run.status === "failed") return "Run failed";
-  // runLine owns the reason wording ("Skipped — no LinkedIn connection"); raw note codes never surface.
-  const line = runLine({ ...run, agent_id: "" });
   if (run.status === "skipped") {
-    const reason = line.split(" — ")[1];
+    const reason = skipReason(run.note);
     return reason ? `Run skipped — ${reason}` : "Run skipped";
   }
-  return line;
+  return runLine({ ...run, agent_id: "" });
 }
 
 /** The narrated "what Vera did" list: setup milestones + recorded runs, newest first, max 12. */

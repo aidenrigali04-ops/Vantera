@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/app/surface";
 import { fmtDayTime, fmtUntil } from "@/lib/today/metrics";
 import { safeZone } from "@/lib/today/sender-facts";
 import { loadCardFunnels } from "./card-funnel-data";
+import { funnelEmpty } from "./card-funnel";
 
 export const metadata = { title: "Playbook" };
 
@@ -191,7 +192,7 @@ export default async function AgentsPage({
                 { label: "Qualified", value: qualified ?? 0 },
               ]}
               funnel={funnels.scout}
-              funnelEmpty="No prospects found yet"
+              funnelEmpty={funnelEmpty("scout", funnels)}
               {...health(scout)}
             />
           ) : (
@@ -211,7 +212,7 @@ export default async function AgentsPage({
               index={1}
               stats={[{ label: "Intent prospects", value: intentLeads ?? 0 }]}
               funnel={funnels.intent}
-              funnelEmpty="No run yet"
+              funnelEmpty={funnelEmpty("intent", funnels)}
               {...health(intent)}
             />
           ) : (
@@ -231,7 +232,7 @@ export default async function AgentsPage({
               index={2}
               stats={[{ label: "Drafts awaiting approval", value: drafts ?? 0 }]}
               funnel={funnels.copy}
-              funnelEmpty="Nothing sent yet"
+              funnelEmpty={funnelEmpty("copy", funnels)}
               {...health(copy)}
             />
           ) : (

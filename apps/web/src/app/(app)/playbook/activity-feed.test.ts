@@ -89,4 +89,12 @@ describe("buildActivityFeed", () => {
     const feed = buildActivityFeed(base({ runs: [run({ started_at: "2026-10-28T10:00:00Z" })] }));
     expect(feed).toEqual([]);
   });
+
+  it("keeps input order on an equal-timestamp tie (stable sort)", () => {
+    const at = "2026-10-26T09:00:00Z";
+    const feed = buildActivityFeed(
+      base({ websiteScannedAt: at, agents: [{ kind: "scout", deployed_at: at }] }),
+    );
+    expect(feed.map((i) => i.text)).toEqual(["Site read", "Prospect agent live"]);
+  });
 });

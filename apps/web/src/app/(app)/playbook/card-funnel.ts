@@ -8,7 +8,26 @@ export type RunFacts = {
   intentSummary: { observed?: number; intent?: number; qualified?: number } | null;
 };
 
-export type CardFunnels = { scout: MiniStage[]; intent: MiniStage[]; copy: MiniStage[] };
+export type CardFunnels = {
+  scout: MiniStage[];
+  intent: MiniStage[];
+  copy: MiniStage[];
+  /** false = no completed intent run yet (intentSummary was null) */
+  intentRan: boolean;
+};
+
+/** Empty-state lines under a mini funnel whose stages are all zero. */
+export const FUNNEL_EMPTY = {
+  scout: "No prospects found yet",
+  intentNoRun: "No run yet",
+  intentNothing: "Last run found nothing",
+  copy: "Nothing sent yet",
+} as const;
+
+export function funnelEmpty(kind: "scout" | "intent" | "copy", funnels: Pick<CardFunnels, "intentRan">): string {
+  if (kind === "intent") return funnels.intentRan ? FUNNEL_EMPTY.intentNothing : FUNNEL_EMPTY.intentNoRun;
+  return FUNNEL_EMPTY[kind];
+}
 
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 
@@ -47,5 +66,6 @@ export function cardFunnels(proof: ProofModel, runs: RunFacts): CardFunnels {
       ["Replied", num(out?.replied)],
       ["Interested", num(out?.interested)],
     ]),
+    intentRan: s !== null,
   };
 }
