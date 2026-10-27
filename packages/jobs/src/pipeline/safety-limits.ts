@@ -10,7 +10,7 @@ export const LINKEDIN_STEADY_DAILY_INVITES = 20; // ~100/week across weekdays
 export const LINKEDIN_STEADY_DAILY_MESSAGES = 25; // conservative; non-configurable (rule 04)
 
 /** new-account ramp: stay tiny while the account builds history */
-const LINKEDIN_RAMP: { maxAgeDays: number; daily: number }[] = [
+export const LINKEDIN_RAMP: { maxAgeDays: number; daily: number }[] = [
   { maxAgeDays: 7, daily: 5 },
   { maxAgeDays: 14, daily: 10 },
   { maxAgeDays: 28, daily: 15 },

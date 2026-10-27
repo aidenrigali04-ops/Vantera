@@ -10,6 +10,13 @@ import {
   RefreshLinkedInButton,
 } from "./channels-forms";
 import { reconcileLinkedInAccounts } from "@/lib/linkedin/sync";
+import {
+  LINKEDIN_RAMP,
+  LINKEDIN_STEADY_DAILY_INVITES,
+  LINKEDIN_STEADY_DAILY_MESSAGES,
+  LINKEDIN_WEEKLY_INVITE_CEILING,
+} from "@vantera/jobs/pipeline/safety-limits";
+import { rampLabel } from "@/lib/safety/caps-line";
 
 export const metadata = { title: "Senders" };
 
@@ -51,7 +58,6 @@ export default async function ChannelsPage({
   const linkedinAccounts = linkedinRows ?? [];
 
   // P1 safety visibility: the pacing the Safety page promises, shown against real counts.
-  // Ceilings mirror packages/jobs/src/pipeline/safety-limits.ts (locked, rule 04).
   const weekAgoIso = isoDaysAgo(7);
   const dayAgoIso = isoDaysAgo(1);
   const { data: weekSendRows } = await supabase
@@ -71,8 +77,7 @@ export default async function ChannelsPage({
     }
     pacing.set(r.linkedin_account_id, c);
   }
-  const WEEKLY_INVITE_CEILING = 100;
-  const DAILY_MESSAGES = 25;
+  const ramp = rampLabel(LINKEDIN_RAMP, LINKEDIN_STEADY_DAILY_INVITES);
 
   return (
     <div className="mx-auto w-full flex max-w-2xl flex-col gap-6">
@@ -197,7 +202,7 @@ export default async function ChannelsPage({
           <CardContent className="space-y-4">
             {linkedinAccounts.map((li) => {
               const c = pacing.get(li.id) ?? { invites7d: 0, invitesToday: 0, messagesToday: 0 };
-              const pct = Math.min(100, Math.round((c.invites7d / WEEKLY_INVITE_CEILING) * 100));
+              const pct = Math.min(100, Math.round((c.invites7d / LINKEDIN_WEEKLY_INVITE_CEILING) * 100));
               return (
                 <div key={li.id} className="space-y-1.5">
                   <p className="text-sm font-medium">{li.display_name ?? "LinkedIn account"}</p>
@@ -205,9 +210,9 @@ export default async function ChannelsPage({
                     <span className="block h-full rounded-full bg-[var(--cyan-strong)]" style={{ width: `${pct}%` }} />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {c.invites7d} of {WEEKLY_INVITE_CEILING} invites this week · {c.invitesToday} today ·{" "}
-                    {c.messagesToday} of {DAILY_MESSAGES} messages today. New accounts ramp gradually
-                    (5→10→15→20/day over four weeks) — these ceilings protect your account and can&apos;t
+                    {c.invites7d} of {LINKEDIN_WEEKLY_INVITE_CEILING} invites this week · {c.invitesToday} today ·{" "}
+                    {c.messagesToday} of {LINKEDIN_STEADY_DAILY_MESSAGES} messages today. New accounts ramp gradually
+                    ({ramp}) — these ceilings protect your account and can&apos;t
                     be raised past the safe line.
                   </p>
                   {/* R6: send-window visibility — why outreach looks "quiet" at night/weekends
