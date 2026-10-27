@@ -30,7 +30,16 @@ describe("capsTrustLine", () => {
 
 describe("rampLabel", () => {
   it("walks the ramp to the steady rate", () => {
-    expect(rampLabel(RAMP, 20)).toBe("5 → 10 → 15 → 20/day over four weeks");
-    expect(rampLabel(RAMP, 20).endsWith("→ 20/day over four weeks")).toBe(true);
+    expect(rampLabel(RAMP, 20)).toBe("5 → 10 → 15 → 20/day over the first four weeks");
+  });
+
+  it("words the period for any ramp length", () => {
+    const threeWeeks: CapsInput["ramp"] = [{ maxAgeDays: 7, daily: 5 }, { maxAgeDays: 21, daily: 10 }];
+    expect(rampLabel(threeWeeks, 20)).toBe("5 → 10 → 20/day over the first three weeks");
+    const oneWeek: CapsInput["ramp"] = [{ maxAgeDays: 7, daily: 5 }];
+    expect(rampLabel(oneWeek, 20)).toBe("5 → 20/day over the first week");
+    expect(capsTrustLine({ dailyInvites: 20, dailyMessages: 25, weeklyInvites: 100, ramp: oneWeek })).toContain(
+      "(5 over the first week)"
+    );
   });
 });

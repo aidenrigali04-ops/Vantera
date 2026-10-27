@@ -16,25 +16,23 @@ export type CapsInput = {
 
 const WEEK_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 
-function weeksPhrase(ramp: RampStep[]): string {
+/** "over the first week" / "over the first four weeks" — the one ramp-period clause both lines use. */
+function rampPeriod(ramp: RampStep[]): string {
   const weeks = Math.max(1, Math.round((ramp.at(-1)?.maxAgeDays ?? 0) / 7));
-  const word = WEEK_WORDS[weeks] ?? String(weeks);
-  return weeks === 1 ? "week" : `${word} weeks`;
+  if (weeks === 1) return "over the first week";
+  return `over the first ${WEEK_WORDS[weeks] ?? String(weeks)} weeks`;
 }
 
-/** "5 → 10 → 15 → 20/day over four weeks" */
+/** "5 → 10 → 15 → 20/day over the first four weeks" */
 export function rampLabel(ramp: CapsInput["ramp"], steady: number): string {
-  const steps = [...ramp.map((s) => s.daily), steady].join(" → ");
   if (ramp.length === 0) return `${steady}/day`;
-  return `${steps}/day over ${weeksPhrase(ramp)}`;
+  return `${[...ramp.map((s) => s.daily), steady].join(" → ")}/day ${rampPeriod(ramp)}`;
 }
 
 /** One trust sentence stating the real caps. */
 export function capsTrustLine(c: CapsInput): string {
   const rampClause =
-    c.ramp.length > 0
-      ? ` once ramped (${c.ramp.map((s) => s.daily).join(" → ")} over the first ${weeksPhrase(c.ramp)})`
-      : "";
+    c.ramp.length > 0 ? ` once ramped (${c.ramp.map((s) => s.daily).join(" → ")} ${rampPeriod(c.ramp)})` : "";
   return (
     `Sends stay within LinkedIn-safe limits: ${c.dailyInvites} invites a day${rampClause}, ` +
     `${c.dailyMessages} messages a day, about ${c.weeklyInvites} invites a week.`

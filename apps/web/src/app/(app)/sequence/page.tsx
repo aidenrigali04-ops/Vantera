@@ -29,7 +29,7 @@ export default async function SequencePage() {
     dailyInvites: LINKEDIN_STEADY_DAILY_INVITES,
     dailyMessages: LINKEDIN_STEADY_DAILY_MESSAGES,
     weeklyInvites: LINKEDIN_WEEKLY_INVITE_CEILING,
-    ramp: LINKEDIN_RAMP.map((s) => ({ ...s })),
+    ramp: LINKEDIN_RAMP,
   };
   return <SequenceBuilder config={config} hasCampaign={Boolean(campaign)} caps={caps} />;
 }
