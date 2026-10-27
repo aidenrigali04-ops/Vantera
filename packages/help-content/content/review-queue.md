@@ -10,15 +10,15 @@ Every message your Outreach Agent writes waits in **Approvals** — nothing send
 
 ## What you see
 
-Approvals has two panes. On the left is the **queue**: one row per draft, with the prospect, the kind of message, and why they were chosen. On the right is the **open draft**: the prospect's fit verdict (for example **Hot prospect · 91**), an **In-market** badge when your Intent Agent caught them showing buying behavior on LinkedIn, the buying signal behind the outreach, and the message itself. You approve with the same context the agent had.
+Approvals has two panes. On the left is the **queue**: one row per draft, with the prospect, the kind of message, and why they were chosen. On the right is the **open draft**: the prospect's fit score with three tier bars, their title and company, the why-now evidence with a source link, and the message itself. You approve with the same context the agent had.
 
-LinkedIn outreach goes out in two steps, so drafts come in pairs: a **connection request** and a **Follow-up** message. Each is tagged so you know which is which. Use **Preview** to see the draft the way the prospect will: an invitation note shows a character counter against the LinkedIn limit, and a message shows as a chat bubble.
+LinkedIn outreach goes out in two steps, so drafts come in pairs: a **connection request** and a **Follow-up** message. Each is tagged so you know which is which. The draft is shown the way the prospect will see it: an invitation note with a character counter against the LinkedIn limit, or a message as a chat bubble. Press **E** to edit it in place.
 
 ## Working a draft
 
 - **Approve** (**A**) — the draft is cleared to send.
 - **Edit** (**E**) — change the message. The style check re-runs automatically.
-- **Regenerate** (**G**) — the agent writes a fresh version. Type a note in the box first to steer it, for example "Make it shorter, lead with the hiring signal" (up to 280 characters), or leave it empty for a new take. Regenerate works on first-touch drafts; reply drafts explain why it isn't available.
+- **Regenerate** (**G**) — the agent writes a fresh version. Type a note in the box first to steer it, for example "Make it shorter, lead with the hiring signal" (up to 280 characters), or leave it empty for a new take. Regenerate works on drafts the agent wrote as part of a sequence (including follow-ups); reply and hand-written drafts show why it's off.
 - **Reject** (**R**) — drop the draft. Pick a quick reason (*Wrong person*, *Bad timing*, *Weak message*, or *Other*); rejections teach your agent who and what to avoid.
 - **Decline & never contact** — in the draft's overflow menu. It drops the draft and adds the contact to your suppression list so no agent messages them again.
 
@@ -30,7 +30,7 @@ If our style check spots anything that could read as robotic, the draft shows a 
 
 ## Keys
 
-**A** approve · **E** edit · **G** regenerate · **R** reject · **←** / **→** previous or next draft · **Esc** leaves a mode (editing, rejecting) · **?** shows the key hint. The same keys work on the Today queue.
+**A** approve · **E** edit · **G** regenerate · **R** reject · **←** / **→** previous or next draft · **Esc** leaves a mode (editing, rejecting) · **?** shows the key hint (Approvals only). On Today, **A**, **E**, **G**, **R** and **←** / **→** work in the open draft.
 
 ## Autopilot or Review
 

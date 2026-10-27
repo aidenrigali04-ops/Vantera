@@ -20,10 +20,9 @@ Clean drafts send without requiring your approval. The agent handles the queue o
 
 ## Pacing and daily limits
 
-In both modes, approved or automatic sends are spaced throughout the day rather than batched all at once. This applies to both email and LinkedIn:
+In both modes, approved or automatic sends are spaced throughout the day rather than batched all at once. Your status chip shows how many invites have gone out today ("N of M invites today").
 
-- **Email**: each mailbox has a per-day cap that scales with its warm-up stage.
-- **LinkedIn**: connection invites ramp up gradually on newer accounts and stay under approximately 100 per week. This ceiling protects your account from platform restrictions.
+Connection invites ramp up gradually on newer accounts and stay under approximately 100 per week. This ceiling protects your account from platform restrictions.
 
 These limits are set by Vantera and cannot be raised — they're there to keep your accounts healthy over the long term, not to throttle you arbitrarily.
 

@@ -67,7 +67,7 @@ The limits shown here are the real ones the system enforces — they are not set
 
 ## The status chip
 
-Every page has a status chip in the top bar that says what your engine is doing right now: for example "Finding prospects · next run in ~25 min", "Sending · 4 of 20 invites today", "Paused by you", or "Ready". When something needs you, it says so and gives you the fix: "LinkedIn not connected · Connect", "Payment failed · Fix". Click it to open a small panel with **Sourcing** (Prospect and Intent agents) and **Outreach** (Outreach agent) switches, and **Pause everything** / **Resume everything**. Pausing everything pauses every agent and sending; resuming turns them all back on. The switches are locked while paused.
+Every page has a status chip in the top bar that says what your engine is doing right now: for example "Finding prospects · next run in ~25 min", "Sending · 4 of 20 invites today", "Paused by you", or "Ready" when there is nothing to report. When something needs you, it says so and gives you the fix: "LinkedIn not connected · Connect", "Payment failed · Fix". Click it to open a small panel with **Sourcing** (Prospect and Intent agents) and **Outreach** (Outreach agent) switches, and **Pause everything** / **Resume everything**. Pausing everything pauses every agent and sending; resuming turns them all back on. The switches are locked while paused.
 
 ## Common questions
 

@@ -12,7 +12,7 @@ The rules gate reads job titles the way a person would: "Chief Executive Officer
 
 Each prospect leads with the reason they're here. The row shows three **fit bars** and then the score: three bars is a hot prospect (85+), two is a strong fit (70+), and one is worth a look. A LinkedIn mark sits on each prospect.
 
-The **Why now** column shows the newest buying signal with when it happened and, when there is one, a link to the post behind it. If there are more, you'll see **+N more**. Signals are real ones captured during enrichment (a funding round, an executive hire, a new office, a product launch, active buying intent); when there isn't one, you see the AI's read on the prospect's top trigger or pain. When a prospect has replied but the reply has been sitting for a few days, it's marked **cooling** so a warm conversation never quietly goes cold. On wider screens you'll also see **Worth** (what closing that prospect means toward your revenue goal) and **Last activity**.
+The **Why now** column shows the newest buying signal with when it happened and, when there is one, a link to the post behind it. If there are more, you'll see **+N**. Signals are real ones captured during enrichment (a funding round, an executive hire, a new office, a product launch, active buying intent); when there isn't one, you see the AI's read on the prospect's top trigger or pain. When a prospect has replied but the reply has been sitting for a few days, it's marked **cooling** so a warm conversation never quietly goes cold. On wider screens you'll also see **Worth** (what closing that prospect means toward your revenue goal) and **Last activity**.
 
 **Hot right now** sits at the top of the page: your strongest-fit prospects, pulled out of the list so you can work the best opportunities first.
 
@@ -30,12 +30,12 @@ Click any prospect to open a **side peek** without losing your place in the list
 - **Why this rank** — what lifted or lowered the score.
 - **Why this prospect** — the AI's rationale, pain points, and buying triggers.
 - **Company** — firmographics and their LinkedIn profile.
-- **Message** — the queued draft. Read it, edit it, or regenerate it with a note to steer the rewrite, right from the peek.
+- **Message** — the queued draft. Read it, edit it while it's waiting for review, or regenerate it with a note to steer the rewrite, right from the peek.
 - **Fit** — **Good fit** or **Not a fit**, with an optional reason (see below).
 - **CRM** — the connection status and any record created.
-- **Notes** — your team's notes.
+- **Notes** — a link to the full brief, where notes live.
 
-The footer has **Not a fit** and **Open full brief**, the complete page with "Your opening" (the angle most likely to land), the full activity timeline, and deal controls. Prospects that didn't fit are under "Filtered out", each with the reasons.
+The footer has **Not a fit** (until you've given a verdict) and **Open full brief**, the complete page with "Your opening" (the angle most likely to land), the full activity timeline, and deal controls. Prospects that didn't fit are under "Filtered out", each with the reasons.
 
 When a newly qualified prospect carries a fresh, high-value signal (a funding round, an executive hire, an acquisition, or active buying intent) you'll get a **hot-signal notification** in the bell, so you can pounce while the timing is right.
 
