@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -13,8 +13,8 @@ import type { ActionTileSpec } from "@/lib/today/tiles";
 import { resumeEngine } from "@/app/(app)/engine-actions";
 import { declineAndSuppress } from "./actions";
 import { BlockersStack } from "./blockers-stack";
-import { ModeSwitch } from "./mode-switch";
-import { resolveOpenDraft } from "./queue-nav";
+import { ModeSwitch, type SendModeChoice } from "./mode-switch";
+import { reconcileRemoved, resolveOpenDraft } from "./queue-nav";
 
 const KEYS: Array<[string, string]> = [
   ["A", "Approve"],
@@ -62,6 +62,24 @@ export function QueueClient({
   // the pane's × closes the draft until the owner picks another one
   const [closed, setClosed] = useState(false);
   const [showKeys, setShowKeys] = useState(false);
+  const [optimisticMode, setOptimisticMode] = useState<SendModeChoice | null>(null);
+  const paneRef = useRef<HTMLDivElement>(null);
+
+  // Every action revalidates /approvals, so a new `rows` prop is server truth: drop removed ids
+  // the server no longer returns (an Undo that brings one back shows it again) and reopen the
+  // pane (render-time reset, no stale frame).
+  // the optimistic send mode holds until the server's mode changes under it
+  const [syncedMode, setSyncedMode] = useState(sendMode);
+  if (syncedMode !== sendMode) {
+    setSyncedMode(sendMode);
+    setOptimisticMode(null);
+  }
+  const [syncedRows, setSyncedRows] = useState(rows);
+  if (syncedRows !== rows) {
+    setSyncedRows(rows);
+    setRemoved((prev) => reconcileRemoved(prev, rows.map((r) => r.id)));
+    setClosed(false);
+  }
 
   const visible = useMemo(() => rows.filter((r) => !removed.has(r.id)), [rows, removed]);
   const openId = closed
@@ -97,6 +115,17 @@ export function QueueClient({
   }, [router, hrefFor]);
 
   // the peek navigates to the next draft itself; here the row only leaves the list
+  // a tapped row below lg: the pane sits under the list, so bring it into view
+  const onTap = useCallback(
+    (id: string) => {
+      onOpen(id);
+      if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
+        requestAnimationFrame(() => paneRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }));
+      }
+    },
+    [onOpen]
+  );
+
   const onRemoved = useCallback((id: string) => {
     setRemoved((prev) => new Set(prev).add(id));
   }, []);
@@ -144,15 +173,16 @@ export function QueueClient({
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  const shownTotal = Math.max(0, total - removed.size);
+  // only ids the current rows still contain count as pending removals (never double-subtract)
+  const shownTotal = Math.max(0, total - rows.filter((r) => removed.has(r.id)).length);
   const totalPages = Math.max(1, Math.ceil(total / per));
-  const review = sendMode !== "automatic";
+  const review = (optimisticMode ?? (sendMode === "automatic" ? "automatic" : "review")) !== "automatic";
 
   const controls = (
     <>
       {review && <p className="text-[13px] text-[var(--ink-mid)]">Nothing is sent without your approval.</p>}
       <BlockersStack blockers={blockers} onResume={onResume} />
-      <ModeSwitch sendMode={sendMode} campaignId={campaignId} />
+      <ModeSwitch sendMode={sendMode} campaignId={campaignId} optimistic={optimisticMode} onOptimistic={setOptimisticMode} />
     </>
   );
 
@@ -180,7 +210,7 @@ export function QueueClient({
       <div className="flex min-w-0 flex-col gap-4 lg:min-h-0">
         {controls}
         <div className={cn(PANEL, "px-4 py-1 lg:min-h-0 lg:flex-1 lg:overflow-y-auto")}>
-          <QueueList rows={visible} activeId={openId} onOpen={onOpen} interactive={false} />
+          <QueueList rows={visible} activeId={openId} onOpen={onTap} interactive={false} />
         </div>
         <div className="flex shrink-0 items-center justify-between gap-3 text-[13px] text-[var(--ink-dim)]">
           <span>
@@ -228,7 +258,7 @@ export function QueueClient({
       </div>
 
       {/* right: the open draft */}
-      <div className={cn(PANEL, "flex min-h-[480px] min-w-0 flex-col overflow-hidden lg:min-h-0")}>
+      <div ref={paneRef} className={cn(PANEL, "flex min-h-[480px] min-w-0 scroll-mt-4 flex-col overflow-hidden lg:min-h-0")}>
         {openId ? (
           <DraftPeek
             variant="pane"

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveOpenDraft } from "./queue-nav";
+import { reconcileRemoved, resolveOpenDraft } from "./queue-nav";
 
 const ids = ["a", "b", "c", "d"];
 
@@ -41,5 +41,27 @@ describe("resolveOpenDraft", () => {
 
   it("a removed row never auto-opens as the first row", () => {
     expect(resolveOpenDraft(ids, null, new Set(["a"]))).toBe("b");
+  });
+});
+
+describe("reconcileRemoved", () => {
+  it("drops ids the revalidated rows no longer contain", () => {
+    expect([...reconcileRemoved(new Set(["a", "x"]), ["a", "b"])]).toEqual(["a"]);
+  });
+
+  it("returns an empty set when none are present", () => {
+    expect(reconcileRemoved(new Set(["x", "y"]), ["a"]).size).toBe(0);
+  });
+
+  it("keeps ids still present (the server has not caught up yet)", () => {
+    const out = reconcileRemoved(new Set(["a", "b"]), ["a", "b", "c"]);
+    expect([...out].sort()).toEqual(["a", "b"]);
+  });
+
+  it("returns a new set, never mutating the input", () => {
+    const input = new Set(["a", "x"]);
+    const out = reconcileRemoved(input, ["a"]);
+    expect(out).not.toBe(input);
+    expect(input.size).toBe(2);
   });
 });

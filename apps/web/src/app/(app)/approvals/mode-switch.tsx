@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -8,7 +8,8 @@ import { SEGMENT_TRACK, segmentClass } from "@/components/app/surface";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { updateSendMode } from "@/app/(app)/playbook/actions";
 
-type Mode = "automatic" | "review";
+export type SendModeChoice = "automatic" | "review";
+type Mode = SendModeChoice;
 
 /**
  * Autopilot | Review — the Outreach agent's send mode, switchable where the drafts are.
@@ -18,14 +19,19 @@ type Mode = "automatic" | "review";
 export function ModeSwitch({
   sendMode,
   campaignId,
+  optimistic,
+  onOptimistic,
 }: {
   sendMode: "automatic" | "review" | "manual" | null;
   campaignId: string | null;
+  /** the caller-owned optimistic mode (the trust line follows it); null = server value */
+  optimistic: Mode | null;
+  onOptimistic: (mode: Mode | null) => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   // optimistic: the segment moves at once; a failed write snaps it back
-  const [optimistic, setOptimistic] = useState<Mode | null>(null);
+  const setOptimistic = onOptimistic;
   const server: Mode = sendMode === "automatic" ? "automatic" : "review";
   const current = optimistic ?? server;
 
@@ -45,8 +51,8 @@ export function ModeSwitch({
         return;
       }
       toast(next === "automatic" ? "Autopilot on · clean drafts send on their own" : "Review on · every draft waits for you");
+      // the optimistic value holds until the refreshed server mode arrives (the caller resets it)
       router.refresh();
-      setOptimistic(null);
     });
   };
 

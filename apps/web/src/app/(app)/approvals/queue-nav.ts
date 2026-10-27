@@ -21,3 +21,13 @@ export function resolveOpenDraft(
   }
   return ids.find(visible) ?? null;
 }
+
+/**
+ * Resync the optimistic "removed" set with revalidated server rows: an id the server no
+ * longer returns has really left the queue (drop it — so an Undo that brings it back shows
+ * it again); an id still present stays hidden until the server catches up.
+ */
+export function reconcileRemoved(removed: ReadonlySet<string>, rowIds: readonly string[]): Set<string> {
+  const present = new Set(rowIds);
+  return new Set([...removed].filter((id) => present.has(id)));
+}

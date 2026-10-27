@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { parseStyleFlags } from "./style-flags";
 import { DraftPreview } from "./draft-preview";
-import { applyIfCurrent, nextAfterRemoval } from "./peek-result";
+import { applyIfCurrent, nextAfterRemoval, type AfterRemoval } from "./peek-result";
 import { REJECT_REASON_ORDER, REJECT_REASONS, type RejectReason } from "./work-card/reject-reasons";
 import type { QueueRow } from "@/lib/today/rows";
 import { fixDraft, regenerateDraft, saveDraftEdit, type RegenerateResult, type ReviewActionState } from "@/app/(app)/approvals/actions";
@@ -136,15 +136,24 @@ export function DraftPeek({
     []
   );
 
-  /** after `doneId` left the queue: move on from IT, only if it is still the open draft */
-  const goNextFrom = useCallback(
-    (doneId: string) => {
-      const step = nextAfterRemoval(
+  /**
+   * Where to go once `doneId` leaves the queue — computed BEFORE the server call, so it never
+   * depends on whether the revalidated list commits before the await returns.
+   */
+  const planNext = useCallback(
+    (doneId: string) =>
+      nextAfterRemoval(
         rowsRef.current.map((r) => r.id),
         doneId,
         openIdRef.current
-      );
-      if (!step) return;
+      ),
+    []
+  );
+
+  /** apply a planned step, only if `doneId` is still the open draft */
+  const goNext = useCallback(
+    (doneId: string, step: AfterRemoval | null) => {
+      if (!step || !applyIfCurrent(openIdRef.current, { sendId: doneId })) return;
       if (step.kind === "open") onNavigate(step.id);
       else onClose();
     },
@@ -162,6 +171,7 @@ export function DraftPeek({
     if (!row || locked || mode === "edit") return;
     const id = row.id;
     const sends = row.sends.held ? "held until the sender is back" : `sends ${row.sends.label}`;
+    const step = planNext(id);
     begin(id, "approve");
     const res = await approveFromToday(id).catch(failed);
     end(id);
@@ -182,13 +192,14 @@ export function DraftPeek({
         },
       },
     });
-    goNextFrom(id);
-  }, [row, locked, mode, begin, end, errorFor, onRemoved, goNextFrom]);
+    goNext(id, step);
+  }, [row, locked, mode, begin, end, errorFor, onRemoved, planNext, goNext]);
 
   const reject = useCallback(
     async (reason: RejectReason) => {
       if (!row || locked) return;
       const id = row.id;
+      const step = planNext(id);
       begin(id, "reject");
       const res = await rejectDraftWithReason(id, reason).catch(failed);
       end(id);
@@ -206,14 +217,15 @@ export function DraftPeek({
           },
         },
       });
-      goNextFrom(id);
+      goNext(id, step);
     },
-    [row, locked, begin, end, errorFor, onRemoved, goNextFrom]
+    [row, locked, begin, end, errorFor, onRemoved, planNext, goNext]
   );
 
   const suppress = useCallback(async () => {
     if (!row || locked || !onSuppress) return;
     const id = row.id;
+    const step = planNext(id);
     begin(id, "suppress");
     const res = await onSuppress(id).catch(failed);
     end(id);
@@ -223,8 +235,8 @@ export function DraftPeek({
     }
     onRemoved(id, "suppressed");
     toast("Declined · they won't be contacted again");
-    goNextFrom(id);
-  }, [row, locked, onSuppress, begin, end, errorFor, onRemoved, goNextFrom]);
+    goNext(id, step);
+  }, [row, locked, onSuppress, begin, end, errorFor, onRemoved, planNext, goNext]);
 
   const startEdit = useCallback(() => {
     if (!current || locked) return;
