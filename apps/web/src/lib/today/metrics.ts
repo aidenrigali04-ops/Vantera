@@ -125,6 +125,9 @@ export function fmtRelative(then: Date, now: Date): string {
   return `${Math.round(hrs / 24)}d`;
 }
 
+/** Re-exported from the client-safe module so client components can re-tick it (no jobs import). */
+export { fmtUntil } from "./fmt-until";
+
 /** `1,204` — never `1.2k` under 10k (and we never show ≥ 10k on Today). */
 export function fmtCount(n: number): string {
   return n.toLocaleString("en-US");

@@ -15,28 +15,7 @@ import { SEGMENT_TRACK, segmentClass } from "@/components/app/surface";
 import { setAgentStatus, type AgentActionState } from "./actions";
 import { RunNowButton } from "./run-now";
 import type { ShowcaseAgent, ShowcaseKind } from "./agent-showcase-data";
-
-// ── time helpers (shared convention with the dashboard/agent-card) ───────────
-function timeUntil(iso: string | null): string {
-  if (!iso) return "within ~15 min";
-  const ms = new Date(iso).getTime() - Date.now();
-  if (ms <= 0) return "any moment now";
-  const mins = Math.round(ms / 60_000);
-  if (mins < 60) return `in ~${mins} min`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `in ~${hrs}h`;
-  return `in ~${Math.round(hrs / 24)}d`;
-}
-
-function timeAgo(iso: string | null): string {
-  if (!iso) return "no runs yet";
-  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.round(hrs / 24)}d ago`;
-}
+import { useUntil } from "@/lib/use-until";
 
 function statusLabel(s: ShowcaseAgent["status"]): string {
   return s === "live" ? "Live" : s === "paused" ? "Paused" : "Draft";
@@ -96,12 +75,15 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
 
   const live = agent.status === "live";
   const automatic = agent.sendMode === "automatic";
+  const nextRun = useUntil(agent.nextRunAt, agent.nextRunLabel);
 
   const runLine =
     agent.kind === "scout" || agent.kind === "intent"
       ? live
-        ? `Next run ${timeUntil(agent.nextRunAt)}${agent.cadence ? ` · every ${agent.cadence === "daily" ? "day" : agent.cadence === "intraday" ? "6 hours" : "week"}` : ""}`
-        : `Last ran ${timeAgo(agent.lastRunAt)}`
+        ? `Next run ${nextRun}${agent.cadence ? ` · every ${agent.cadence === "daily" ? "day" : agent.cadence === "intraday" ? "6 hours" : "week"}` : ""}`
+        : agent.lastRanLabel
+          ? `Last ran ${agent.lastRanLabel}`
+          : "No runs yet"
       : automatic
         ? "Sending automatically — flagged drafts still come to Approvals."
         : "Drafts wait in Approvals until you approve them.";
@@ -169,15 +151,21 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
           </div>
         )}
 
-        <p className="border-t border-[var(--hairline)] pt-4 text-xs text-muted-foreground">
+        <p
+          className="border-t border-[var(--hairline)] pt-4 text-xs text-muted-foreground"
+          title={live && agent.nextRunTitle ? `Next run ${agent.nextRunTitle}` : undefined}
+        >
           {runLine}
         </p>
 
         {/* T4 operate path: the agent's actual work, run by run — never config-only again. */}
         {agent.attention && (
-          <p className="rounded-[var(--r-btn)] bg-[var(--attention-tint)] px-3 py-2 text-xs font-medium leading-relaxed text-[var(--attention)]">
-            {agent.attention}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--r-btn)] bg-[var(--attention-tint)] px-3 py-2 text-xs font-medium leading-relaxed text-[var(--attention)]">
+            <p className="min-w-0 flex-1">{agent.attention.reason}</p>
+            <Button asChild variant="ghost" size="sm" className="-my-1 shrink-0 text-[var(--attention)]">
+            <Link href={agent.attention.cta.href}>{agent.attention.cta.label}</Link>
+          </Button>
+          </div>
         )}
         {agent.runHistory.length > 0 && (
           <div className="border-t border-[var(--hairline)] pt-4">

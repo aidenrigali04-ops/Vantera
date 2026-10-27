@@ -30,6 +30,9 @@ export interface QueueRow {
   body: string;
   styleFlags: string | null;
   channel: "linkedin";
+  origin: "sequence" | "reply_response" | "manual";
+  /** true only for first-touch drafts (the invite and its first message) — gates Regenerate */
+  regenerable: boolean;
   /** the peek's evidence bullets (≤ 4): signals + the rank's pain points / triggers */
   evidence: Array<{ text: string; href?: string }>;
   /** the rank's one-line rationale */
@@ -38,6 +41,8 @@ export interface QueueRow {
   charLimit: number;
   /** prospect's LinkedIn profile, for the evidence links */
   linkedinUrl: string | null;
+  /** how long ago the draft was written, `fmtRelative` (`now` / `12m` / `3h` / `2d`) */
+  drafted: string;
 }
 
 export type ReplyClass = "Interested" | "Neutral" | "Out of office" | "Needs you";

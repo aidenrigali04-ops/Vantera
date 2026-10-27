@@ -10,6 +10,8 @@
 export interface Violation {
   rule: string;
   detail: string;
+  /** which LinkedIn draft field produced it; undefined = not attributable to one field */
+  part?: "invite" | "message";
 }
 
 // phrases that mark machine-written or template outreach; matched case-insensitively

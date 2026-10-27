@@ -58,6 +58,7 @@ export {
 } from "./copy/opener";
 export {
   draftLinkedIn,
+  regenerateLinkedInStage,
   validateLinkedInDraft,
   leadIdentity,
   linkedinDraftSchema,
@@ -66,6 +67,7 @@ export {
   FOLLOWUP_MAX_CHARS,
   FOLLOWUP_MAX_WORDS,
   type LinkedInDraft,
+  type LinkedInStage,
 } from "./copy/linkedin";
 export {
   leadBlock,
@@ -73,6 +75,8 @@ export {
   proofSection,
   avoidBlock,
   exemplarBlock,
+  steerBlock,
+  STEER_MAX_CHARS,
   type CopyLead,
   type CopyContext,
   type DraftInput,

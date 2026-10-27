@@ -10,7 +10,8 @@ import { FormError } from "@/components/form-error";
 import { setAgentStatus, updateSendMode, type AgentActionState } from "./actions";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { RunNowButton } from "./run-now";
-import { runLine, type AgentRunRow } from "./agent-health";
+import { runLine, type AgentRunRow, type Attention } from "./agent-health";
+import { useUntil } from "@/lib/use-until";
 
 /* Each agent gets the landing's pastel icon tile (components/landing/frame.tsx TONES). */
 const KIND_TILE = {
@@ -36,20 +37,6 @@ export type AgentRow = {
   agent_icps?: { position: number; icps: { name: string } | null }[];
 };
 
-function formatRun(at: string | null, timezone: string): string | null {
-  if (!at) return null;
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      weekday: "short",
-      hour: "numeric",
-      minute: "2-digit",
-      timeZone: timezone,
-    }).format(new Date(at));
-  } catch {
-    return new Date(at).toLocaleString();
-  }
-}
-
 export function AgentCard({
   agent,
   roleLabel,
@@ -58,16 +45,25 @@ export function AgentCard({
   attention = null,
   lastRun = null,
   lastRunAgo = null,
+  nextRunLabel,
+  nextRunTitle = null,
+  lastRanLabel = null,
 }: {
   agent: AgentRow;
   roleLabel: string;
   stats: { label: string; value: number }[];
   index?: number;
   /** T4: why a LIVE agent needs the owner (null = healthy) — computed by agent-health.ts */
-  attention?: string | null;
+  attention?: Attention;
   /** T4: the latest recorded run, for the what-happened line */
   lastRun?: AgentRunRow | null;
   lastRunAgo?: string | null;
+  /** server-formatted `fmtUntil(next_run_at)`; re-ticked client-side every 60s */
+  nextRunLabel: string;
+  /** absolute next run ("Thu 10:30am", agent timezone) for the hover title */
+  nextRunTitle?: string | null;
+  /** server-formatted "5h ago" of last_run_at */
+  lastRanLabel?: string | null;
 }) {
   const [state, action] = useActionState<AgentActionState, FormData>(setAgentStatus, {});
   const [modeState, switchMode, switchingMode] = useActionState<AgentActionState, FormData>(
@@ -82,8 +78,7 @@ export function AgentCard({
     .sort((a, b) => a.position - b.position)
     .map((l) => l.icps?.name)
     .filter((n): n is string => Boolean(n));
-  const nextRun = formatRun(agent.next_run_at, agent.timezone);
-  const lastRanLabel = formatRun(agent.last_run_at, agent.timezone);
+  const nextRun = useUntil(agent.next_run_at, nextRunLabel);
 
   return (
     <Panel index={index} interactive className="flex flex-col gap-4">
@@ -153,9 +148,12 @@ export function AgentCard({
       </div>
 
       {attention && (
-        <p className="rounded-[var(--r-btn)] bg-[var(--attention-tint)] px-3 py-2 text-xs font-medium leading-relaxed text-[var(--attention)]">
-          {attention}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--r-btn)] bg-[var(--attention-tint)] px-3 py-2 text-xs font-medium leading-relaxed text-[var(--attention)]">
+          <p className="min-w-0 flex-1">{attention.reason}</p>
+          <Button asChild variant="ghost" size="sm" className="-my-1 shrink-0 text-[var(--attention)]">
+            <Link href={attention.cta.href}>{attention.cta.label}</Link>
+          </Button>
+        </div>
       )}
 
       {icpNames.length > 0 && (
@@ -190,9 +188,9 @@ export function AgentCard({
                 {runLine(lastRun)}
               </p>
             )}
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground" title={live && nextRunTitle ? `Next run ${nextRunTitle}` : undefined}>
               {live
-                ? nextRun
+                ? agent.next_run_at
                   ? `Next run ${nextRun}`
                   : "First run starts within 15 minutes"
                 : lastRanLabel
@@ -222,7 +220,7 @@ export function AgentCard({
                      this page — it confirms (R2 idiom) instead of firing on one ghost click. */
                   <ConfirmDialog
                     title="Send automatically?"
-                    description="Clean drafts go out on their own within your safety limits. Anything the humanizer flags still waits for you in Approvals. You can switch back anytime."
+                    description="Clean drafts go out on their own within your safety limits. Anything the style check flags still waits for you in Approvals. You can switch back anytime."
                     confirmLabel="Turn on automatic sending"
                     onConfirm={() => modeFormRef.current?.requestSubmit()}
                     trigger={(open) => (

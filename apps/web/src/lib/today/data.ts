@@ -1,7 +1,9 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { CONNECTION_NOTE_MAX_CHARS, FOLLOWUP_MAX_CHARS } from "@vantera/agent-brains";
 import { accountSkipsPayment } from "@/lib/billing/founder-exempt";
+import { billingFacts } from "@/lib/engine/build";
+import { buildQueueRows, leadName, type QueueSendIn, type SignalRowIn } from "./queue";
+import { accountTimeZone, buildSenderFacts, type SenderRaw } from "./sender-facts";
 import { engineLineFor } from "./engine-line";
 import {
   capUsage,
@@ -10,14 +12,11 @@ import {
   fmtDate,
   fmtDayTime,
   fmtRelative,
-  fmtSendSlot,
   fmtTime,
   initials,
-  nextSendWindow,
   replyRate,
-  shortName,
 } from "./metrics";
-import type { ActivityRow, QueueRow, QueueStep, ReplyClass, ReplyRow, SenderChipRow, StatTile, TodayView } from "./rows";
+import type { ActivityRow, QueueRow, ReplyClass, ReplyRow, SenderChipRow, StatTile, TodayView } from "./rows";
 import { checklistFor, GET_STARTED_ASK } from "./checklist";
 import { readChecklistFacts } from "./checklist-facts";
 import { buildStatusSentence } from "./sentence";
@@ -57,17 +56,6 @@ interface LeadLite {
   linkedin_account_id: string | null;
 }
 
-interface DraftRaw {
-  id: string;
-  lead_id: string | null;
-  body: string | null;
-  style_flags: string | null;
-  linkedin_stage: "invite" | "message" | null;
-  origin: "sequence" | "reply_response" | "manual" | null;
-  created_at: string;
-  leads: LeadLite | null;
-}
-
 interface ReplyRaw {
   id: string;
   lead_id: string;
@@ -76,14 +64,6 @@ interface ReplyRaw {
   classification_rationale: string | null;
   received_at: string;
   leads: Pick<LeadLite, "id" | "first_name" | "last_name" | "company_name" | "status"> | null;
-}
-
-interface SenderRaw {
-  id: string;
-  display_name: string | null;
-  status: SenderFacts["status"];
-  connected_at: string | null;
-  updated_at: string | null;
 }
 
 interface AgentRaw {
@@ -110,38 +90,11 @@ export interface TodayLoad {
   accountId: string;
 }
 
-function leadName(l: Pick<LeadLite, "first_name" | "last_name" | "company_name"> | null): string {
-  if (!l) return "Unknown prospect";
-  return [l.first_name, l.last_name].filter(Boolean).join(" ") || l.company_name || "Unknown prospect";
-}
-
-type SignalGlyph = NonNullable<QueueRow["signal"]>["glyph"];
-
-function signalGlyph(kind: string | null): SignalGlyph {
-  const k = (kind ?? "").toLowerCase();
-  if (k.includes("hiring") || k.includes("job")) return "briefcase";
-  if (k.includes("post") || k.includes("comment") || k.includes("engag")) return "message-circle";
-  if (k.includes("role") || k.includes("promot") || k.includes("title")) return "arrow-up-right";
-  if (k.includes("fund") || k.includes("launch") || k.includes("raise")) return "banknote";
-  return null;
-}
-
 function replyClass(classification: string | null, needsHuman: boolean): ReplyClass {
   if (needsHuman) return "Needs you";
   if (classification === "interested") return "Interested";
   if (classification === "out_of_office") return "Out of office";
   return "Neutral";
-}
-
-/** The account timezone: the Prospect agent's configured zone, else UTC. */
-function accountTimeZone(agents: AgentRaw[]): string {
-  const tz = agents.find((a) => a.kind === "scout")?.timezone ?? agents[0]?.timezone ?? "UTC";
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: tz });
-    return tz;
-  } catch {
-    return "UTC";
-  }
 }
 
 export async function loadToday(supabase: SupabaseClient, userId: string, now = new Date()): Promise<TodayLoad | null> {
@@ -204,12 +157,12 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
     supabase
       .from("scheduled_sends")
       .select(
-        "id, lead_id, body, style_flags, linkedin_stage, origin, created_at, leads(id, first_name, last_name, title, company_name, location, ai_score, ai_rationale, ai_insights, linkedin_url, status, linkedin_account_id)"
+        "id, lead_id, body, style_flags, linkedin_stage, origin, recipe, created_at, leads(id, first_name, last_name, title, company_name, location, ai_score, ai_rationale, ai_insights, linkedin_url, status, linkedin_account_id)"
       )
       .eq("status", "pending_review")
       .order("created_at", { ascending: true })
       .limit(60)
-      .returns<DraftRaw[]>(),
+      .returns<QueueSendIn[]>(),
     // Replies that may be waiting (interested / neutral / other); the waiting rule is applied below.
     supabase
       .from("replies")
@@ -265,7 +218,10 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
 
   if (!account.data) return null;
   // Fatal reads (blueprint §8): the senders list and the drafts count.
-  if (senders.error) throw new Error(`today: senders read failed: ${senders.error.message}`);
+  if (senders.error) {
+    console.error("today: senders read failed", senders.error);
+    throw new Error("Couldn't load Today.");
+  }
   if (draftsCountRes.error) throw new Error(`today: drafts count failed: ${draftsCountRes.error.message}`);
 
   const agentRows = agents.data ?? [];
@@ -279,97 +235,31 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
   const todaySends = (sendsTodayRes.data ?? []).filter((x) => isToday(x.sent_at));
   const approvedToday = (approvedTodayRes.data ?? []).filter((x) => isToday(x.approved_at)).length;
   const weekSends = invitesWeekRes.data ?? [];
-  const senderFacts: SenderFacts[] = (senders.data ?? []).map((s) => {
-    const mine = todaySends.filter((x) => x.linkedin_account_id === s.id);
-    return {
-      id: s.id,
-      name: shortName(s.display_name),
-      status: s.status,
-      ageDays: s.connected_at ? Math.max(0, (now.getTime() - new Date(s.connected_at).getTime()) / DAY) : 0,
-      invitesToday: mine.filter((x) => x.scheduled_sends?.linkedin_stage === "invite").length,
-      messagesToday: mine.filter((x) => x.scheduled_sends?.linkedin_stage !== "invite").length,
-      invitesThisWeek: weekSends.filter((x) => x.linkedin_account_id === s.id && x.scheduled_sends?.linkedin_stage === "invite").length,
-      statusChangedAt: s.status === "disconnected" || s.status === "restricted" ? s.updated_at : null,
-    };
-  });
+  const senderFacts: SenderFacts[] = buildSenderFacts(senders.data ?? [], todaySends, weekSends, now);
   const down = downSenders(senderFacts);
   const downIds = new Set(down.map((d) => d.id));
   const senderName = new Map(senderFacts.map((s) => [s.id, s.name]));
 
   // ── drafts (the queue) ───────────────────────────────────────────────────────
-  const drafts = draftsRes.data ?? [];
+  const drafts: QueueSendIn[] = draftsRes.data ?? [];
   const draftsTotal = draftsCountRes.count ?? 0;
   const draftsHeld = drafts.filter((d) => d.leads?.linkedin_account_id && downIds.has(d.leads.linkedin_account_id)).length;
-  // step = position in the lead's sequence: invites are "Invite"; messages are "Follow-up N"
-  // by the number of earlier message-stage drafts/sends for the same lead in this queue set.
-  const messageIndexByLead = new Map<string, number>();
-  const ordered = [...drafts].sort((a, b) => {
-    const rank = (d: DraftRaw) => (d.origin === "reply_response" ? 0 : d.linkedin_stage === "invite" ? 1 : 2);
-    const r = rank(a) - rank(b);
-    if (r !== 0) return r;
-    return (b.leads?.ai_score ?? 0) - (a.leads?.ai_score ?? 0);
-  });
-  const queueRows: QueueRow[] = ordered.slice(0, QUEUE_LIMIT).map((d) => {
-    const lead = d.leads;
-    const name = leadName(lead);
-    let step: QueueStep;
-    if (d.origin === "reply_response") step = "Reply";
-    else if (d.linkedin_stage === "invite") step = "Invite";
-    else {
-      const n = (messageIndexByLead.get(d.lead_id ?? d.id) ?? 0) + 1;
-      messageIndexByLead.set(d.lead_id ?? d.id, n);
-      step = n >= 3 ? "Follow-up 3" : n === 2 ? "Follow-up 2" : "Follow-up 1";
-    }
-    const senderId = lead?.linkedin_account_id ?? healthySenders(senderFacts)[0]?.id ?? null;
-    const held = senderId ? downIds.has(senderId) : false;
-    const slot = nextSendWindow(now, lead?.location);
-    return {
-      id: d.id,
-      leadId: lead?.id ?? null,
-      name,
-      context: [lead?.title, lead?.company_name].filter(Boolean).join(" · "),
-      initials: initials(name),
-      signal: null, // filled below from lead_signals
-      signalFallback: step === "Invite" ? null : "Follow-up due",
-      score: lead?.ai_score ?? null,
-      step,
-      sends: { label: held ? "held" : fmtSendSlot(slot, tz), sender: senderId ? (senderName.get(senderId) ?? null) : null, held },
-      body: d.body ?? "",
-      styleFlags: d.style_flags,
-      channel: "linkedin",
-      evidence: [
-        ...(lead?.ai_insights?.triggers ?? []).slice(0, 2).map((t) => ({ text: t })),
-        ...(lead?.ai_insights?.pain_points ?? []).slice(0, 2).map((t) => ({ text: t })),
-      ].slice(0, 4),
-      rationale: lead?.ai_rationale ?? null,
-      charLimit: step === "Invite" ? CONNECTION_NOTE_MAX_CHARS : FOLLOWUP_MAX_CHARS,
-      linkedinUrl: lead?.linkedin_url ?? null,
-    };
-  });
-
+  const queueArgs = { sends: drafts, downSenderIds: downIds, now, limit: QUEUE_LIMIT, timeZone: tz, senders: senderFacts };
   // top signal per queued lead (one lateral-style read, bounded to the surfaced rows)
-  const queueLeadIds = queueRows.map((r) => r.leadId).filter((x): x is string => Boolean(x));
+  const queueLeadIds = buildQueueRows({ ...queueArgs, signals: [] })
+    .map((r) => r.leadId)
+    .filter((x): x is string => Boolean(x));
+  let queueSignals: SignalRowIn[] = [];
   if (queueLeadIds.length > 0) {
     const { data: signals } = await supabase
       .from("lead_signals")
       .select("lead_id, kind, label, observed_at")
       .in("lead_id", queueLeadIds)
       .order("observed_at", { ascending: false })
-      .returns<{ lead_id: string; kind: string | null; label: string; observed_at: string | null }[]>();
-    const top = new Map<string, { kind: string | null; label: string; observed_at: string | null }>();
-    for (const s of signals ?? []) if (!top.has(s.lead_id)) top.set(s.lead_id, s);
-    for (const r of queueRows) {
-      const s = r.leadId ? top.get(r.leadId) : undefined;
-      if (s) {
-        r.signal = {
-          label: s.label.length > 28 ? `${s.label.slice(0, 27)}…` : s.label,
-          age: s.observed_at ? fmtRelative(new Date(s.observed_at), now) : "",
-          glyph: signalGlyph(s.kind),
-        };
-        r.evidence = [{ text: s.label, href: r.linkedinUrl ?? undefined }, ...r.evidence].slice(0, 4);
-      }
-    }
+      .returns<SignalRowIn[]>();
+    queueSignals = signals ?? [];
   }
+  const queueRows: QueueRow[] = buildQueueRows({ ...queueArgs, signals: queueSignals });
 
   // ── replies waiting (the repo's rule: no delivered message after the reply; not converted) ──
   const candidates = (repliesRes.data ?? []).filter((r) => r.leads?.status !== "converted");
@@ -453,16 +343,7 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
     oldestWaitingAt: waitingByLead[0]?.received_at ?? null,
     senders: senderFacts,
     pausedAt: acct.paused_at,
-    billing: {
-      status: (skipsPayment
-        ? "active"
-        : ["none", "trialing", "active", "past_due", "canceled"].includes(acct.subscription_status)
-          ? acct.subscription_status
-          : "none") as TodayInputs["billing"]["status"],
-      plan: skipsPayment && (!acct.plan || acct.plan === "none") ? "growth" : acct.plan,
-      pastDueSince: acct.subscription_status === "past_due" ? acct.current_period_end : null,
-      canceledAt: acct.subscription_status === "canceled" ? acct.current_period_end : null,
-    },
+    billing: billingFacts(acct, skipsPayment),
     engine: {
       scoutLive: scout?.status === "live",
       firstRunAt,
@@ -478,7 +359,7 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
 
   // ── tiles + primary ──────────────────────────────────────────────────────────
   const topDraft = queueRows[0] ?? null;
-  const topDraftRaw = topDraft ? ordered.find((d) => d.id === topDraft.id) : null;
+  const topDraftRaw = topDraft ? drafts.find((d) => d.id === topDraft.id) : null;
   const needsHuman = (notesRes.data ?? [])[0] ?? null;
   const nextMeeting = nextMeetingRes.data;
   const meetingIsToday = nextMeeting ? fmtActivityTime(new Date(nextMeeting.meeting_at), now, tz) === fmtTime(new Date(nextMeeting.meeting_at), tz) : false;

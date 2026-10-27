@@ -19,9 +19,9 @@ describe("agentAttention", () => {
   });
 
   it("a live copy agent with no LinkedIn connected cannot send — say so", () => {
-    expect(
-      agentAttention({ kind: "copy", status: "live", sendMode: "automatic", linkedinActive: 0, lastRun: null })
-    ).toMatch(/can't send/);
+    const a = agentAttention({ kind: "copy", status: "live", sendMode: "automatic", linkedinActive: 0, lastRun: null });
+    expect(a?.reason).toMatch(/can't send/);
+    expect(a?.cta).toEqual({ label: "Connect LinkedIn", href: "/settings/senders" });
     expect(
       agentAttention({ kind: "copy", status: "live", sendMode: "review", linkedinActive: 1, lastRun: null })
     ).toBeNull();
@@ -29,17 +29,23 @@ describe("agentAttention", () => {
 
   it("a trial-cap idle tells the owner sourcing stopped, not that the search failed", () => {
     const r = run({ summary: { discoveryTarget: 0, discovered: 0, gatePassed: 0, qualified: 0, reason: "trial_cap" } });
-    expect(agentAttention({ kind: "scout", status: "live", linkedinActive: 1, lastRun: r })).toMatch(/lead limit/);
+    const a = agentAttention({ kind: "scout", status: "live", linkedinActive: 1, lastRun: r });
+    expect(a?.reason).toMatch(/lead limit/);
+    expect(a?.cta.href).toBe("/settings/billing");
   });
 
   it("dead-scout class: target > 0 with 0 discovered surfaces to the user", () => {
     const r = run({ summary: { discoveryTarget: 25, discovered: 0, gatePassed: 0, qualified: 0 } });
-    expect(agentAttention({ kind: "scout", status: "live", linkedinActive: 1, lastRun: r })).toMatch(/0 prospects/);
+    const a = agentAttention({ kind: "scout", status: "live", linkedinActive: 1, lastRun: r });
+    expect(a?.reason).toMatch(/0 prospects/);
+    expect(a?.cta.href).toBe("/playbook/scout");
   });
 
   it("parked ICP criteria surface with a fix hint", () => {
     const r = run({ summary: { criteriaPending: 2, discoveryTarget: 25, discovered: 10 } });
-    expect(agentAttention({ kind: "scout", status: "live", linkedinActive: 1, lastRun: r })).toMatch(/2 ICPs/);
+    const a = agentAttention({ kind: "scout", status: "live", linkedinActive: 1, lastRun: r });
+    expect(a?.reason).toMatch(/2 ICPs/);
+    expect(a?.cta.href).toBe("/playbook/scout/edit");
   });
 
   it("a healthy run warns about nothing", () => {
@@ -49,25 +55,31 @@ describe("agentAttention", () => {
 
   it("intent: all reads failing points at the connection", () => {
     const r = run({ kind: "intent", summary: { targets: 4, sourcingErrors: 4, observed: 0 } });
-    expect(agentAttention({ kind: "intent", status: "live", linkedinActive: 1, lastRun: r })).toMatch(/reconnect/);
+    const a = agentAttention({ kind: "intent", status: "live", linkedinActive: 1, lastRun: r });
+    expect(a?.reason).toMatch(/reconnect/);
+    expect(a?.cta.href).toBe("/settings/senders");
   });
 
   it("failed runs warn regardless of kind", () => {
-    expect(
-      agentAttention({ kind: "intent", status: "live", linkedinActive: 1, lastRun: run({ status: "failed" }) })
-    ).toMatch(/failed/);
+    const a = agentAttention({ kind: "intent", status: "live", linkedinActive: 1, lastRun: run({ status: "failed" }) });
+    expect(a?.reason).toMatch(/failed/);
+    expect(a?.cta.href).toBe("/playbook/intent");
   });
 
   it("intent: an empty watchlist is a failed setup, not a quiet day", () => {
     const r = run({ kind: "intent", status: "skipped", note: "empty_watchlist", summary: { reason: "empty_watchlist" } });
-    expect(agentAttention({ kind: "intent", status: "live", linkedinActive: 1, lastRun: r })).toMatch(/watchlist/);
+    const a = agentAttention({ kind: "intent", status: "live", linkedinActive: 1, lastRun: r });
+    expect(a?.reason).toMatch(/watchlist/);
+    expect(a?.cta.href).toBe("/playbook/intent");
   });
 
   it("scout: rank errors with no qualified survivors warn that scoring failed", () => {
     const r = run({
       summary: { discoveryTarget: 10, discovered: 10, gatePassed: 8, qualified: 0, rankErrors: 8 },
     });
-    expect(agentAttention({ kind: "scout", status: "live", linkedinActive: 1, lastRun: r })).toMatch(/Scoring failed/);
+    const a = agentAttention({ kind: "scout", status: "live", linkedinActive: 1, lastRun: r });
+    expect(a?.reason).toMatch(/Scoring failed/);
+    expect(a?.cta.href).toBe("/playbook/scout");
   });
 });
 

@@ -4,7 +4,7 @@ import { getModel, registerPrompt } from "@vantera/ai";
 import { findMissingWhyNow, type WhyNow } from "./why-now";
 import { validateHumanity, findUngroundedClaims, findUngroundedEntities, findTemplateOpener, normalizeDashes, type Violation } from "./humanizer";
 import { findRepeatedOpener } from "./opener";
-import { avoidBlock, exemplarBlock, generateHumanized, leadBlock, strategyDirectives, PROSPECT_ACCURACY_RULE, VOICE_RULES, type DraftInput } from "./shared";
+import { avoidBlock, exemplarBlock, generateHumanized, leadBlock, steerBlock, strategyDirectives, PROSPECT_ACCURACY_RULE, VOICE_RULES, type DraftInput } from "./shared";
 import { FACT_ASSERTING_SHAPES, groundingHasShapeSignal, shapeBudget, type MessageShape } from "./shape";
 
 /**
@@ -84,47 +84,49 @@ export function validateLinkedInDraft(
   avoidSkeletons?: readonly string[] | null,
 ): Violation[] {
   const budget = shapeBudget(shape);
-  const violations = [
-    ...validateHumanity(draft.connection_note, { maxChars: CONNECTION_NOTE_MAX_CHARS }),
-    ...validateHumanity(draft.followup_message, { maxChars: budget.maxChars, maxWords: budget.maxWords }),
+  const tag = (part: "invite" | "message", vs: Violation[]): Violation[] => vs.map((v) => ({ ...v, part }));
+  const note = draft.connection_note;
+  const msg = draft.followup_message;
+  const violations: Violation[] = [
+    ...tag("invite", validateHumanity(note, { maxChars: CONNECTION_NOTE_MAX_CHARS })),
+    ...tag("message", validateHumanity(msg, { maxChars: budget.maxChars, maxWords: budget.maxWords })),
   ];
-  if (/https?:\/\//i.test(draft.connection_note)) {
-    violations.push({ rule: "no-links", detail: "no links in a connection note" });
+  if (/https?:\/\//i.test(note)) {
+    violations.push({ rule: "no-links", detail: "no links in a connection note", part: "invite" });
   }
   // Copy-quality fix (2026-10-21): the follow-up must open on THIS prospect, never on the stock
   // "Thanks for connecting / Curious how" template, and never on a recent message's first words.
-  violations.push(...findTemplateOpener(draft.followup_message));
-  violations.push(...findRepeatedOpener(draft.followup_message, avoidSkeletons, identity));
+  violations.push(...tag("message", findTemplateOpener(msg)));
+  violations.push(...tag("message", findRepeatedOpener(msg, avoidSkeletons, identity)));
   // ML-3: a verified why-now is the reason to reach out — the note must reference it.
-  violations.push(...findMissingWhyNow(draft.connection_note, whyNow, identity));
+  violations.push(...tag("invite", findMissingWhyNow(note, whyNow, identity)));
   // The first follow-up is a soft, human ask — a raw link makes it read like a pitch (content is
   // referenced, never pasted in the first touch). Same anti-pitch discipline as the note.
-  if (/https?:\/\//i.test(draft.followup_message)) {
-    violations.push({ rule: "no-links", detail: "no links in the first follow-up — keep it a soft ask" });
+  if (/https?:\/\//i.test(msg)) {
+    violations.push({ rule: "no-links", detail: "no links in the first follow-up — keep it a soft ask", part: "message" });
   }
   // Touch 1 earns a conversation; it never sells. Product name or a meeting ask here is the
   // classic pitch-slap — enforced, not just prompted.
-  if (sellerName && sellerName.trim().length > 2 && draft.followup_message.toLowerCase().includes(sellerName.trim().toLowerCase())) {
-    violations.push({ rule: "no-product-pitch", detail: `the first message must not name ${sellerName.trim()} — earn the conversation first` });
+  if (sellerName && sellerName.trim().length > 2 && msg.toLowerCase().includes(sellerName.trim().toLowerCase())) {
+    violations.push({ rule: "no-product-pitch", detail: `the first message must not name ${sellerName.trim()} — earn the conversation first`, part: "message" });
   }
-  if (/\b(?:a\s+(?:quick\s+)?call|meeting|demo|calendar|15\s*-?\s*min)\b/i.test(draft.followup_message)) {
-    violations.push({ rule: "no-meeting-ask", detail: "no call/meeting ask in the first message — the question IS the CTA" });
+  if (/\b(?:a\s+(?:quick\s+)?call|meeting|demo|calendar|15\s*-?\s*min)\b/i.test(msg)) {
+    violations.push({ rule: "no-meeting-ask", detail: "no call/meeting ask in the first message — the question IS the CTA", part: "message" });
   }
   if (grounding) {
     violations.push(
-      ...findUngroundedClaims(`${draft.connection_note}\n${draft.followup_message}`, grounding),
-      ...findUngroundedEntities(`${draft.connection_note}\n${draft.followup_message}`, grounding),
+      ...tag("invite", [...findUngroundedClaims(note, grounding), ...findUngroundedEntities(note, grounding)]),
+      ...tag("message", [...findUngroundedClaims(msg, grounding), ...findUngroundedEntities(msg, grounding)]),
     );
     // Deterministic grounding guard (spec §5c, anti-hallucination layer 3): a fact-asserting shape
     // (trigger_consequence / gift / peer_insider) leans its whole framing on a specific prospect
     // fact. If the shape was applied but the grounding block does NOT carry that signal, the premise
-    // was never real — route to review rather than trust it. Belt-and-suspenders on selectMessageShape.
-    // This is NOT a claim to catch all hallucination: an INVENTED fact shaped like the signal is
-    // defended by selection + the directive + PROSPECT_ACCURACY_RULE and ultimately the review queue.
+    // was never real — route to review rather than trust it. The shape governs the follow-up.
     if (shape && FACT_ASSERTING_SHAPES.includes(shape) && !groundingHasShapeSignal(grounding, shape)) {
       violations.push({
         rule: "shape-signal-missing",
         detail: `the ${shape} shape asserts a specific fact, but the grounding has no matching signal — do not use this framing without it`,
+        part: "message",
       });
     }
   }
@@ -136,21 +138,29 @@ export function leadIdentity(lead: DraftInput["lead"]): string {
   return [lead.firstName, lead.lastName, lead.companyName].filter(Boolean).join(" ");
 }
 
-/** LinkedIn copy system: personalized connection note + post-accept follow-up per lead. */
-export async function draftLinkedIn(
-  input: DraftInput,
-  model: LanguageModel = getModel()
-): Promise<LinkedInDraft> {
-  const block = leadBlock(input);
-  // Optional experiment strategy + recent-phrasing avoidance + winning-opener exemplars are
-  // appended after the block; all are empty by default, so the prompt is unchanged when none
-  // applies. Grounding stays the BLOCK alone (none of them adds facts), so the humanizer /
-  // anti-hallucination checks are identical — an exemplar's old metric can never whitelist a
-  // new claim (Stage 0.5).
-  const strat = strategyDirectives(input.context.strategy);
-  const avoid = avoidBlock(input.context.avoidPhrases);
-  const exemplars = exemplarBlock(input.context.winningExemplars);
-  const basePrompt = [block, strat, avoid, exemplars].filter(Boolean).join("\n\n");
+export type LinkedInStage = "invite" | "message";
+
+/**
+ * Single prompt-assembly path for draftLinkedIn and regenerateLinkedInStage so they cannot drift.
+ * `grounding` is the leadBlock ALONE: strategy, avoid, exemplar and steer blocks are prompt-only
+ * and never add facts, so an old metric or a steer number can never whitelist a new claim.
+ */
+function assemblePrompt(input: DraftInput, steer: string | null): { grounding: string; basePrompt: string } {
+  const grounding = leadBlock(input);
+  const basePrompt = [
+    grounding,
+    strategyDirectives(input.context.strategy),
+    avoidBlock(input.context.avoidPhrases),
+    exemplarBlock(input.context.winningExemplars),
+    steerBlock(steer),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  return { grounding, basePrompt };
+}
+
+async function runLinkedIn(input: DraftInput, steer: string | null, model: LanguageModel): Promise<LinkedInDraft> {
+  const { grounding, basePrompt } = assemblePrompt(input, steer);
   // The chosen shape governs the follow-up length budget + the grounding guard in the validator.
   // Unset ⇒ shapeBudget falls back to the exact 180/28 default (byte-identical).
   const shape = input.context.strategy?.messageShape;
@@ -165,19 +175,34 @@ export async function draftLinkedIn(
           maxOutputTokens: 600,
         })
       ).object;
-      // Fix stray em-dashes deterministically before linting (both fields), same reason as the
-      // conversation brain — a clean note shouldn't wait in review over one dash.
+      // Fix stray em-dashes deterministically before linting (both fields).
       return {
         connection_note: normalizeDashes(obj.connection_note),
         followup_message: normalizeDashes(obj.followup_message),
       };
     },
     (draft) =>
-      validateLinkedInDraft(draft, block, input.context.accountName, shape, input.lead.whyNow, leadIdentity(input.lead), input.context.avoidSkeletons)
+      validateLinkedInDraft(draft, grounding, input.context.accountName, shape, input.lead.whyNow, leadIdentity(input.lead), input.context.avoidSkeletons)
   );
-  return {
-    connectionNote: output.connection_note,
-    followupMessage: output.followup_message,
-    violations,
-  };
+  return { connectionNote: output.connection_note, followupMessage: output.followup_message, violations };
+}
+
+/** LinkedIn copy system: personalized connection note + post-accept follow-up per lead. */
+export function draftLinkedIn(input: DraftInput, model: LanguageModel = getModel()): Promise<LinkedInDraft> {
+  return runLinkedIn(input, null, model);
+}
+
+/**
+ * Re-roll one stage with an optional owner steer (prompt-only). Runs the same generate → lint →
+ * bounded re-roll flow as draftLinkedIn. It generates BOTH fields and discards the other one
+ * (token cost accepted). Violations are filtered to this stage (untagged ones are kept).
+ */
+export async function regenerateLinkedInStage(
+  input: DraftInput,
+  stage: LinkedInStage,
+  steer: string | null,
+  model: LanguageModel = getModel()
+): Promise<{ text: string; violations: Violation[] }> {
+  const d = await runLinkedIn(input, steer, model);
+  return { text: stage === "invite" ? d.connectionNote : d.followupMessage, violations: d.violations.filter((v) => v.part === stage || v.part === undefined) };
 }

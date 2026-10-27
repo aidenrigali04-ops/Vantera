@@ -5,15 +5,26 @@ import {
   CONNECTION_NOTE_MAX_CHARS,
   FOLLOWUP_MAX_CHARS,
   FOLLOWUP_MAX_WORDS,
+  STEER_MAX_CHARS,
   describeViolations,
   fixDraftText,
+  regenerateLinkedInStage,
   validateHumanity,
 } from "@vantera/agent-brains";
+import { getModel } from "@vantera/ai";
 import { createClient } from "@/lib/supabase/server";
+import { buildFirstTouchDraftInput } from "@/lib/copy/first-touch-input";
+import { isRegenerable } from "@/lib/copy/regenerable";
 import { normalizeSuppressionValue } from "@/lib/suppression";
 import { parseDraftEdit } from "./validation";
 
-export type ReviewActionState = { error?: string; notice?: string };
+export type ReviewActionState = {
+  error?: string;
+  notice?: string;
+  /** saveDraftEdit: what was actually written, so the caller shows the saved text + re-linted flags */
+  body?: string;
+  styleFlags?: string | null;
+};
 
 async function session() {
   const supabase = await createClient();
@@ -39,12 +50,15 @@ export async function approveDraft(
   const { supabase, user } = await session();
   if (!user) return { error: "Your session expired. Sign in again." };
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("scheduled_sends")
     .update({ status: "approved", approved_by: user.id, approved_at: new Date().toISOString() })
     .eq("id", sendId)
-    .eq("status", "pending_review"); // only queued drafts can be approved
+    .eq("status", "pending_review") // only queued drafts can be approved
+    .select("id");
   if (error) return { error: "Could not approve the draft. Only workspace admins can review." };
+  // 0 rows = already handled or RLS hid it — never report an approval that didn't land.
+  if (!data || data.length === 0) return { error: "That draft was already handled." };
   revalidatePath("/approvals");
   return {};
 }
@@ -88,14 +102,19 @@ export async function saveDraftEdit(
   const violations = validateHumanity([subject, body].filter(Boolean).join("\n"));
   const styleFlags = violations.length > 0 ? describeViolations(violations) : null;
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("scheduled_sends")
     .update({ subject, body, style_flags: styleFlags })
     .eq("id", sendId)
-    .eq("status", "pending_review");
+    .eq("status", "pending_review")
+    .select("id");
   if (error) return { error: "Could not save the edit. Only workspace admins can review." };
+  // 0 rows = no longer pending (sent/approved/canceled) or RLS hid it — never report a save that didn't land.
+  if (!data || data.length === 0) return { error: "That draft was already handled." };
   revalidatePath("/approvals");
-  return {};
+  revalidatePath("/today");
+  revalidatePath("/prospects");
+  return { body, styleFlags };
 }
 
 /**
@@ -145,16 +164,90 @@ export async function fixDraft(
   }
   const styleFlags = fixed.violations.length > 0 ? describeViolations(fixed.violations) : null;
 
-  const { error } = await supabase
+  const { data: written, error } = await supabase
     .from("scheduled_sends")
     .update({ body: fixed.text, style_flags: styleFlags })
     .eq("id", sendId)
-    .eq("status", "pending_review");
+    .eq("status", "pending_review")
+    .select("id");
   if (error) return { error: "Could not save the fix. Only workspace admins can review." };
+  if (!written || written.length === 0) return { error: "That draft was already handled." };
   revalidatePath("/approvals");
+  revalidatePath("/today");
+  revalidatePath("/prospects");
   return styleFlags
-    ? { notice: "Cleaned up what it could — a flag still remains, so give the copy a quick read." }
-    : {};
+    ? {
+        body: fixed.text,
+        styleFlags,
+        notice: "Cleaned up what it could — a flag still remains, so give the copy a quick read.",
+      }
+    : { body: fixed.text, styleFlags: null };
+}
+
+export type RegenerateResult = { body?: string; styleFlags?: string | null; error?: string };
+
+/** The AI call failed. Logged server-side so a broken key or outage shows in runtime logs. */
+function logRegenerateFailure(sendId: string, err: unknown): void {
+  const e = err as { name?: string; message?: string; statusCode?: number };
+  console.error("regenerateDraft: draft failed", { sendId, name: e?.name, statusCode: e?.statusCode, message: e?.message });
+}
+
+/**
+ * Regenerate a queued FIRST-TOUCH draft, optionally steered by a short owner note (prompt-only —
+ * the brain never lets it add facts). The new text goes through the same humanizer; its verdict
+ * is written as the draft's flags. The draft stays pending_review.
+ */
+export async function regenerateDraft(sendId: string, steer: string): Promise<RegenerateResult> {
+  if (!sendId) return { error: "Invalid request." };
+  const { supabase, user } = await session();
+  if (!user) return { error: "Your session expired. Sign in again." };
+
+  const { data: send } = await supabase
+    .from("scheduled_sends")
+    .select("id, lead_id, linkedin_stage, status, recipe")
+    .eq("id", sendId)
+    .eq("status", "pending_review")
+    .maybeSingle<{
+      id: string;
+      lead_id: string;
+      linkedin_stage: "invite" | "message" | null;
+      status: string;
+      recipe: unknown;
+    }>();
+  if (!send) return { error: "That draft was already handled." };
+  // Only the first-touch brain's drafts: follow-ups and replies are thread-aware (I1).
+  if (!isRegenerable(send.recipe)) return { error: "Only first-touch drafts can be regenerated." };
+
+  const input = await buildFirstTouchDraftInput(supabase, send.lead_id);
+  if (!input) return { error: "Couldn't load this prospect's context." };
+
+  const note = steer.trim().slice(0, STEER_MAX_CHARS);
+  let result: Awaited<ReturnType<typeof regenerateLinkedInStage>>;
+  try {
+    result = await regenerateLinkedInStage(
+      input,
+      send.linkedin_stage === "invite" ? "invite" : "message",
+      note || null,
+      getModel()
+    );
+  } catch (err) {
+    logRegenerateFailure(sendId, err);
+    return { error: "Couldn't regenerate right now. Try again." };
+  }
+  const styleFlags = describeViolations(result.violations) ?? null;
+
+  const { data, error } = await supabase
+    .from("scheduled_sends")
+    .update({ body: result.text, style_flags: styleFlags })
+    .eq("id", sendId)
+    .eq("status", "pending_review")
+    .select("id");
+  if (error) return { error: "Could not save the new draft. Only workspace admins can review." };
+  if (!data || data.length === 0) return { error: "That draft was already handled." };
+  revalidatePath("/approvals");
+  revalidatePath("/today");
+  revalidatePath("/prospects");
+  return { body: result.text, styleFlags };
 }
 
 export async function declineAndSuppress(

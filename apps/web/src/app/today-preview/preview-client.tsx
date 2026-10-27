@@ -31,6 +31,13 @@ export function PreviewClient({ state, tab }: { state: PreviewStateKey; tab: "qu
         signOut={noop}
         pauseEngine={noopEngine}
         resumeEngine={noopEngine}
+        chip={
+          view.paused
+            ? { dot: "paused", label: "Paused by you", detail: "Resume", href: null, nextRunAt: null, untilLabel: null, nextRunTitle: null }
+            : { dot: "running", label: "Sending", detail: "12 of 25 invites today", href: null, nextRunAt: null, untilLabel: null, nextRunTitle: null }
+        }
+        groups={{ sourcing: view.paused ? "paused" : "live", outreach: view.paused ? "paused" : "live" }}
+        setAgentGroup={noopEngine}
       />
       <div className="mx-auto flex w-full max-w-[1400px] flex-wrap gap-1.5 px-4 pt-4 sm:px-6">
         {(Object.keys(PREVIEW_STATES) as PreviewStateKey[]).map((key) => (

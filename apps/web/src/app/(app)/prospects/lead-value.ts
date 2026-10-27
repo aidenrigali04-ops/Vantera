@@ -27,6 +27,22 @@ export function scoreVerdict(score: number | null): ScoreVerdict {
   return { tier: "look", label: "Worth a look" };
 }
 
+/** Bars lit in the tier glyph: hot 3, strong 2, look 1, unscored 0. */
+export type TierGlyph = 0 | 1 | 2 | 3;
+
+export function tierGlyph(score: number | null): TierGlyph {
+  switch (scoreVerdict(score).tier) {
+    case "hot":
+      return 3;
+    case "strong":
+      return 2;
+    case "look":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
 /** The qualification bar (rule 06 default min_score). Value is shown only at/above it. */
 export const QUALIFIED_MIN_SCORE = 70;
 
@@ -102,6 +118,8 @@ export interface LeadSignalView {
   kind: string;
   label: string | null;
   detail?: string | null;
+  level?: string | null;
+  source?: string | null;
   observed_at?: string | null;
 }
 
@@ -156,7 +174,7 @@ export function coolingState(
 }
 
 /** Shared relative-day label: "today", "3d ago", "4w ago", "2mo ago". Null on a bad date. */
-function relativeDays(iso: string, now: Date): string | null {
+export function relativeDays(iso: string, now: Date): string | null {
   const t = new Date(iso).getTime();
   if (!Number.isFinite(t)) return null;
   const days = Math.floor((now.getTime() - t) / 86_400_000);

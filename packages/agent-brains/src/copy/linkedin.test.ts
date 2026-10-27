@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV3 } from "ai/test";
 import { fnv1a64 } from "@vantera/ai";
-import { draftLinkedIn, validateLinkedInDraft, LINKEDIN_SYSTEM, CONNECTION_NOTE_MAX_CHARS } from "./linkedin";
+import { draftLinkedIn, regenerateLinkedInStage, validateLinkedInDraft, LINKEDIN_SYSTEM, CONNECTION_NOTE_MAX_CHARS } from "./linkedin";
 import { leadBlock, strategyDirectives, type DraftInput } from "./shared";
 import { validateHumanity } from "./humanizer";
 import { MESSAGE_SHAPES, SHAPE_BUDGET, shapeBudget, type MessageShape } from "./shape";
@@ -484,5 +484,52 @@ describe("draftLinkedIn — repeated opener feeds the bounded regenerate (copy-q
     expect(seen[0]).not.toContain(SKEL);
     expect(out.violations).toEqual([]);
     expect(out.followupMessage).toMatch(/^Three SDRs/);
+  });
+});
+
+describe("regenerateLinkedInStage — steer is prompt-only", () => {
+  it("puts the steer in the model prompt", async () => {
+    const { model, seen } = capturingModel();
+    await regenerateLinkedInStage(INPUT, "invite", "lead with the hiring angle", model);
+    expect(seen[0]).toContain("Owner direction");
+    expect(seen[0]).toContain("lead with the hiring angle");
+  });
+
+  it("omits the steer block when blank, matching draftLinkedIn's prompt byte for byte", async () => {
+    const a = capturingModel();
+    await draftLinkedIn(INPUT, a.model);
+    const b = capturingModel();
+    await regenerateLinkedInStage(INPUT, "message", null, b.model);
+    expect(b.seen[0]).toBe(a.seen[0]);
+  });
+
+  it("never grounds on the steer: a steer-only number in the draft still trips the ungrounded-claim check", async () => {
+    const steered = {
+      connection_note: "Dana, saw Acme grew 40% last quarter, impressive.",
+      followup_message: CLEAN.followup_message,
+    };
+    const m = new MockLanguageModelV3({ doGenerate: async () => textResponse(steered) });
+    const out = await regenerateLinkedInStage(INPUT, "invite", "mention their 40% growth", m);
+    expect(out.violations.some((v) => v.rule === "ungrounded-claim")).toBe(true);
+    // the grounding the validator sees is leadBlock alone: it never contains the steer text
+    expect(leadBlock(INPUT)).not.toContain("40%");
+    expect(leadBlock(INPUT)).not.toContain("mention their");
+  });
+
+  it("returns only the requested stage's violations", async () => {
+    const bad = { connection_note: CLEAN.connection_note, followup_message: "Dana, can we set up a quick call this week?" };
+    const mk = () => new MockLanguageModelV3({ doGenerate: async () => textResponse(bad) });
+    const inv = await regenerateLinkedInStage(INPUT, "invite", null, mk());
+    expect(inv.violations).toEqual([]);
+    const msg = await regenerateLinkedInStage(INPUT, "message", null, mk());
+    expect(msg.violations.some((v) => v.rule === "no-meeting-ask")).toBe(true);
+    expect(msg.violations.every((v) => v.part === "message")).toBe(true);
+  });
+
+  it("returns the field for the requested stage", async () => {
+    const m1 = new MockLanguageModelV3({ doGenerate: async () => textResponse(CLEAN) });
+    expect((await regenerateLinkedInStage(INPUT, "invite", null, m1)).text).toBe(CLEAN.connection_note);
+    const m2 = new MockLanguageModelV3({ doGenerate: async () => textResponse(CLEAN) });
+    expect((await regenerateLinkedInStage(INPUT, "message", null, m2)).text).toBe(CLEAN.followup_message);
   });
 });

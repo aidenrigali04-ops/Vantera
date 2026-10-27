@@ -503,12 +503,17 @@ export async function updateSendMode(
     return { error: "Invalid request." };
   }
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("campaigns")
     .update({ send_mode: sendMode }) // RLS scopes to the admin's account (rule 02)
-    .eq("id", campaignId);
-  if (error) return { error: "Could not update send mode. Only workspace admins can do this." };
+    .eq("id", campaignId)
+    .select("id");
+  // A member RLS won't let write gets 0 rows back, not an error — that is a refusal too.
+  if (error || !data || data.length === 0) {
+    return { error: "Could not update send mode. Only workspace admins can do this." };
+  }
   revalidatePath("/playbook");
+  revalidatePath("/approvals");
   return {};
 }
 
@@ -528,6 +533,9 @@ export async function setAgentStatus(
     .eq("id", agentId);
   if (error) return { error: "Could not update the agent. Only workspace admins can do this." };
   revalidatePath("/playbook");
+  // The chrome's run-state chip lives in the app layout, which doesn't re-render on navigation.
+  revalidatePath("/", "layout");
+  revalidatePath("/today");
   return {};
 }
 

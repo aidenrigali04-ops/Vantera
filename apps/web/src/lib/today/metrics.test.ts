@@ -9,6 +9,7 @@ import {
   fmtRelative,
   fmtSendSlot,
   fmtTime,
+  fmtUntil,
   fmtWindow,
   initials,
   nextSendWindow,
@@ -134,5 +135,18 @@ describe("engineLineFor", () => {
     });
     expect(engineLineFor("stopped_billing", inputs(), { nextSendAt: null, sentToday: 0, allowedToday: 0 })).toMatchObject({ dot: "stopped", link: { href: "/settings/billing" } });
     expect(engineLineFor("stopped_senders", inputs(), { nextSendAt: null, sentToday: 0, allowedToday: 0 })).toMatchObject({ dot: "stopped", link: { href: "/settings/senders" } });
+  });
+});
+
+describe("fmtUntil", () => {
+  const now = new Date("2026-06-16T12:00:00Z");
+  const at = (ms: number) => new Date(now.getTime() + ms);
+  it("buckets", () => {
+    expect(fmtUntil(null, now)).toBe("within ~15 min");
+    expect(fmtUntil(at(-5 * 60_000), now)).toBe("any moment now");
+    expect(fmtUntil(at(30_000), now)).toBe("any moment now");
+    expect(fmtUntil(at(12 * 60_000), now)).toBe("in ~12 min");
+    expect(fmtUntil(at(3 * 3_600_000), now)).toBe("in ~3h");
+    expect(fmtUntil(at(50 * 3_600_000).toISOString(), now)).toBe("in ~2d");
   });
 });

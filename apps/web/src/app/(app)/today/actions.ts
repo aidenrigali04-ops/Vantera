@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { GET_STARTED_ASK } from "@/lib/today/checklist";
+import { REJECT_REASON_ORDER, type RejectReason } from "@/components/today/work-card/reject-reasons";
 
 /**
  * Today's own server actions. Every write resolves the user from the validated session and
@@ -10,8 +11,9 @@ import { GET_STARTED_ASK } from "@/lib/today/checklist";
  * which RLS scopes to the caller's workspace anyway.
  */
 
-export type RejectReason = "wrong_person" | "bad_timing" | "weak_message" | "other";
-const REJECT_REASONS: ReadonlySet<string> = new Set(["wrong_person", "bad_timing", "weak_message", "other"]);
+// One source for the reason set (work-card/reject-reasons.ts); re-exported for existing callers.
+export type { RejectReason };
+const REJECT_REASONS: ReadonlySet<string> = new Set<string>(REJECT_REASON_ORDER);
 
 // The tile asks hide for a day (tiles.ts); GET_STARTED_ASK hides the checklist for good —
 // its permanence lives in `checklistFor`, not in tiles.ts.

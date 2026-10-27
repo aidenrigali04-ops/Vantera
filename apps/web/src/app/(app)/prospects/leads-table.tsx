@@ -6,13 +6,16 @@ import { toast } from "sonner";
 import { ArrowDown, Rows3, Search, SlidersHorizontal, Snowflake, TrendingUp } from "lucide-react";
 import { PANEL_SURFACE, Eyebrow } from "@/components/ui/panel";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ScoreBadge, SourceBadge, WhyNowLine } from "@/components/lead-why-now";
+import { ScoreBadge, SourceBadge, WhyNowCellView, WhyNowLine } from "@/components/lead-why-now";
 import { LeadProfileSheet } from "@/components/lead-profile";
+import { peekNav } from "@/components/lead-profile/use-peek-nav";
+import { regenerateDraft } from "../approvals/actions";
 import { bulkArchiveLeads, bulkSuppressLeads, type BulkResult } from "./bulk-actions";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/today/work-card/chips";
 import { initials } from "@/lib/today/metrics";
-import { EMPTY_FILTERS, leadsHref, type LeadsFilters, type LeadsSort } from "./leads-params";
+import { EMPTY_FILTERS, leadsHref, type LeadsFilters, type LeadsSort, type TabCounts } from "./leads-params";
+import type { IntentPostIn, SignalGroup, WhyNowCell } from "@/lib/prospects/why-now-cell";
 
 export type { LeadsFilters, LeadsSort } from "./leads-params";
 import {
@@ -63,6 +66,20 @@ export interface LeadRow {
   learned_reasons?: { label: string; ratio: number }[] | null;
   /** ML-4: the user's own fit verdict */
   fit_verdict?: "good_fit" | "not_fit" | null;
+  /** UX-2: batched server-side reasons (rendered by the table in a later task) */
+  intent_posts?: IntentPostIn[];
+  queued_draft?: {
+    id: string;
+    body: string;
+    status: string;
+    linkedin_stage: string | null;
+    origin: string | null;
+    style_flags: unknown;
+    /** first-touch drafts only (the invite and its first message) — gates Regenerate */
+    regenerable: boolean;
+  } | null;
+  fit_reason?: string | null;
+  why_now?: WhyNowCell;
 }
 
 export interface ReplyView {
@@ -124,6 +141,22 @@ function StatusPill({ status }: { status: string }) {
 
 function leadName(lead: LeadRow): string {
   return [lead.first_name, lead.last_name].filter(Boolean).join(" ") || "Unknown";
+}
+
+/** LinkedIn mark — lucide dropped brand icons, so the path is inlined. */
+function LinkedInGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 1 1 0-4.125 2.062 2.062 0 0 1 0 4.125zM7.119 20.452H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+    </svg>
+  );
+}
+
+/** Headline of the post the why-now cell links to (its post_ref is the cell's href). */
+function linkedPostTitle(lead: LeadRow): string | null {
+  const href = lead.why_now?.href;
+  if (!href) return null;
+  return lead.intent_posts?.find((p) => p.post_ref === href)?.headline ?? null;
 }
 
 /** Loss-aversion marker: a warm reply left waiting (the warm pipeline going cold). */
@@ -299,6 +332,7 @@ export function LeadsTable({
   per = 25,
   filters = EMPTY_FILTERS,
   industries = [],
+  signalGroups = [],
 }: {
   leads: LeadRow[];
   hotLeads?: LeadRow[];
@@ -310,18 +344,34 @@ export function LeadsTable({
   per?: number;
   filters?: LeadsFilters;
   industries?: string[];
+  /** rendered on the page's tab strip; accepted here so the table and tabs share one prop bag */
+  tabCounts?: TabCounts;
+  signalGroups?: SignalGroup[];
 }) {
-  const [peek, setPeek] = useState<LeadRow | null>(null);
+  // `fromTable` decides whether the peek gets prev/next (table rows) or not (Hot strip cards).
+  const [peek, setPeek] = useState<{
+    lead: LeadRow;
+    fromTable: boolean;
+    section?: "signals" | "message";
+  } | null>(null);
   // R4 bulk selection — page-scoped; every bulk op confirms and toasts its outcome.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkPending, startBulk] = useTransition();
   const density = useSyncExternalStore(subscribeDensity, readDensity, () => "comfortable" as const);
   const toggleDensity = writeDensity;
 
-  const open = (lead: LeadRow) => setPeek(lead);
+  const open = (lead: LeadRow, section?: "signals" | "message") =>
+    setPeek({ lead, fromTable: true, section });
+  const openFromStrip = (lead: LeadRow) => setPeek({ lead, fromTable: false });
   const cellY = density === "compact" ? "py-1.5" : "py-3";
 
   const pageIds = leads.map((l) => l.id);
+  // Prev/next walks the table's final (rendered) order; stepping drops the initial section.
+  const nav = peek?.fromTable ? peekNav(pageIds, peek.lead.id) : null;
+  const step = (id: string | null) => {
+    const next = id ? leads.find((l) => l.id === id) : undefined;
+    if (next) setPeek({ lead: next, fromTable: true });
+  };
   const allSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
   const toggleAll = () =>
     setSelected(allSelected ? new Set() : new Set(pageIds));
@@ -357,7 +407,7 @@ export function LeadsTable({
     leadsHref({ tab, q, sort: sort === field ? "newest" : field, per, filters });
 
   const activeFilterCount =
-    (filters.industry ? 1 : 0) + (filters.min ? 1 : 0) + (filters.days ? 1 : 0) + (filters.intent ? 1 : 0);
+    (filters.industry ? 1 : 0) + (filters.min ? 1 : 0) + (filters.days ? 1 : 0) + (filters.intent ? 1 : 0) + (filters.signal ? 1 : 0);
 
   return (
     // Fills the page's one-screen column: toolbar pinned, the region below scrolls
@@ -374,6 +424,7 @@ export function LeadsTable({
             {filters.min && <input type="hidden" name="min" value={filters.min} />}
             {filters.days && <input type="hidden" name="days" value={filters.days} />}
             {filters.intent && <input type="hidden" name="intent" value="1" />}
+            {filters.signal && <input type="hidden" name="signal" value={filters.signal} />}
             <Search
               className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/60"
               aria-hidden
@@ -465,6 +516,36 @@ export function LeadsTable({
                   />
                   <span>In-market only</span>
                 </label>
+                {signalGroups.length > 0 ? (
+                  <fieldset className="flex flex-col gap-1">
+                    <legend className="mb-1 text-xs font-medium text-muted-foreground">Signal</legend>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="signal"
+                        value=""
+                        defaultChecked={!filters.signal}
+                        className="size-4 accent-[var(--cyan-strong)]"
+                      />
+                      <span>Any signal</span>
+                    </label>
+                    {signalGroups.map((g) => (
+                      <label key={g.kind} className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="signal"
+                          value={g.kind}
+                          defaultChecked={filters.signal === g.kind}
+                          className="size-4 accent-[var(--cyan-strong)]"
+                        />
+                        <span className="min-w-0 flex-1 truncate">{g.label}</span>
+                        <span className="font-mono text-xs tabular-nums text-muted-foreground">{g.count}</span>
+                      </label>
+                    ))}
+                  </fieldset>
+                ) : (
+                  filters.signal && <input type="hidden" name="signal" value={filters.signal} />
+                )}
                 <div className="flex items-center justify-between pt-1">
                   <Link href={leadsHref({ tab, q, sort, per })} className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground">
                     Clear filters
@@ -559,7 +640,7 @@ export function LeadsTable({
       <div className="min-h-0 min-w-0 flex-1 overflow-x-auto lg:overflow-y-auto">
       <HotNowStrip
         hotLeads={hotLeads}
-        onSelect={open}
+        onSelect={openFromStrip}
         avgDealValueCents={avgDealValueCents}
         goalCents={goalCents}
       />
@@ -629,6 +710,18 @@ export function LeadsTable({
                       <div className="min-w-0">
                         <div className="flex min-w-0 items-center gap-2">
                           <p className="truncate font-semibold text-[var(--ink)]">{leadName(lead)}</p>
+                          {lead.linkedin_url && (
+                            <a
+                              href={lead.linkedin_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-label="Open LinkedIn profile"
+                              onClick={(e) => e.stopPropagation()}
+                              className="shrink-0 text-muted-foreground/60 transition-colors hover:text-[var(--acc)]"
+                            >
+                              <LinkedInGlyph className="size-3.5" />
+                            </a>
+                          )}
                           <SourceBadge source={lead.source} />
                         </div>
                         {lead.title && (
@@ -646,9 +739,17 @@ export function LeadsTable({
                   {/* The anticipation column — the real signal gets its own room, never crammed
                       under the name. Cooling rides here too: both answer "why act on this row". */}
                   <td className={cn("hidden overflow-hidden px-4 md:table-cell", cellY)}>
-                    <WhyNowLine lead={lead} className="mt-0" />
+                    {lead.why_now !== undefined ? (
+                      <WhyNowCellView
+                        cell={lead.why_now}
+                        postTitle={linkedPostTitle(lead)}
+                        onMore={() => open(lead, "signals")}
+                      />
+                    ) : (
+                      <WhyNowLine lead={lead} className="mt-0" />
+                    )}
                     <CoolingChip lead={lead} />
-                    {!leadSignalLine(lead.lead_signals, lead.ai_insights) &&
+                    {!(lead.why_now !== undefined ? lead.why_now : leadSignalLine(lead.lead_signals, lead.ai_insights)) &&
                       !coolingState(lead.status, latestReply(lead)?.received_at ?? null) && (
                         <span className="text-muted-foreground/40">—</span>
                       )}
@@ -657,7 +758,7 @@ export function LeadsTable({
                     <StatusPill status={lead.status} />
                   </td>
                   <td className={cn("px-4", cellY)}>
-                    <ScoreBadge score={lead.ai_score} />
+                    <ScoreBadge score={lead.ai_score} glyph />
                   </td>
                   <td className={cn("hidden overflow-hidden px-4 xl:table-cell", cellY)}>
                     {proj ? (
@@ -696,11 +797,27 @@ export function LeadsTable({
           click deeper. Same shared profiler as the dashboard prospects (never a second code path). */}
       {peek && (
         <LeadProfileSheet
-          lead={peek}
+          lead={peek.lead}
           onClose={() => setPeek(null)}
           avgDealValueCents={avgDealValueCents}
           goalCents={goalCents}
-          fullProfileHref={`/prospects/${peek.id}`}
+          fullProfileHref={`/prospects/${peek.lead.id}`}
+          initialSection={peek.section}
+          onRegenerate={
+            peek.lead.queued_draft?.regenerable && peek.lead.queued_draft.status === "pending_review"
+              ? (id, steer) => regenerateDraft(id, steer)
+              : undefined
+          }
+          nav={
+            nav && nav.index >= 0
+              ? {
+                  index: nav.index,
+                  total: nav.total,
+                  onPrev: () => step(nav.prevId),
+                  onNext: () => step(nav.nextId),
+                }
+              : undefined
+          }
         />
       )}
     </div>

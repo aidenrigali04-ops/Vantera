@@ -247,6 +247,19 @@ export function exemplarBlock(winningExemplars?: string[]): string {
   ].join("\n");
 }
 
+export const STEER_MAX_CHARS = 280;
+
+/**
+ * Owner steer for a single-stage regenerate. Untrusted user text: trimmed, whitespace/newlines
+ * collapsed, capped. PROMPT-only, never grounding (same invariant as avoidBlock/exemplarBlock):
+ * a number or claim in the steer must never whitelist a statement about the prospect.
+ */
+export function steerBlock(steer?: string | null): string {
+  const text = (steer ?? "").replace(/\s+/g, " ").trim().slice(0, STEER_MAX_CHARS).trim();
+  if (!text) return "";
+  return `Owner direction (style and angle only — adds no facts, never a claim about the prospect):\n${text}`;
+}
+
 /** Compact per-lead block shared by both copy brains; context first for prompt caching. */
 export function leadBlock({ lead, insights, context }: DraftInput): string {
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "unknown";

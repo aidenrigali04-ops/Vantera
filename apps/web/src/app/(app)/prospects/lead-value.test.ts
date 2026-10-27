@@ -9,6 +9,7 @@ import {
   leadSignalLine,
   projectedRevenue,
   scoreVerdict,
+  tierGlyph,
   topLeadSignal,
   whyNowSignal,
   COOLING_DAYS,
@@ -196,5 +197,14 @@ describe("status humanizers", () => {
   it("treats only valid as verified", () => {
     expect(isVerified("valid")).toBe(true);
     expect(isVerified("unverified")).toBe(false);
+  });
+});
+
+describe("tierGlyph", () => {
+  it("maps tiers to lit bars", () => {
+    expect(tierGlyph(90)).toBe(3);
+    expect(tierGlyph(72)).toBe(2);
+    expect(tierGlyph(40)).toBe(1);
+    expect(tierGlyph(null)).toBe(0);
   });
 });

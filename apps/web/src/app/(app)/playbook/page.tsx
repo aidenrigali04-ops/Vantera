@@ -6,6 +6,8 @@ import { Panel } from "@/components/ui/panel";
 import { AgentCard, type AgentRow } from "./agent-card";
 import { agentAttention, type AgentRunRow } from "./agent-health";
 import { PageHeader } from "@/components/app/surface";
+import { fmtDayTime, fmtUntil } from "@/lib/today/metrics";
+import { safeZone } from "@/lib/today/sender-facts";
 
 export const metadata = { title: "Playbook" };
 
@@ -69,9 +71,18 @@ export default async function AgentsPage({
   const latestRunByAgent = new Map<string, AgentRunRow>();
   for (const r of runRows ?? []) if (!latestRunByAgent.has(r.agent_id)) latestRunByAgent.set(r.agent_id, r);
   const linkedinActive = liActive ?? 0;
+  const now = new Date();
+  // Run times are formatted here on the server (fmtUntil); the card re-ticks the relative label
+  // client-side after mount and keeps the absolute time on hover.
+  const runLabels = (a: AgentRow) => ({
+    nextRunLabel: fmtUntil(a.next_run_at, now),
+    nextRunTitle: a.next_run_at ? fmtDayTime(new Date(a.next_run_at), safeZone(a.timezone)) : null,
+    lastRanLabel: agoLabel(a.last_run_at),
+  });
   const health = (a: AgentRow | null) =>
     a
       ? {
+          ...runLabels(a),
           lastRun: latestRunByAgent.get(a.id) ?? null,
           lastRunAgo: agoLabel(latestRunByAgent.get(a.id)?.started_at ?? null),
           attention: agentAttention({
@@ -82,7 +93,7 @@ export default async function AgentsPage({
             lastRun: latestRunByAgent.get(a.id) ?? null,
           }),
         }
-      : { lastRun: null, lastRunAgo: null, attention: null };
+      : { lastRun: null, lastRunAgo: null, attention: null, nextRunLabel: "", nextRunTitle: null, lastRanLabel: null };
 
   return (
     // One-screen on desktop: the page never scrolls — content scrolls in its own region.

@@ -65,6 +65,10 @@ Along the bottom of the card, one line always tells you what the sending layer i
 
 The limits shown here are the real ones the system enforces — they are not settings. New or quiet accounts ramp up gradually over their first four weeks, and there is a hard weekly ceiling on connection invites. These protect your own LinkedIn account, so they cannot be raised.
 
+## The status chip
+
+Every page has a status chip in the top bar that says what your engine is doing right now: for example "Finding prospects · next run in ~25 min", "Sending · 4 of 20 invites today", "Paused by you", or "Ready" when there is nothing to report. When something needs you, it says so and gives you the fix: "LinkedIn not connected · Connect", "Payment failed · Fix". Click it to open a small panel with **Sourcing** (Prospect and Intent agents) and **Outreach** (Outreach agent) switches, and **Pause everything** / **Resume everything**. Pausing everything pauses every agent and sending; resuming turns them all back on. The switches are locked while paused.
+
 ## Common questions
 
 - **Why is a draft "held"?** Its sender is disconnected or restricted. The draft is kept, not lost; it sends once that sender is back.

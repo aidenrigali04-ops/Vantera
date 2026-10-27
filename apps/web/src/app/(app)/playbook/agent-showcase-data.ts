@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
-import { agentAttention, runLine, type AgentRunRow } from "./agent-health";
+import { agentAttention, runLine, type AgentRunRow, type Attention } from "./agent-health";
+import { fmtDayTime, fmtUntil } from "@/lib/today/metrics";
+import { safeZone } from "@/lib/today/sender-facts";
 
 export type ShowcaseKind = "scout" | "copy" | "intent";
 
@@ -26,7 +28,13 @@ export type ShowcaseAgent = {
   /** Hero progress bar — only where a true 0–100 ratio exists (scout). */
   progress: { label: string; value: number; caption: string } | null;
   /** T4: why a LIVE agent needs the owner (null = healthy) — agent-health.ts */
-  attention: string | null;
+  attention: Attention;
+  /** server-formatted `fmtUntil(nextRunAt)`; the client re-ticks it every 60s */
+  nextRunLabel: string;
+  /** absolute next run ("Thu 10:30am", agent timezone) for the hover title */
+  nextRunTitle: string | null;
+  /** server-formatted "5h ago" of lastRunAt; null = no runs yet */
+  lastRanLabel: string | null;
   /** T4: the last few recorded runs, newest first, server-formatted */
   runHistory: { agoLabel: string; line: string }[];
 };
@@ -98,7 +106,7 @@ function agoLabel(iso: string): string {
 function toShowcaseAgent(
   row: AgentDbRow,
   counts: { sourced: number; qualified: number; drafts: number },
-  health: { attention: string | null; runHistory: { agoLabel: string; line: string }[] }
+  health: { attention: Attention; runHistory: { agoLabel: string; line: string }[] }
 ): ShowcaseAgent {
   const icpNames = (row.agent_icps ?? [])
     .sort((a, b) => a.position - b.position)
@@ -106,11 +114,18 @@ function toShowcaseAgent(
     .filter((n): n is string => Boolean(n));
 
   const config = row.config ?? {};
+  const now = new Date();
+  const runs = {
+    nextRunLabel: fmtUntil(row.next_run_at, now),
+    nextRunTitle: row.next_run_at ? fmtDayTime(new Date(row.next_run_at), safeZone(row.timezone)) : null,
+    lastRanLabel: row.last_run_at ? agoLabel(row.last_run_at) : null,
+  };
 
   if (row.kind === "scout") {
     const { sourced, qualified } = counts;
     return {
       ...health,
+      ...runs,
       id: row.id,
       kind: "scout",
       roleLabel: "Prospect sourcing",
@@ -150,6 +165,7 @@ function toShowcaseAgent(
     );
     return {
       ...health,
+      ...runs,
       id: row.id,
       kind: "intent",
       roleLabel: "Intent detection",
@@ -180,6 +196,7 @@ function toShowcaseAgent(
 
   return {
     ...health,
+    ...runs,
     id: row.id,
     kind: "copy",
     roleLabel: "Outreach & conversations",
