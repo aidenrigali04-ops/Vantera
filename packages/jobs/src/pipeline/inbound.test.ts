@@ -8,7 +8,7 @@ import {
   type ReplyVerdict,
 } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
-import { runInbound } from "./inbound";
+import { handleLinkedInEvent, runInbound } from "./inbound";
 import { MAX_BEST_OF_N } from "./copy-draft";
 import type { InboundDeps, InboundStore, NewScheduledSend, ResponderBundle } from "./types";
 
@@ -31,6 +31,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   bookedMeetings: { leadId: string; at: Date }[];
   scheduledSends: NewScheduledSend[];
   takeovers: { accountId: string; leadId: string; campaignId: string | null }[];
+  nativeMessages: Parameters<InboundStore["insertNativeMessage"]>[0][];
   bundleRequests: { leadId: string; opts?: { excludeReplyId?: string } }[];
   /** ordered log of effect calls — proves the classification marker is written LAST */
   effects: string[];
@@ -51,6 +52,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   const savedProviderRefs: { leadId: string; providerRef: string }[] = [];
   const revivedRuns: { leadId: string; nextActionAt: Date }[] = [];
   const takeovers: { accountId: string; leadId: string; campaignId: string | null }[] = [];
+  const nativeMessages: Parameters<InboundStore["insertNativeMessage"]>[0][] = [];
   const bundleRequests: { leadId: string; opts?: { excludeReplyId?: string } }[] = [];
   const effects: string[] = [];
   const base: InboundStore = {
@@ -79,6 +81,13 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     isOwnOutboundMessage: async () => false,
     pauseForHumanTakeover: async (accountId, leadId, campaignId) => {
       takeovers.push({ accountId, leadId, campaignId });
+    },
+    insertNativeMessage: async (m) => {
+      const created = !nativeMessages.some(
+        (x) => x.accountId === m.accountId && x.providerMessageRef === m.providerMessageRef
+      );
+      if (created) nativeMessages.push(m);
+      return { created };
     },
     addSuppression: async (...args) => { effects.push("suppress"); suppressions.push(args); },
     setLeadConnected: async (leadId, at) => { connectedLeads.push({ leadId, at }); },
@@ -115,6 +124,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     scheduledSends,
     savedProviderRefs,
     takeovers,
+    nativeMessages,
     bundleRequests,
     effects,
   });
@@ -1524,6 +1534,40 @@ describe("runInbound — native human takeover (outbound echo)", () => {
     expect(store.replies).toHaveLength(0); // never a reply
   });
 
+  it("mirrors the natively typed message into the lead's thread (inbox shows it)", async () => {
+    const store = storeForLead();
+    await runInbound({ source: "linkedin", payload: ECHO }, deps(store));
+    expect(store.nativeMessages).toEqual([
+      {
+        accountId: "acc1",
+        leadId: "lead1",
+        providerMessageRef: "li_msg_own_1",
+        body: "Hi Ryan, jumping in personally here",
+        sentAt: new Date("2026-06-12T10:05:00.000Z"),
+      },
+    ]);
+  });
+
+  it("a replayed echo is mirrored once and never re-pauses a thread the user handed back", async () => {
+    const store = storeForLead();
+    await runInbound({ source: "linkedin", payload: ECHO }, deps(store));
+    const again = await runInbound({ source: "linkedin", payload: ECHO }, deps(store));
+    expect(again).toEqual({ handled: true, action: "echo:duplicate" });
+    expect(store.nativeMessages).toHaveLength(1);
+    expect(store.takeovers).toHaveLength(1);
+  });
+
+  it("a stale native message (backfill) is mirrored but does not flip the thread's state now", async () => {
+    const store = storeForLead();
+    const result = await runInbound(
+      { source: "linkedin", payload: ECHO },
+      deps(store, { now: () => new Date("2026-06-20T10:00:00.000Z") })
+    );
+    expect(result).toEqual({ handled: true, action: "echo:mirrored" });
+    expect(store.nativeMessages).toHaveLength(1);
+    expect(store.takeovers).toHaveLength(0);
+  });
+
   it("our own send echoed back is ignored (no takeover)", async () => {
     const seen: unknown[][] = [];
     const store = storeForLead({
@@ -1535,6 +1579,7 @@ describe("runInbound — native human takeover (outbound echo)", () => {
     const result = await runInbound({ source: "linkedin", payload: ECHO }, deps(store));
     expect(result).toEqual({ handled: true, action: "echo:own" });
     expect(store.takeovers).toHaveLength(0);
+    expect(store.nativeMessages).toHaveLength(0); // already in the thread as a Vantera send
     expect(seen).toEqual([["acc1", "lead1", "li_msg_own_1", "Hi Ryan, jumping in personally here"]]);
   });
 
@@ -1543,5 +1588,31 @@ describe("runInbound — native human takeover (outbound echo)", () => {
     const result = await runInbound({ source: "linkedin", payload: ECHO }, deps(store));
     expect(result).toEqual({ handled: false, action: "no matching lead" });
     expect(store.takeovers).toHaveLength(0);
+  });
+});
+
+describe("handleLinkedInEvent — an already-parsed event (the thread-sync entry point)", () => {
+  it("routes a parsed reply through the same reply path as a webhook", async () => {
+    const store = makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li", accountId: "acc1" }),
+      findLeadByProviderRef: async () => ({ id: "lead1", campaignId: "camp1" }),
+    });
+    const result = await handleLinkedInEvent(
+      {
+        type: "reply",
+        providerEventId: "msg_9",
+        connectedAccountRef: LINKEDIN_ACCOUNT_REF,
+        fromProfileUrl: "https://www.linkedin.com/in/ACoAA_PROSPECT",
+        fromProviderRef: "ACoAA_PROSPECT",
+        fromPublicIdentifier: null,
+        fromName: null,
+        body: "Sounds good, tell me more",
+        receivedAt: "2026-06-12T10:05:00.000Z",
+      },
+      deps(store)
+    );
+    expect(result).toEqual({ handled: true, action: "reply:interested" });
+    expect(store.replies).toHaveLength(1);
+    expect(store.replies[0]!.providerMessageRef).toBe("msg_9");
   });
 });

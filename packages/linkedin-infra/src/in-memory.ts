@@ -16,6 +16,8 @@ import type {
   ProfilePostsRequest,
   SearchPostsRequest,
   SendOutcome,
+  ThreadMessageEvent,
+  ThreadMessagesRequest,
   WebhookSetupResult,
 } from "./types";
 
@@ -30,6 +32,8 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
   readonly engagersByPost = new Map<string, LinkedInEngager[]>();
   readonly followers: LinkedInFollower[] = [];
   readonly profiles = new Map<string, LinkedInProfile>();
+  /** Seedable thread history, keyed `${connectedAccountId}:${attendeeProviderRef}` (oldest first). */
+  readonly threads = new Map<string, ThreadMessageEvent[]>();
   private counter = 0;
 
   constructor(private readonly webhookSecret = "in-memory-secret") {}
@@ -143,6 +147,11 @@ export class InMemoryLinkedInInfra implements LinkedInInfra {
 
   async getConnectionState(_req: GetProfileRequest): Promise<{ connected: boolean; distance: string | null }> {
     return { connected: false, distance: null };
+  }
+
+  async listThreadMessages(req: ThreadMessagesRequest): Promise<ThreadMessageEvent[]> {
+    const thread = this.threads.get(`${req.connectedAccountId}:${req.attendeeProviderRef}`) ?? [];
+    return thread.slice(-req.limit);
   }
 
   async probeWebhook(_requestUrl: string): Promise<{ status: number; verified: boolean }> {

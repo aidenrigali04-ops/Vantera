@@ -116,7 +116,7 @@ describe("suppression list (rule 11 — the master gate)", () => {
 });
 
 describe("retention windows (rule 11)", () => {
-  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "lab_decisions", "strategies", "lead_strategy_stamp", "lead_feedback", "meeting_connections", "meeting_events", "lead_embeddings"])(
+  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "lab_decisions", "strategies", "lead_strategy_stamp", "lead_feedback", "meeting_connections", "meeting_events", "lead_embeddings", "native_messages"])(
     "%s states its retention window",
     (table) => {
       expect(allMigrations).toContain(`retention(${table})`);
@@ -125,7 +125,7 @@ describe("retention windows (rule 11)", () => {
 });
 
 describe("service-role-only write surfaces (rules 09/11)", () => {
-  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls", "security_events", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "strategies", "lead_strategy_stamp", "meeting_connections", "meeting_events", "lab_decisions"])(
+  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls", "security_events", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "strategies", "lead_strategy_stamp", "meeting_connections", "meeting_events", "lab_decisions", "native_messages"])(
     "%s has no client write policies",
     (table) => {
     const policyRe = new RegExp(`create policy \\w+ on public\\.${table}\\s+for (insert|update|delete|all)`);

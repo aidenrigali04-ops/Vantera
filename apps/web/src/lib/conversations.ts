@@ -5,7 +5,9 @@ import { orThrow } from "@/lib/supabase/guard";
 /**
  * The conversation cockpit's data layer (L2, spec 2026-07-15). The full two-way thread has
  * always existed in the DB — sent messages in scheduled_sends, inbound in replies — the UI
- * just never stitched it. RLS scopes every query (rule 02); no accountId is passed.
+ * just never stitched it. Messages the user typed natively in LinkedIn live in native_messages
+ * (0073) and join as the seller's manual turns. RLS scopes every query (rule 02); no accountId
+ * is passed.
  */
 
 export type ThreadTurn = {
@@ -31,6 +33,20 @@ type SentRow = {
   linkedin_stage: string | null;
 };
 type ReplyRow = { lead_id: string; body: string | null; received_at: string; classification: string | null };
+type NativeRow = { lead_id: string; body: string; sent_at: string };
+
+/** A natively typed LinkedIn message is a human-sent seller turn: it reads as manual, clears
+ *  "waiting on you", and sorts at the moment it was sent. */
+export function nativeAsSent(rows: NativeRow[]): SentRow[] {
+  return rows.map((n) => ({
+    lead_id: n.lead_id,
+    body: n.body,
+    updated_at: n.sent_at,
+    origin: "manual",
+    recipe: null,
+    linkedin_stage: "message",
+  }));
+}
 
 function playLabel(recipe: SendRecipe | null): string | null {
   const strategy = (recipe?.strategy ?? null) as CopyStrategy | null;
@@ -40,7 +56,7 @@ function playLabel(recipe: SendRecipe | null): string | null {
 
 /** Full two-way thread for one lead, oldest first. */
 export async function loadThread(db: SupabaseClient, leadId: string): Promise<ThreadTurn[]> {
-  const [{ data: sent }, { data: got }] = await Promise.all([
+  const [{ data: sentRows }, { data: got }, { data: native }] = await Promise.all([
     db
       .from("scheduled_sends")
       .select("lead_id, body, updated_at, origin, recipe, linkedin_stage")
@@ -52,9 +68,15 @@ export async function loadThread(db: SupabaseClient, leadId: string): Promise<Th
       .select("lead_id, body, received_at, classification")
       .eq("lead_id", leadId)
       .returns<ReplyRow[]>(),
+    db
+      .from("native_messages")
+      .select("lead_id, body, sent_at")
+      .eq("lead_id", leadId)
+      .returns<NativeRow[]>(),
   ]);
+  const sent = [...(sentRows ?? []), ...nativeAsSent(native ?? [])];
   const turns: ThreadTurn[] = [
-    ...(sent ?? [])
+    ...sent
       .filter((s) => (s.body ?? "").trim())
       .map((s) => ({
         role: "agent" as const,
@@ -106,7 +128,7 @@ export async function loadInbox(
   const sentLimit = Math.min(opts.sentLimit ?? 600, 3000);
   const replyLimit = Math.min(opts.replyLimit ?? 400, 2000);
   // R1c: a failed read must hit the route's error boundary, never render an empty inbox.
-  const [sentRes, gotRes] = await Promise.all([
+  const [sentRes, gotRes, nativeRes] = await Promise.all([
     db
       .from("scheduled_sends")
       .select("lead_id, body, updated_at, origin, recipe, linkedin_stage")
@@ -120,8 +142,17 @@ export async function loadInbox(
       .order("received_at", { ascending: false })
       .limit(replyLimit)
       .returns<ReplyRow[]>(),
+    db
+      .from("native_messages")
+      .select("lead_id, body, sent_at")
+      .order("sent_at", { ascending: false })
+      .limit(replyLimit)
+      .returns<NativeRow[]>(),
   ]);
-  const sent = orThrow(sentRes, "your sent messages");
+  const sent = [
+    ...(orThrow(sentRes, "your sent messages") ?? []),
+    ...nativeAsSent(orThrow(nativeRes, "your LinkedIn messages") ?? []),
+  ];
   const got = orThrow(gotRes, "replies");
   const byLead = new Map<
     string,

@@ -33,6 +33,7 @@ import {
   outreachSends,
   proofPoints,
   replies,
+  nativeMessages,
   revealRuns,
   scheduledSends,
   sequenceRuns,
@@ -139,6 +140,7 @@ import {
   type SequenceTouchStore,
   type StrategyStampStore,
 } from "./types";
+import type { ThreadSyncStore } from "./thread-sync";
 import { normalizeLinkedInUrl } from "./copy-draft";
 import { stampEnteredLead } from "./stamp";
 import { resolveSequenceConfig } from "./sequence-config";
@@ -2234,6 +2236,23 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       return Boolean(byBody);
     },
 
+    async insertNativeMessage(m: {
+      accountId: string;
+      leadId: string;
+      providerMessageRef: string;
+      body: string;
+      sentAt: Date;
+    }) {
+      // Idempotent on (account_id, provider_message_ref) — 0073 unique index; the webhook and the
+      // thread sync share the provider's message id, so neither can mirror a message twice.
+      const rows = await db
+        .insert(nativeMessages)
+        .values(m)
+        .onConflictDoNothing({ target: [nativeMessages.accountId, nativeMessages.providerMessageRef] })
+        .returning({ id: nativeMessages.id });
+      return { created: rows.length > 0 };
+    },
+
     async pauseForHumanTakeover(accountId: string, leadId: string, campaignId: string | null) {
       // Same semantics as the in-app manual reply (sendManualReply): the agent's queued drafts go
       // (never a human's own manual sends), and every live-or-stood-down run holds at paused_reply
@@ -2352,8 +2371,15 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
             or(isNull(replies.classification), ne(replies.classification, "out_of_office"))
           )
         );
+      // What the user typed natively in LinkedIn (0073) is the seller's side of the thread too — a
+      // brain blind to it re-asks what the human already asked, or contradicts what they promised.
+      const native = await db
+        .select({ body: nativeMessages.body, at: nativeMessages.sentAt })
+        .from(nativeMessages)
+        .where(and(eq(nativeMessages.accountId, accountId), eq(nativeMessages.leadId, leadId)));
       const thread = [
         ...sent.map((s) => ({ role: "agent" as const, text: s.body ?? "", at: s.deliveredAt })),
+        ...native.map((n) => ({ role: "agent" as const, text: n.body, at: n.at })),
         ...got.map((r) => ({ role: "lead" as const, text: r.body ?? "", at: r.at })),
       ]
         .filter((t) => t.text.trim() !== "")
@@ -2365,10 +2391,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       // A human's manual message is thread context and gates the delivery gap, but never spends
       // the AGENT's converse-to-close budget.
       const agentMessages = sentMessages.filter((s) => s.origin !== "manual");
-      const lastAgentMessageAt = sentMessages.reduce<Date | null>(
-        (max, r) => (max === null || r.deliveredAt > max ? r.deliveredAt : max),
-        null
-      );
+      // A natively typed message gates the delivery gap exactly like an in-app manual one.
+      const lastAgentMessageAt = [...sentMessages.map((r) => r.deliveredAt), ...native.map((n) => n.at)].reduce<
+        Date | null
+      >((max, at) => (max === null || at > max ? at : max), null);
 
       // Newest message-stage draft still queued/in-flight — callers decide what it means:
       // sequence touches never stack on one; the responder supersedes it when it predates the reply.
@@ -4376,6 +4402,49 @@ export function createPullbackStore(db: Db) {
         .update(accounts)
         .set({ lifecycleLastEmailAt: at })
         .where(eq(accounts.id, accountId));
+    },
+  };
+}
+
+/**
+ * Thread sync (0073) store — the rotation over contacted leads' LinkedIn threads. Service role,
+ * cross-tenant by design (a system job, like the scheduler): every row carries its own accountId
+ * and the inbound handler re-derives the tenant from the connected identity anyway.
+ */
+export function createThreadSyncStore(db: Db): ThreadSyncStore {
+  return {
+    async listThreadSyncCandidates(perAccount: number) {
+      // The lead's assigned sender seat when it has one; else its tenant's ONLY active seat (a
+      // lead matched by an inbound message before any send). Ambiguous → skipped, never guessed.
+      const rows = (await db.execute(sql`
+        with cand as (
+          select l.id as lead_id, l.account_id, l.linkedin_provider_ref as attendee,
+            coalesce(
+              (select la.provider_ref from ${linkedinAccounts} la
+                where la.id = l.linkedin_account_id and la.status = 'active'),
+              (select min(la.provider_ref) from ${linkedinAccounts} la
+                where la.account_id = l.account_id and la.status = 'active'
+                having count(*) = 1)
+            ) as seat,
+            l.linkedin_thread_synced_at as synced_at
+          from ${leads} l
+          where l.linkedin_provider_ref is not null
+        ), ranked as (
+          select *, row_number() over (partition by seat order by synced_at asc nulls first, lead_id) as rn
+          from cand where seat is not null
+        )
+        select lead_id, account_id, attendee, seat from ranked where rn <= ${perAccount}
+      `)) as unknown as { lead_id: string; account_id: string; attendee: string; seat: string }[];
+      return rows.map((r) => ({
+        leadId: r.lead_id,
+        accountId: r.account_id,
+        attendeeProviderRef: r.attendee,
+        connectedAccountRef: r.seat,
+      }));
+    },
+
+    async markThreadSynced(leadId: string, at: Date) {
+      await db.update(leads).set({ linkedinThreadSyncedAt: at }).where(eq(leads.id, leadId));
     },
   };
 }

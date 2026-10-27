@@ -13,8 +13,13 @@ first.
 ## The thread
 
 Each thread shows everything: the messages Vera sent (labeled with the play that wrote them),
-anything you sent yourself, and every reply from the prospect with its read on it (interested,
-not interested, and so on).
+anything you sent yourself — from Vantera or typed directly in LinkedIn — and every reply from
+the prospect with its read on it (interested, not interested, and so on).
+
+Your LinkedIn conversations with prospects are mirrored here automatically. New messages usually
+appear within a minute, and every prospect's thread is also re-checked against LinkedIn every few
+hours, so nothing you or a prospect sent goes missing — even if a message took the long way
+around.
 
 ## Replying
 

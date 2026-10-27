@@ -8,6 +8,7 @@ import {
   type ReplyVerdict,
 } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
+import type { LinkedInEvent } from "@vantera/linkedin-infra";
 import { normalizeLinkedInUrl, MAX_BEST_OF_N } from "./copy-draft";
 import type { InboundDeps, InboundPayload, InboundStore, InboundSummary } from "./types";
 
@@ -271,10 +272,18 @@ async function matchLead(
  * not_interested / unsubscribe write suppression (entries never expire).
  */
 export async function runInbound(payload: InboundPayload, deps: InboundDeps): Promise<InboundSummary> {
-  const now = deps.now?.() ?? new Date();
-
   const event = deps.linkedinInfra.parseEventWebhook(payload.payload);
   if (!event) return { handled: false, action: "unparseable" };
+  return handleLinkedInEvent(event, deps);
+}
+
+/**
+ * The event-level core of runInbound — also the entry point for the thread sync, which reads
+ * messages straight from the provider (no webhook payload) and must route them through exactly
+ * the same matching, idempotency and side effects as a webhook delivery.
+ */
+export async function handleLinkedInEvent(event: LinkedInEvent, deps: InboundDeps): Promise<InboundSummary> {
+  const now = deps.now?.() ?? new Date();
 
   if (event.type === "account_status") {
     if (!event.vanteraAccountId) return { handled: false, action: "account event without tenant" };
@@ -359,6 +368,22 @@ export async function runInbound(payload: InboundPayload, deps: InboundDeps): Pr
     if (!lead) return { handled: false, action: "no matching lead" };
     if (await deps.store.isOwnOutboundMessage(accountId, lead.id, event.providerEventId, event.body)) {
       return { handled: true, action: "echo:own" };
+    }
+    // Mirror the human's message into the thread — the inbox stitches threads from stored rows,
+    // and this one existed nowhere else. Idempotent on the provider message id (0073).
+    const sentAt = new Date(event.sentAt);
+    const { created } = await deps.store.insertNativeMessage({
+      accountId,
+      leadId: lead.id,
+      providerMessageRef: event.providerEventId,
+      body: event.body,
+      sentAt,
+    });
+    // Takeover is a reaction to a FRESH message, once. A replayed echo, or a days-old one found by
+    // the thread sync, must not re-pause a thread the user has since handed back to the agent.
+    if (!created) return { handled: true, action: "echo:duplicate" };
+    if (now.getTime() - sentAt.getTime() > RESPOND_MAX_REPLY_AGE_MS) {
+      return { handled: true, action: "echo:mirrored" };
     }
     await deps.store.pauseForHumanTakeover(accountId, lead.id, lead.campaignId);
     return { handled: true, action: "echo:human_takeover" };

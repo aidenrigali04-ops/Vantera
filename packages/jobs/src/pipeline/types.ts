@@ -800,6 +800,18 @@ export interface InboundStore {
    * top of the person now driving the thread.
    */
   pauseForHumanTakeover(accountId: string, leadId: string, campaignId: string | null): Promise<void>;
+  /**
+   * Mirror a message the account owner typed natively in LinkedIn into the lead's thread (0073).
+   * Idempotent on (accountId, providerMessageRef): `created` is false when it was already stored,
+   * which is how a replay or a sync pass knows not to react to it a second time.
+   */
+  insertNativeMessage(m: {
+    accountId: string;
+    leadId: string;
+    providerMessageRef: string;
+    body: string;
+    sentAt: Date;
+  }): Promise<{ created: boolean }>;
   addSuppression(
     accountId: string,
     kind: "linkedin",
