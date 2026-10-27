@@ -31,3 +31,8 @@ export function reconcileRemoved(removed: ReadonlySet<string>, rowIds: readonly 
   const present = new Set(rowIds);
   return new Set([...removed].filter((id) => present.has(id)));
 }
+
+/** A stable key for the SET of row ids on screen — a re-render with the same rows keeps it. */
+export function rowsKey(rows: readonly { id: string }[]): string {
+  return rows.map((r) => r.id).join("\u0000");
+}

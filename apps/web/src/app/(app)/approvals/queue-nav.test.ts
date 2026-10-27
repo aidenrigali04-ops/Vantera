@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reconcileRemoved, resolveOpenDraft } from "./queue-nav";
+import { reconcileRemoved, resolveOpenDraft, rowsKey } from "./queue-nav";
 
 const ids = ["a", "b", "c", "d"];
 
@@ -63,5 +63,24 @@ describe("reconcileRemoved", () => {
     const out = reconcileRemoved(input, ["a"]);
     expect(out).not.toBe(input);
     expect(input.size).toBe(2);
+  });
+});
+
+describe("rowsKey", () => {
+  it("gives the same key for the same ids (new array, new objects)", () => {
+    expect(rowsKey([{ id: "a" }, { id: "b" }])).toBe(rowsKey([{ id: "a" }, { id: "b" }]));
+  });
+
+  it("gives a different key when the ids change", () => {
+    expect(rowsKey([{ id: "a" }, { id: "b" }])).not.toBe(rowsKey([{ id: "a" }]));
+    expect(rowsKey([{ id: "a" }, { id: "b" }])).not.toBe(rowsKey([{ id: "a" }, { id: "c" }]));
+  });
+
+  it("never collides across id boundaries", () => {
+    expect(rowsKey([{ id: "ab" }, { id: "c" }])).not.toBe(rowsKey([{ id: "a" }, { id: "bc" }]));
+  });
+
+  it("is empty-safe", () => {
+    expect(rowsKey([])).toBe("");
   });
 });

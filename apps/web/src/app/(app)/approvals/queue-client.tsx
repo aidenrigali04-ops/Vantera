@@ -14,7 +14,7 @@ import { resumeEngine } from "@/app/(app)/engine-actions";
 import { declineAndSuppress } from "./actions";
 import { BlockersStack } from "./blockers-stack";
 import { ModeSwitch, type SendModeChoice } from "./mode-switch";
-import { reconcileRemoved, resolveOpenDraft } from "./queue-nav";
+import { reconcileRemoved, resolveOpenDraft, rowsKey } from "./queue-nav";
 
 const KEYS: Array<[string, string]> = [
   ["A", "Approve"],
@@ -65,18 +65,21 @@ export function QueueClient({
   const [optimisticMode, setOptimisticMode] = useState<SendModeChoice | null>(null);
   const paneRef = useRef<HTMLDivElement>(null);
 
-  // Every action revalidates /approvals, so a new `rows` prop is server truth: drop removed ids
-  // the server no longer returns (an Undo that brings one back shows it again) and reopen the
-  // pane (render-time reset, no stale frame).
   // the optimistic send mode holds until the server's mode changes under it
   const [syncedMode, setSyncedMode] = useState(sendMode);
   if (syncedMode !== sendMode) {
     setSyncedMode(sendMode);
     setOptimisticMode(null);
   }
-  const [syncedRows, setSyncedRows] = useState(rows);
-  if (syncedRows !== rows) {
-    setSyncedRows(rows);
+
+  // Every action revalidates /approvals, so a changed row set is server truth: drop removed ids
+  // the server no longer returns (an Undo that brings one back shows it again) and reopen the
+  // pane (render-time reset, no stale frame). Keyed by the row ids, not the array reference:
+  // a same-rows re-render (e.g. the × updating ?draft) must not reopen the pane it just closed.
+  const key = rowsKey(rows);
+  const [syncedKey, setSyncedKey] = useState(key);
+  if (syncedKey !== key) {
+    setSyncedKey(key);
     setRemoved((prev) => reconcileRemoved(prev, rows.map((r) => r.id)));
     setClosed(false);
   }
