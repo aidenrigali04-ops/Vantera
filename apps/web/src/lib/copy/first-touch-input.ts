@@ -11,8 +11,10 @@ type SessionClient = Awaited<ReturnType<typeof createClient>>;
  *
  * Deliberately NO bookingUrl: the first touch is link-free by rule; the link belongs to the
  * conversation stage. Manual re-roll: mirrors the pipeline's first-touch grounding (lead, insights,
- * account positioning, CTA, website); the pipeline's strategy/exemplar/avoid steering is
- * intentionally not replayed here. Null when the lead isn't visible/has no insights, or no live Outreach agent.
+ * account positioning, CTA) — and, like `toDraftInput`, no website link and no seller name in the
+ * grounding. The pipeline's strategy/exemplar/avoid steering is intentionally not replayed here.
+ * The agent may be live or paused (the queue stays open while paused). Null when the lead isn't
+ * visible/has no insights, or there is no deployed Outreach agent.
  */
 export async function buildFirstTouchDraftInput(
   supabase: SessionClient,
@@ -36,15 +38,14 @@ export async function buildFirstTouchDraftInput(
       .from("agents")
       .select("config")
       .eq("kind", "copy")
-      .eq("status", "live")
+      .in("status", ["live", "paused"])
       .limit(1)
-      .maybeSingle<{ config: { cta?: string; websiteUrl?: string | null } | null }>(),
+      .maybeSingle<{ config: { cta?: string } | null }>(),
     supabase
       .from("accounts")
-      .select("name, onboarding_industry, value_prop, brand_voice, guardrails, website_scan")
+      .select("onboarding_industry, value_prop, brand_voice, guardrails, website_scan")
       .limit(1)
       .maybeSingle<{
-        name: string | null;
         onboarding_industry: string | null;
         value_prop: string | null;
         brand_voice: string | null;
@@ -74,8 +75,6 @@ export async function buildFirstTouchDraftInput(
     insights: lead.ai_insights,
     context: {
       cta: agent.config?.cta ?? "a quick look",
-      websiteUrl: agent.config?.websiteUrl ?? null,
-      accountName: account?.name ?? null,
       accountIndustry: account?.onboarding_industry ?? null,
       valueProp: account?.value_prop ?? account?.website_scan?.summary ?? null,
       brandVoice: account?.brand_voice ?? null,

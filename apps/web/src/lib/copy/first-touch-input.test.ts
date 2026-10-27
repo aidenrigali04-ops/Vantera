@@ -15,6 +15,7 @@ function fakeClient(rows: Rows) {
       const b: Record<string, unknown> = {
         select: () => b,
         eq: () => b,
+        in: () => b,
         limit: () => b,
         maybeSingle: () => Promise.resolve(result),
         returns: () => b,
@@ -38,7 +39,9 @@ describe("buildFirstTouchDraftInput", () => {
     const input = await buildFirstTouchDraftInput(fakeClient(base), "l1");
     expect(input).not.toBeNull();
     expect(input!.context.bookingUrl).toBeUndefined();
-    expect(input!.context.websiteUrl).toBe("https://site.example");
+    // the pipeline's toDraftInput sets neither: no link and no seller name in first-touch grounding
+    expect(input!.context).not.toHaveProperty("websiteUrl");
+    expect(input!.context).not.toHaveProperty("accountName");
     expect(input!.context.cta).toBe("book intro");
     expect(input!.context.valueProp).toBe("scan summary");
     expect(input!.context.brandVoice).toBe("warm");
@@ -52,7 +55,24 @@ describe("buildFirstTouchDraftInput", () => {
     expect(input!.context.valueProp).toBe("we fix churn");
   });
 
-  it("returns null without a live copy agent", async () => {
+  it("reads the Outreach agent whether live or paused (Regenerate still works while paused)", async () => {
+    const filters: unknown[][] = [];
+    const client = fakeClient(base) as unknown as { from: (t: string) => Record<string, (...a: unknown[]) => unknown> };
+    const spy = {
+      from(table: string) {
+        const b = client.from(table);
+        const wrapped: Record<string, unknown> = { ...b };
+        for (const k of ["eq", "in"]) wrapped[k] = (...a: unknown[]) => (table === "agents" && filters.push([k, ...a]), wrapped);
+        for (const k of ["select", "limit", "returns"]) wrapped[k] = () => wrapped;
+        return wrapped;
+      },
+    };
+    expect(await buildFirstTouchDraftInput(spy as never, "l1")).not.toBeNull();
+    expect(filters).toContainEqual(["in", "status", ["live", "paused"]]);
+    expect(filters).not.toContainEqual(["eq", "status", "live"]);
+  });
+
+  it("returns null without a deployed (live or paused) copy agent", async () => {
     expect(await buildFirstTouchDraftInput(fakeClient({ ...base, agents: null }), "l1")).toBeNull();
   });
 
