@@ -186,13 +186,11 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
 
       {/* actions */}
       <div className="mt-5 flex flex-wrap items-center gap-2">
-        {agent.kind !== "intent" && (
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/playbook/${agent.kind}/edit`}>
-              <Settings2 className="size-4" /> Edit config
-            </Link>
-          </Button>
-        )}
+        <Button asChild variant="outline" size="sm">
+          <Link href={`/playbook/${agent.kind}/edit`}>
+            <Settings2 className="size-4" /> Edit config
+          </Link>
+        </Button>
         {agent.kind === "scout" && (
           <Button asChild variant="outline" size="sm">
             <Link href="/playbook/scout/targeting">Targeting rules</Link>

@@ -1,7 +1,7 @@
 ---
 title: Your Intent Agent
 surface: agents
-routes: /playbook, /playbook/new/intent, /playbook/intent
+routes: /playbook, /playbook/new/intent, /playbook/intent, /playbook/intent/edit
 ---
 
 # Your Intent Agent
@@ -41,6 +41,10 @@ Only people who clear both become prospects, each tagged with the "why now" sign
 2. **Watch** — the keywords and hashtags are already filled in from your website scan, brand, and ICP; edit them or add your own, then pick your signal types. You need a deployed Prospect Agent first, since the Intent Agent qualifies against its ICP.
 3. **Schedule** — pick a run time and a daily or weekly cadence.
 4. **Deploy** — its first run starts within about 15 minutes. Qualified intent prospects flow straight into Approvals — nothing sends without you.
+
+## Changing what it watches
+
+Open the agent on the Playbook page and choose **Edit config**. You can rename it, add or remove keywords, competitors, hashtags, and creators, switch signal types on or off, and change the run time or cadence. **Save changes** keeps the agent live (or paused, if you paused it) — the new watchlist is read on its next run, within about 15 minutes, and then it follows the new schedule. Only workspace admins can change an agent.
 
 ## Company events, too (Growth and Scale)
 

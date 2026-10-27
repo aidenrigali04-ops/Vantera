@@ -122,13 +122,11 @@ export function AgentCard({
         </div>
         </div>
         <div className="flex items-center gap-1">
-          {agent.kind !== "intent" && (
-            <Button asChild variant="ghost" size="sm">
-              <Link href={`/playbook/${agent.kind}/edit`}>
-                <Settings2 className="size-4" /> Edit config
-              </Link>
-            </Button>
-          )}
+          <Button asChild variant="ghost" size="sm">
+            <Link href={`/playbook/${agent.kind}/edit`}>
+              <Settings2 className="size-4" /> Edit config
+            </Link>
+          </Button>
           {agent.kind === "scout" && (
             <Button asChild variant="ghost" size="sm">
               <Link href="/playbook/scout/targeting">Targeting rules</Link>
