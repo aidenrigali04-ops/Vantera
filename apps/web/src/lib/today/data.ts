@@ -126,10 +126,11 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
     approvedTodayRes,
     answeredWeekRes,
     checklistData,
+    repliesTotalRes,
   ] = await Promise.all([
     supabase
       .from("accounts")
-      .select("id, name, plan, subscription_status, stripe_subscription_id, paused_at, current_period_end")
+      .select("id, name, plan, subscription_status, stripe_subscription_id, paused_at, current_period_end, avg_deal_value_cents")
       .limit(1)
       .maybeSingle<{
         id: string;
@@ -139,6 +140,7 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
         stripe_subscription_id: string | null;
         paused_at: string | null;
         current_period_end: string | null;
+        avg_deal_value_cents: number | null;
       }>(),
     supabase
       .from("user_profiles")
@@ -214,6 +216,8 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
     supabase.from("replies").select("id", { count: "exact", head: true }).gte("received_at", weekAgo).in("classification", ["interested", "neutral", "other"]),
     // Get Started facts (UX-1): derived from existing data; degrades to "not done" on error.
     readChecklistFacts(supabase).catch(() => ({ buyersConfirmed: false, prospectsReviewed: false, firstApprovedAt: null, calendarOrCrmConnected: false })),
+    // all-time replies — the deal-size ask waits for the first one
+    supabase.from("replies").select("id", { count: "exact", head: true }),
   ]);
 
   if (!account.data) return null;
@@ -386,6 +390,8 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
     crmHandoff: null,
     calendarLink: null,
     dismissedAsks: prof?.dismissed_asks ?? {},
+    avgDealValueCents: acct.avg_deal_value_cents ?? null,
+    repliesTotal: repliesTotalRes.count ?? 0,
   };
   const tiles = tilesFor(inputs, extras);
   const primary = primaryFor(tiles);

@@ -13,6 +13,8 @@ const extras = (over: Partial<TileExtras> = {}): TileExtras => ({
   crmHandoff: null,
   calendarLink: null,
   dismissedAsks: {},
+  avgDealValueCents: 500_000,
+  repliesTotal: 0,
   ...over,
 });
 
@@ -96,6 +98,37 @@ describe("tilesFor — the Z4 priority engine", () => {
   });
   it("empty when nothing needs the user", () => {
     expect(tilesFor(inputs({ drafts: 0, repliesWaiting: 0 }), extras())).toEqual([]);
+  });
+});
+
+describe("tilesFor — the deal-size ask", () => {
+  const free = () => inputs({ repliesWaiting: 0 });
+  it("asks once there is a reply and no deal size, as an inline P3 ask", () => {
+    const t = tilesFor(free(), extras({ avgDealValueCents: null, repliesTotal: 1 }));
+    expect(t.map((x) => x.kind)).toEqual(["drafts", "deal_size"]);
+    expect(t[1]).toMatchObject({
+      kind: "deal_size",
+      priority: 3,
+      inline: "deal_size",
+      title: "Set your average deal size",
+      meta: "to see pipeline in dollars",
+      href: "/dashboard?view=analytics",
+      dismissible: true,
+    });
+  });
+  it("stays away when the value is set or there are no replies", () => {
+    expect(tilesFor(free(), extras({ avgDealValueCents: 100, repliesTotal: 4 })).map((x) => x.kind)).not.toContain("deal_size");
+    expect(tilesFor(free(), extras({ avgDealValueCents: null, repliesTotal: 0 })).map((x) => x.kind)).not.toContain("deal_size");
+  });
+  it("hides for a day once dismissed", () => {
+    const x = { avgDealValueCents: null, repliesTotal: 2 };
+    expect(tilesFor(free(), extras({ ...x, dismissedAsks: { deal_size: "2026-08-21T10:00:00Z" } })).map((t) => t.kind)).toEqual(["drafts"]);
+    expect(tilesFor(free(), extras({ ...x, dismissedAsks: { deal_size: "2026-08-19T10:00:00Z" } })).map((t) => t.kind)).toContain("deal_size");
+  });
+  it("never becomes the primary button", () => {
+    const t = tilesFor(inputs({ drafts: 0, repliesWaiting: 0 }), extras({ avgDealValueCents: null, repliesTotal: 1 }));
+    expect(t.map((x) => x.kind)).toEqual(["deal_size"]);
+    expect(primaryFor(t)).toBeNull();
   });
 });
 

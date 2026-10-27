@@ -1,4 +1,5 @@
 import { fmtDate, fmtRelative, fmtTime, fmtWindow, nextSendWindow } from "./metrics";
+import { dealSizeTile } from "./deal-size-tile";
 import { downSenders, healthySenders } from "./state";
 import type { SenderFacts, TodayInputs } from "./types";
 
@@ -24,7 +25,8 @@ export type TileKind =
   | "playbook_suggestion"
   | "style_memory"
   | "crm_handoff"
-  | "calendar_link";
+  | "calendar_link"
+  | "deal_size";
 
 export type TileGlyph =
   | "unplug"
@@ -37,7 +39,8 @@ export type TileGlyph =
   | "sliders"
   | "pen-line"
   | "plug"
-  | "link";
+  | "link"
+  | "dollar-sign";
 
 export interface ActionTileSpec {
   kind: TileKind;
@@ -50,8 +53,8 @@ export interface ActionTileSpec {
   href: string;
   /** dismissible one-time asks (P3/P4) */
   dismissible: boolean;
-  /** `true` = an inline action (engine resume), not a navigation */
-  inline?: "resume";
+  /** an inline action (engine resume, deal-size form), not a navigation */
+  inline?: "resume" | "deal_size";
 }
 
 export interface TileExtras {
@@ -71,13 +74,17 @@ export interface TileExtras {
   calendarLink: { leadName: string } | null;
   /** {kind: iso} from user_profiles.dismissed_asks */
   dismissedAsks: Record<string, string>;
+  /** accounts.avg_deal_value_cents — null until set; drives the deal-size ask */
+  avgDealValueCents: number | null;
+  /** all-time replies count (the ask waits for the first reply) */
+  repliesTotal: number;
 }
 
 export const MAX_TILES = 4;
 const PER_ROW = 3;
 
 /** Tile kinds that may be dismissed (hidden for the day). */
-const DISMISSIBLE: ReadonlySet<TileKind> = new Set(["playbook_suggestion", "style_memory", "crm_handoff", "calendar_link"]);
+const DISMISSIBLE: ReadonlySet<TileKind> = new Set(["playbook_suggestion", "style_memory", "crm_handoff", "calendar_link", "deal_size"]);
 
 /** A dismissed ask stays hidden for the day; a new trigger is a new day. */
 function dismissedToday(kind: TileKind, dismissed: Record<string, string>, now: Date): boolean {
@@ -264,6 +271,8 @@ export function tilesFor(i: TodayInputs, x: TileExtras): ActionTileSpec[] {
       dismissible: true,
     });
   }
+  const dealSize = dealSizeTile(x.avgDealValueCents, x.repliesTotal);
+  if (dealSize) asks.push(dealSize);
   if (x.crmHandoff) {
     asks.push({
       kind: "crm_handoff",
@@ -311,9 +320,10 @@ function dedupe(tiles: ActionTileSpec[]): ActionTileSpec[] {
   });
 }
 
-/** The primary (ink) button mirrors the top tile; hidden when the row is empty. */
+/** The primary (ink) button mirrors the top tile; hidden when the row is empty. The deal-size
+ *  ask is an inline form on its tile — never the primary. */
 export function primaryFor(tiles: ActionTileSpec[]): { label: string; count: number | null; href: string; inline?: "resume" } | null {
-  const top = tiles[0];
+  const top = tiles.find((t) => t.kind !== "deal_size");
   if (!top) return null;
   switch (top.kind) {
     case "drafts":
