@@ -551,7 +551,7 @@ export function DraftPeek({
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => void approve()} disabled={locked || mode === "edit"} className="inline-flex h-10 items-center gap-2 rounded-[var(--r-btn)] bg-[var(--acc)] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--acc-ink)] disabled:opacity-40 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]">
+            <button type="button" data-copilot="approve-draft" onClick={() => void approve()} disabled={locked || mode === "edit"} className="inline-flex h-10 items-center gap-2 rounded-[var(--r-btn)] bg-[var(--acc)] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[var(--acc-ink)] disabled:opacity-40 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]">
               {doing === "approve" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" strokeWidth={1.75} />}
               Approve <kbd className="ml-1 rounded bg-[rgb(255_255_255/0.16)] px-1.5 font-mono text-[11px]">A</kbd>
             </button>
@@ -559,7 +559,7 @@ export function DraftPeek({
               <PenLine className="size-4" strokeWidth={1.75} /> Edit <kbd className="font-mono text-[11px] text-[var(--ink-dim)]">E</kbd>
             </button>
             {current.styleFlags && (
-              <button type="button" onClick={() => void fix()} disabled={locked} className="inline-flex h-9 items-center gap-1.5 rounded-[var(--r-btn)] px-3 text-[14px] font-medium text-[var(--ink)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)] disabled:opacity-40">
+              <button type="button" data-copilot="fix-draft" onClick={() => void fix()} disabled={locked} className="inline-flex h-9 items-center gap-1.5 rounded-[var(--r-btn)] px-3 text-[14px] font-medium text-[var(--ink)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-2)] disabled:opacity-40">
                 <Sparkles className="size-4" strokeWidth={1.75} /> Fix
               </button>
             )}

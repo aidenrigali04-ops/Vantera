@@ -2,6 +2,7 @@
  * The Today work card (blueprint §6.7–§6.11) — one card, three tabs, the Engine line.
  */
 export { WorkCard, type WorkCardProps } from "./work-card";
+export { QueueList, type QueueListProps } from "./queue-list";
 export { CardTabs, type CardTab, type TabSpec } from "./card-tabs";
 export { EngineLineView } from "./engine-line-view";
 export { SenderChip } from "./sender-chip";
