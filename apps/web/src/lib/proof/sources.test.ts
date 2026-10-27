@@ -25,48 +25,83 @@ describe("sources", () => {
     expect(rowOf(i, "intent:hashtags").found).toBe(1);
     expect(rowOf(i, "none").found).toBe(0);
   });
-  it("every source column reconciles to the funnel (union of row lead sets == stage set)", () => {
-    let seed = 7;
-    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const COLS = ["found", "contacted", "accepted", "replied", "interested", "closed"] as const;
+  const stageSize = (i: ProofInput) => {
+    const s = leadSets(i);
+    return { found: i.leads.length, contacted: s.contacted.size, accepted: s.accepted.size,
+      replied: s.replied.size, interested: s.interested.size, closed: s.closed.size };
+  };
+  const mk = (n: number, rnd: () => number) => {
+    const ids = Array.from({ length: n }, (_, k) => `L${k}`);
+    return ids.map((id) => lead(id, {
+      status: rnd() < 0.2 ? "converted" : "sourced",
+      linkedin_invited_at: rnd() < 0.5 ? "x" : null,
+      linkedin_connected_at: rnd() < 0.3 ? "x" : null,
+    }));
+  };
+  const rng = () => { let seed = 7; return () => ((seed = (seed * 16807) % 2147483647) / 2147483647); };
+  it("source columns are bounded by the funnel (max <= N <= sum) on overlapping data", () => {
+    const rnd = rng();
+    const leads = mk(20, rnd);
     const kinds = ["funding", "hiring", "follow"];
     const targets = ["revenue ops", "acme", "#AI", "gone", null];
-    const ids = Array.from({ length: 20 }, (_, n) => `L${n}`);
+    const ids = leads.map((l) => l.id);
     const i: ProofInput = {
-      ...empty(), watch,
-      leads: ids.map((id) => lead(id, {
-        status: rnd() < 0.2 ? "converted" : "sourced",
-        linkedin_invited_at: rnd() < 0.5 ? "x" : null,
-        linkedin_connected_at: rnd() < 0.3 ? "x" : null,
-      })),
+      ...empty(), watch, leads,
       sendLeadIds: ids.filter(() => rnd() < 0.3),
-      replies: ids.filter(() => rnd() < 0.3).map((lead_id) => ({
-        lead_id, classification: rnd() < 0.5 ? "interested" : "neutral",
-      })),
+      replies: ids.filter(() => rnd() < 0.3).map((lead_id) => ({ lead_id, classification: rnd() < 0.5 ? "interested" : "neutral" })),
       signals: ids.filter(() => rnd() < 0.5).map((lead_id) => ({ lead_id, kind: kinds[Math.floor(rnd() * 3)]! })),
-      observations: ids.filter(() => rnd() < 0.4).map((lead_id) => ({
-        lead_id, watch_target: targets[Math.floor(rnd() * 5)]!,
-      })),
+      observations: ids.filter(() => rnd() < 0.4).map((lead_id) => ({ lead_id, watch_target: targets[Math.floor(rnd() * 5)]! })),
     };
     const m = buildProof(i);
-    const stage = (k: string) => m.funnel.find((s) => s.key === k)!.count;
-    // Every lead belongs to >=1 row; per-lead membership is recomputed independently below.
-    const sets = leadSets(i);
-    const member = new Map<string, Set<string>>();
-    const add = (k: string, id: string) => (member.get(k) ?? member.set(k, new Set()).get(k)!).add(id);
-    const sigIds = new Set(i.signals.map((s) => s.lead_id));
-    const obsIds = new Set(i.observations.map((o) => o.lead_id));
-    i.signals.forEach((s) => add(s.kind, s.lead_id));
-    i.observations.forEach((o) => add(`intent:${watchCategory(o.watch_target, watch) ?? "removed"}`, o.lead_id));
-    i.leads.forEach((l) => { if (!sigIds.has(l.id) && !obsIds.has(l.id)) add("none", l.id); });
-    const union = new Set([...member.values()].flatMap((s) => [...s]));
-    expect(union.size).toBe(stage("found"));
-    for (const [col, set] of [["contacted", sets.contacted], ["replied", sets.replied], ["interested", sets.interested], ["closed", sets.closed]] as const) {
-      const u = new Set<string>();
-      for (const [, s] of member) for (const id of s) if (set.has(id)) u.add(id);
-      expect(u.size).toBe(stage(col));
-      expect(u.size).toBe(set.size);
+    const N = stageSize(i);
+    for (const c of COLS) {
+      const vals = m.sources.map((r) => r[c] as number);
+      expect(Math.max(...vals)).toBeLessThanOrEqual(N[c]);
+      expect(vals.reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(N[c]);
     }
     expect(m.sources.map((r) => r.key)).toEqual(expect.arrayContaining(["intent:removed", "none"]));
+  });
+  it("source columns sum exactly to the funnel when rows do not overlap", () => {
+    const rnd = rng();
+    const leads = mk(24, rnd);
+    const targets = ["revenue ops", "acme", "gone", "#ai"];
+    const i: ProofInput = {
+      ...empty(), watch, leads,
+      sendLeadIds: leads.filter(() => rnd() < 0.3).map((l) => l.id),
+      replies: leads.filter(() => rnd() < 0.3).map((l) => ({ lead_id: l.id, classification: rnd() < 0.5 ? "interested" : "neutral" })),
+      signals: leads.filter((_, k) => k % 3 === 0).map((l) => ({ lead_id: l.id, kind: "funding" })),
+      observations: leads.filter((_, k) => k % 3 === 1).map((l, k) => ({ lead_id: l.id, watch_target: targets[k % 4]! })),
+    };
+    const m = buildProof(i);
+    const N = stageSize(i);
+    for (const c of COLS) {
+      expect(m.sources.reduce((a, r) => a + (r[c] as number), 0)).toBe(N[c]);
+    }
+    expect(m.sources.find((r) => r.key === "intent:removed")!.found).toBeGreaterThan(0);
+    expect(m.sources.find((r) => r.key === "none")!.found).toBeGreaterThan(0);
+  });
+  it("follow signal row is labelled Follows", () => {
+    const i: ProofInput = { ...empty(), leads: [lead("A")], signals: [{ lead_id: "A", kind: "follow" }] };
+    const r = sourceRows(i, leadSets(i)).find((x) => x.key === "follow")!;
+    expect(r.label).toBe("Follows");
+    expect(r.found).toBe(1);
+  });
+  it("null-target observation is not a watch row: lead falls to none or its signal row", () => {
+    const i: ProofInput = {
+      ...empty(), watch, leads: [lead("A"), lead("B")],
+      signals: [{ lead_id: "B", kind: "hiring" }],
+      observations: [{ lead_id: "A", watch_target: null }, { lead_id: "B", watch_target: null }],
+    };
+    const rows = sourceRows(i, leadSets(i));
+    const get = (k: string) => rows.find((r) => r.key === k)!;
+    expect(get("intent:removed").found).toBe(0);
+    expect(get("none").found).toBe(1);
+    expect(get("hiring").found).toBe(1);
+  });
+  it("creator match is slug-exact, not substring", () => {
+    expect(watchCategory("https://linkedin.com/in/jane", watch)).toBe("removed");
+    expect(watchCategory("https://linkedin.com/in/jane-doe", watch)).toBe("creators");
   });
   it("a watch target no longer configured lands in Removed watch targets", () => {
     const i: ProofInput = { ...empty(), watch, leads: [lead("A")], observations: [{ lead_id: "A", watch_target: "old" }] };

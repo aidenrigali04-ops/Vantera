@@ -49,9 +49,8 @@ export function watchCategory(
   if (
     watch.creators.some((c) => {
       const n = norm(c);
-      if (n === t) return true;
       const cs = slug(n);
-      return !!(ts && cs && ts === cs) || (!!ts && n.includes(`linkedin.com/in/${ts}`)) || (!!cs && t.includes(`linkedin.com/in/${cs}`));
+      return ts && cs ? ts === cs : n === t;
     })
   )
     return "creators";
@@ -96,9 +95,11 @@ export function sourceRows(input: ProofInput, sets: LeadSets): ProofRow[] {
   const withObs = new Set<string>();
   for (const o of input.observations) {
     if (!ids.has(o.lead_id)) continue;
+    // A null target is not a watch row: skip it (lead falls to its signal rows or "none").
+    const cat = watchCategory(o.watch_target, input.watch);
+    if (cat === null) continue;
     withObs.add(o.lead_id);
-    // A null target can't be matched to config; keep it visible under "removed" so nothing is dropped.
-    byCat.get(watchCategory(o.watch_target, input.watch) ?? "removed")!.add(o.lead_id);
+    byCat.get(cat)!.add(o.lead_id);
   }
   const none = new Set<string>();
   for (const l of input.leads) if (!withSignal.has(l.id) && !withObs.has(l.id)) none.add(l.id);

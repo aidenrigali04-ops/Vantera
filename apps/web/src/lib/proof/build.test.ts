@@ -30,7 +30,7 @@ describe("buildProof", () => {
     expect(m.funnel.map((s) => [s.key, s.count])).toEqual([
       ["found", 6], ["qualified", 4], ["contacted", 4], ["accepted", 3],
       ["replied", 3], ["interested", 1], ["meetings", 1], ["closed", 1],
-    ])
+    ]);
     expect(m.funnel[2]!.pct).toBe(100);
     expect(m.funnel[5]!.pct).toBe(33);
   });
