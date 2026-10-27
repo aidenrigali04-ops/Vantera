@@ -53,10 +53,12 @@ function makeClient() {
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => makeClient() }));
 vi.mock("next/cache", () => ({ revalidatePath: (p: string, t?: string) => revalidated.push([p, t]) }));
+let skipsPayment = false;
+vi.mock("@/lib/billing/founder-exempt", () => ({ accountSkipsPayment: async () => skipsPayment }));
 
 const { pauseEngine, resumeEngine, setAgentGroup } = await import("./engine-actions");
 
-const ACCOUNT = { id: "acct-1" };
+const ACCOUNT = { id: "acct-1", subscription_status: "active" };
 const updates = (table: string) => calls.filter((c) => c.table === table && c.op === "update");
 
 /** An admin workspace: the account row is readable and writable; agents per `agents`. */
@@ -81,6 +83,7 @@ beforeEach(() => {
   calls.length = 0;
   revalidated.length = 0;
   user = { id: "user-1" };
+  skipsPayment = false;
 });
 
 describe("pauseEngine", () => {
@@ -156,6 +159,39 @@ describe("resumeEngine", () => {
     const base = respond;
     respond = (c) => (c.table === "agents" && c.op === "update" ? { data: null, error: { message: "boom" } } : base(c));
     expect((await resumeEngine()).error).toBe("Resumed the account but couldn't resume the agents — try again.");
+  });
+
+  it("a lapsed account clears only paused_at — outreach and agents stay off", async () => {
+    admin([{ id: "a1", kind: "scout", status: "paused" }]);
+    const base = respond;
+    respond = (c) => (c.table === "accounts" && c.op === "select" ? { data: { ...ACCOUNT, subscription_status: "canceled" } } : base(c));
+    expect((await resumeEngine()).error).toBe("Fix billing to resume sending.");
+    const [acct] = updates("accounts");
+    expect(acct?.values).toEqual({ paused_at: null });
+    expect(updates("agents")).toHaveLength(0);
+    expect(revalidated).toContainEqual(["/", "layout"]);
+  });
+
+  it("a founder-exempt account with no subscription resumes everything", async () => {
+    skipsPayment = true;
+    admin([{ id: "a1", kind: "scout", status: "paused" }]);
+    const base = respond;
+    respond = (c) => (c.table === "accounts" && c.op === "select" ? { data: { ...ACCOUNT, subscription_status: "none" } } : base(c));
+    expect(await resumeEngine()).toEqual({});
+    expect(updates("accounts")[0]?.values).toEqual({ paused_at: null, outreach_paused: false });
+    expect(updates("agents")).toHaveLength(1);
+  });
+
+  it("a pending deletion request clears only paused_at — outreach and agents stay off", async () => {
+    admin([{ id: "a1", kind: "scout", status: "paused" }]);
+    const base = respond;
+    respond = (c) => (c.table === "account_deletion_requests" ? { data: { id: "del-1" } } : base(c));
+    expect((await resumeEngine()).error).toBe("Sending stays off while a deletion request is open.");
+    expect(updates("accounts")[0]?.values).toEqual({ paused_at: null });
+    expect(updates("agents")).toHaveLength(0);
+    const read = calls.find((c) => c.table === "account_deletion_requests");
+    expect(read?.filters).toContainEqual(["eq", "account_id", "acct-1"]);
+    expect(read?.filters).toContainEqual(["eq", "status", "pending"]);
   });
 
   it("non-admin → error", async () => {

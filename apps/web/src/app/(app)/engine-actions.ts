@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { accountSkipsPayment } from "@/lib/billing/founder-exempt";
 
 /**
  * The workspace engine controls (Dashboard blueprint v1.0 §6.1; UX-2 Task 9).
@@ -10,7 +11,10 @@ import { createClient } from "@/lib/supabase/server";
  * The jobs don't read `accounts.paused_at` — sourcing runs gate on `agents.status = 'live'` and
  * sends gate on `accounts.outreach_paused` — so "pause everything" writes all three: the
  * `paused_at` stamp (what the UI shows), `outreach_paused` (stops sends), and every live agent
- * → paused (stops sourcing + drafting). Resume reverses all three. Approvals stay open.
+ * → paused (stops sourcing + drafting). Resume reverses all three — but only the user's pause.
+ * `outreach_paused` is also set by billing (lapse, cancel, trial expiry) and by a GDPR deletion
+ * request; resume never overrides those. A lapsed account or one with a pending deletion gets
+ * `paused_at` cleared and nothing else, plus a plain-language reason. Approvals stay open.
  *
  * The account is always resolved from the session through RLS (rule 02) — the client never
  * supplies an account id. Writes are RLS-scoped too: a member the policy doesn't let write
@@ -29,7 +33,9 @@ function revalidateEngineSurfaces() {
   revalidatePath("/approvals");
 }
 
-async function sessionClient(): Promise<{ supabase: SupabaseClient; accountId: string } | null> {
+type Session = { supabase: SupabaseClient; accountId: string; subscriptionStatus: string | null };
+
+async function sessionClient(): Promise<Session | null> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -37,17 +43,55 @@ async function sessionClient(): Promise<{ supabase: SupabaseClient; accountId: s
   if (!user) return null;
   const { data: account } = await supabase
     .from("accounts")
+    .select("id, subscription_status")
+    .limit(1)
+    .maybeSingle<{ id: string; subscription_status: string | null }>();
+  if (!account) return null;
+  return { supabase, accountId: account.id, subscriptionStatus: account.subscription_status ?? null };
+}
+
+const ENTITLED_STATUSES = new Set(["active", "trialing"]);
+
+/**
+ * Why sending must stay off even after the user's own pause is lifted, or null when nothing
+ * but the user's pause holds it. Founder-exempt workspaces have no subscription to check.
+ */
+async function nonUserLock({ supabase, accountId, subscriptionStatus }: Session): Promise<string | null> {
+  const { data: deletion } = await supabase
+    .from("account_deletion_requests")
     .select("id")
+    .eq("account_id", accountId)
+    .eq("status", "pending")
     .limit(1)
     .maybeSingle<{ id: string }>();
-  if (!account) return null;
-  return { supabase, accountId: account.id };
+  if (deletion) return "Sending stays off while a deletion request is open.";
+  if (ENTITLED_STATUSES.has(subscriptionStatus ?? "")) return null;
+  if (await accountSkipsPayment(supabase, accountId)) return null;
+  return "Fix billing to resume sending.";
+}
+
+/** Clear only the user's pause stamp — billing/deletion locks keep sending and agents off. */
+async function clearUserPauseOnly({ supabase, accountId }: Session, failure: string, reason: string): Promise<EngineResult> {
+  const { data: updated, error } = await supabase
+    .from("accounts")
+    .update({ paused_at: null })
+    .eq("id", accountId)
+    .select("id")
+    .returns<{ id: string }[]>();
+  if (error || !updated || updated.length === 0) return { error: failure };
+  revalidateEngineSurfaces();
+  return { error: reason };
 }
 
 async function setEnginePaused(paused: boolean, failure: string, partial: string): Promise<EngineResult> {
   const session = await sessionClient();
   if (!session) return { error: failure };
   const { supabase, accountId } = session;
+
+  if (!paused) {
+    const lock = await nonUserLock(session);
+    if (lock) return clearUserPauseOnly(session, failure, lock);
+  }
 
   // The account row first: it is the admin check. A refused write touches no agent.
   const { data: updated, error } = await supabase
