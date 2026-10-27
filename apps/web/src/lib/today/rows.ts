@@ -30,6 +30,7 @@ export interface QueueRow {
   body: string;
   styleFlags: string | null;
   channel: "linkedin";
+  origin: "sequence" | "reply_response" | "manual";
   /** the peek's evidence bullets (≤ 4): signals + the rank's pain points / triggers */
   evidence: Array<{ text: string; href?: string }>;
   /** the rank's one-line rationale */
