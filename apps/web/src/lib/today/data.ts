@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { accountSkipsPayment } from "@/lib/billing/founder-exempt";
+import { billingFacts } from "@/lib/engine/build";
 import { buildQueueRows, leadName, type QueueSendIn, type SignalRowIn } from "./queue";
 import { accountTimeZone, buildSenderFacts, type SenderRaw } from "./sender-facts";
 import { engineLineFor } from "./engine-line";
@@ -339,16 +340,7 @@ export async function loadToday(supabase: SupabaseClient, userId: string, now = 
     oldestWaitingAt: waitingByLead[0]?.received_at ?? null,
     senders: senderFacts,
     pausedAt: acct.paused_at,
-    billing: {
-      status: (skipsPayment
-        ? "active"
-        : ["none", "trialing", "active", "past_due", "canceled"].includes(acct.subscription_status)
-          ? acct.subscription_status
-          : "none") as TodayInputs["billing"]["status"],
-      plan: skipsPayment && (!acct.plan || acct.plan === "none") ? "growth" : acct.plan,
-      pastDueSince: acct.subscription_status === "past_due" ? acct.current_period_end : null,
-      canceledAt: acct.subscription_status === "canceled" ? acct.current_period_end : null,
-    },
+    billing: billingFacts(acct, skipsPayment),
     engine: {
       scoutLive: scout?.status === "live",
       firstRunAt,

@@ -12,3 +12,5 @@ export { initialsFrom } from "./initials";
 export { CommandPalette, openCommandPalette, OPEN_SEARCH_EVENT } from "./command-palette";
 export { PALETTE_DESTINATIONS, filterDestinations, type PaletteDestination, type PaletteKey } from "./palette-search";
 export { MobileChrome, type MobileChromeProps } from "./mobile-chrome";
+export { StatusChip, ChipDotGlyph, type StatusChipProps } from "./status-chip";
+export { EnginePopover, type EnginePopoverProps, type GroupAction } from "./engine-popover";

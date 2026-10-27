@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { AvatarTile, type AvatarTileProps } from "./avatar-tile";
 import { BellTile } from "./bell-tile";
 import { openCommandPalette } from "./command-palette";
+import { EnginePopover, type EnginePopoverProps } from "./engine-popover";
 import { badgeFor, formatBadge, isActivePath, type NavBadges, type NavKey } from "./nav-items";
 import { CHROME_FOCUS, CHROME_MOTION } from "./tile";
 
@@ -20,7 +21,8 @@ const MOBILE_TABS: readonly { key: NavKey; label: string; href: string; icon: Lu
 
 export type MobileChromeProps = {
   workspaceName: string;
-  paused?: boolean;
+  /** The run-state chip + popover controls (shown as dot + short label). */
+  engine: Omit<EnginePopoverProps, "variant">;
   badges?: NavBadges;
   notifications: AppNotification[];
   account: Omit<AvatarTileProps, "signOut">;
@@ -38,7 +40,7 @@ const TAB_CLASS = cn(
  * bar (Today · Approvals · Inbox · More) that respects the home-indicator safe area. "More"
  * opens the command palette, which carries every other destination.
  */
-export function MobileChrome({ workspaceName, paused = false, badges, notifications, account, signOut }: MobileChromeProps) {
+export function MobileChrome({ workspaceName, engine, badges, notifications, account, signOut }: MobileChromeProps) {
   const pathname = usePathname();
 
   return (
@@ -51,16 +53,9 @@ export function MobileChrome({ workspaceName, paused = false, badges, notificati
         >
           <VanteraLogo className="size-4.5" />
         </Link>
-        <span className="flex min-w-0 flex-1 items-center gap-1.5">
-          {paused && (
-            <span
-              role="img"
-              aria-label="Engine paused"
-              title="Engine paused"
-              className="size-1.5 shrink-0 rounded-full bg-[var(--attention)]"
-            />
-          )}
-          <span className="truncate text-sm font-medium text-[var(--ink-2)]">{workspaceName}</span>
+        <span className="flex min-w-0 flex-1 items-center gap-1">
+          <span className="min-w-0 shrink truncate text-sm font-medium text-[var(--ink-2)]">{workspaceName}</span>
+          <EnginePopover {...engine} variant="compact" />
         </span>
         <div className="flex shrink-0 items-center gap-1.5">
           <BellTile notifications={notifications} />

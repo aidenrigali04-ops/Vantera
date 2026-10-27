@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { agentAttention, runLine, type AgentRunRow } from "./agent-health";
+import { fmtDayTime, fmtUntil } from "@/lib/today/metrics";
 
 export type ShowcaseKind = "scout" | "copy" | "intent";
 
@@ -27,6 +28,12 @@ export type ShowcaseAgent = {
   progress: { label: string; value: number; caption: string } | null;
   /** T4: why a LIVE agent needs the owner (null = healthy) — agent-health.ts */
   attention: string | null;
+  /** server-formatted `fmtUntil(nextRunAt)`; the client re-ticks it every 60s */
+  nextRunLabel: string;
+  /** absolute next run ("Thu 10:30am", agent timezone) for the hover title */
+  nextRunTitle: string | null;
+  /** server-formatted "5h ago" of lastRunAt; null = no runs yet */
+  lastRanLabel: string | null;
   /** T4: the last few recorded runs, newest first, server-formatted */
   runHistory: { agoLabel: string; line: string }[];
 };
@@ -95,6 +102,16 @@ function agoLabel(iso: string): string {
   return `${Math.round(hrs / 24)}d ago`;
 }
 
+/** The agent's configured timezone when valid, else UTC (fmtDayTime throws on a bad zone). */
+function safeZone(tz: string | null | undefined): string {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz ?? "UTC" });
+    return tz ?? "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
 function toShowcaseAgent(
   row: AgentDbRow,
   counts: { sourced: number; qualified: number; drafts: number },
@@ -106,11 +123,18 @@ function toShowcaseAgent(
     .filter((n): n is string => Boolean(n));
 
   const config = row.config ?? {};
+  const now = new Date();
+  const runs = {
+    nextRunLabel: fmtUntil(row.next_run_at, now),
+    nextRunTitle: row.next_run_at ? fmtDayTime(new Date(row.next_run_at), safeZone(row.timezone)) : null,
+    lastRanLabel: row.last_run_at ? agoLabel(row.last_run_at) : null,
+  };
 
   if (row.kind === "scout") {
     const { sourced, qualified } = counts;
     return {
       ...health,
+      ...runs,
       id: row.id,
       kind: "scout",
       roleLabel: "Prospect sourcing",
@@ -150,6 +174,7 @@ function toShowcaseAgent(
     );
     return {
       ...health,
+      ...runs,
       id: row.id,
       kind: "intent",
       roleLabel: "Intent detection",
@@ -180,6 +205,7 @@ function toShowcaseAgent(
 
   return {
     ...health,
+    ...runs,
     id: row.id,
     kind: "copy",
     roleLabel: "Outreach & conversations",

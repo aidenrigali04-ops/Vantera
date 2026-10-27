@@ -1,8 +1,10 @@
 "use client";
 
 import type { AppNotification } from "@/components/notifications/notifications-bell";
+import type { ChipState, EngineGroups } from "@/lib/engine/chip";
 import { AvatarTile } from "./avatar-tile";
 import { CommandPalette } from "./command-palette";
+import { EnginePopover, type GroupAction } from "./engine-popover";
 import { LogoTile } from "./logo-tile";
 import { MobileChrome } from "./mobile-chrome";
 import type { NavBadges } from "./nav-items";
@@ -22,6 +24,11 @@ export type TopChromeProps = {
   signOut: () => Promise<void>;
   pauseEngine: EngineAction;
   resumeEngine: EngineAction;
+  /** The run-state chip, computed on the server (`chipFor`) — serializable only. */
+  chip: ChipState;
+  /** The popover's Sourcing / Outreach switch states (`groupsFor`). */
+  groups: EngineGroups;
+  setAgentGroup: GroupAction;
 };
 
 /**
@@ -42,7 +49,11 @@ export function TopChrome({
   signOut,
   pauseEngine,
   resumeEngine,
+  chip,
+  groups,
+  setAgentGroup,
 }: TopChromeProps) {
+  const engine = { chip, groups, paused, pauseEngine, resumeEngine, setAgentGroup };
   return (
     <>
       <header
@@ -58,6 +69,7 @@ export function TopChrome({
         </div>
 
         <div className="flex items-center gap-3">
+          <EnginePopover {...engine} />
           <UtilityCluster notifications={notifications} />
           <AvatarTile initial={account.initial} displayName={account.displayName} email={account.email} signOut={signOut} />
         </div>
@@ -65,7 +77,7 @@ export function TopChrome({
 
       <MobileChrome
         workspaceName={workspaceName}
-        paused={paused}
+        engine={engine}
         badges={badges}
         notifications={notifications}
         account={account}

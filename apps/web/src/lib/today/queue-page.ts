@@ -1,5 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { blockersFor } from "@/lib/engine/blockers";
+import { loadEngineState } from "@/lib/engine/state";
 import { fmtDate } from "./metrics";
 import { buildQueueRows, pageSlice, type QueueSendIn, type SignalRowIn } from "./queue";
 import type { QueueRow } from "./rows";
@@ -32,7 +34,7 @@ export async function loadQueuePage(
   const weekAgo = new Date(now.getTime() - 7 * DAY).toISOString();
   const sinceYesterdayish = new Date(now.getTime() - 36 * 3_600_000).toISOString();
 
-  const [draftsRes, sendersRes, agentsRes, sendsTodayRes, weekRes, copyRes] = await Promise.all([
+  const [draftsRes, sendersRes, agentsRes, sendsTodayRes, weekRes, copyRes, engine] = await Promise.all([
     supabase
       .from("scheduled_sends")
       .select(
@@ -61,6 +63,9 @@ export async function loadQueuePage(
       .eq("kind", "copy")
       .limit(1)
       .returns<{ campaign_id: string | null; campaigns: { send_mode: string | null } | { send_mode: string | null }[] | null }[]>(),
+    // The engine blockers stack (sender repairs, payment, no sender, the pause) — same state
+    // the chrome chip reads, memoized per request.
+    loadEngineState(supabase),
   ]);
   if (draftsRes.error) throw new Error(`queue: drafts read failed: ${draftsRes.error.message}`);
   if (sendersRes.error) throw new Error(`queue: senders read failed: ${sendersRes.error.message}`);
@@ -99,7 +104,7 @@ export async function loadQueuePage(
     rows,
     total: ordered.length,
     capped: sends.length >= QUEUE_PAGE_HARD_CAP,
-    blockers: [], // TODO(ux2-task-9): blockersFor(engineState)
+    blockers: blockersFor(engine, now),
     sendMode,
     campaignId: copy?.campaign_id ?? null,
   };

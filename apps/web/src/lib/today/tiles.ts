@@ -85,65 +85,94 @@ function dismissedToday(kind: TileKind, dismissed: Record<string, string>, now: 
   return now.getTime() - new Date(at).getTime() < 24 * 3_600_000;
 }
 
+// ── engine blockers (shared with lib/engine/blockers.ts — the Approvals blockers stack) ──
+
+/** P0: one repair tile per down sender (disconnected → reconnect, restricted → open). */
+export function senderRepairTiles(senders: SenderFacts[], draftsHeld: number, tz: string): ActionTileSpec[] {
+  return downSenders(senders).map((s) =>
+    s.status === "disconnected"
+      ? {
+          kind: "sender_disconnected" as const,
+          priority: 0 as const,
+          tone: "attention" as const,
+          glyph: "unplug" as const,
+          title: `Reconnect ${s.name}`,
+          meta: `dropped ‹${s.statusChangedAt ? fmtTime(new Date(s.statusChangedAt), tz) : "recently"}› · ‹${draftsHeld}› drafts held`,
+          href: `/settings/senders#${s.id}`,
+          dismissible: false,
+        }
+      : {
+          kind: "sender_restricted" as const,
+          priority: 0 as const,
+          tone: "attention" as const,
+          glyph: "unplug" as const,
+          title: `${s.name} is restricted by LinkedIn`,
+          meta: "sending paused · approvals stay open",
+          href: `/settings/senders#${s.id}`,
+          dismissible: false,
+        }
+  );
+}
+
+/** P0: the failed payment, or null when billing is fine. */
+export function paymentFailedTile(billing: TodayInputs["billing"], now: Date, tz: string): ActionTileSpec | null {
+  if (billing.status !== "past_due") return null;
+  const since = billing.pastDueSince ? new Date(billing.pastDueSince) : now;
+  const pauses = new Date(since.getTime() + 7 * 86_400_000);
+  return {
+    kind: "payment_failed",
+    priority: 0,
+    tone: "billing",
+    glyph: "credit-card",
+    title: "Update payment",
+    meta: `failed ‹${fmtDate(since, tz)}› · sending pauses ‹${fmtDate(pauses, tz)}›`,
+    href: "/settings/billing",
+    dismissible: false,
+  };
+}
+
+/** P1: no LinkedIn connected yet. A workspace that never connected is not "stopped" (state.ts
+ *  keeps zero senders steady — sourcing runs either way), but sending can't start until it does. */
+export function senderMissingTile(): ActionTileSpec {
+  return {
+    kind: "sender_missing",
+    priority: 1,
+    tone: "attention",
+    glyph: "plug",
+    title: "No LinkedIn connected yet",
+    meta: "Your agent is finding prospects. Connect to start sending.",
+    href: "/settings/senders",
+    dismissible: false,
+  };
+}
+
+/** P2: the user's own pause, with the inline resume. */
+export function enginePausedTile(pausedAt: string, tz: string): ActionTileSpec {
+  return {
+    kind: "engine_paused",
+    priority: 2,
+    tone: "routine",
+    glyph: "play",
+    title: "Resume the engine",
+    meta: `paused by you ‹${fmtTime(new Date(pausedAt), tz)}› · approvals still open`,
+    href: "#resume",
+    dismissible: false,
+    inline: "resume",
+  };
+}
+
 export function tilesFor(i: TodayInputs, x: TileExtras): ActionTileSpec[] {
   const tiles: ActionTileSpec[] = [];
   const tz = i.timeZone;
 
   // P0 — repairs (one tile per down sender, the cheaper repair first)
-  for (const s of downSenders(i.senders)) {
-    if (s.status === "disconnected") {
-      tiles.push({
-        kind: "sender_disconnected",
-        priority: 0,
-        tone: "attention",
-        glyph: "unplug",
-        title: `Reconnect ${s.name}`,
-        meta: `dropped ‹${s.statusChangedAt ? fmtTime(new Date(s.statusChangedAt), tz) : "recently"}› · ‹${i.draftsHeld}› drafts held`,
-        href: `/settings/senders#${s.id}`,
-        dismissible: false,
-      });
-    } else {
-      tiles.push({
-        kind: "sender_restricted",
-        priority: 0,
-        tone: "attention",
-        glyph: "unplug",
-        title: `${s.name} is restricted by LinkedIn`,
-        meta: "sending paused · approvals stay open",
-        href: `/settings/senders#${s.id}`,
-        dismissible: false,
-      });
-    }
-  }
-  if (i.billing.status === "past_due") {
-    const since = i.billing.pastDueSince ? new Date(i.billing.pastDueSince) : i.now;
-    const pauses = new Date(since.getTime() + 7 * 86_400_000);
-    tiles.push({
-      kind: "payment_failed",
-      priority: 0,
-      tone: "billing",
-      glyph: "credit-card",
-      title: "Update payment",
-      meta: `failed ‹${fmtDate(since, tz)}› · sending pauses ‹${fmtDate(pauses, tz)}›`,
-      href: "/settings/billing",
-      dismissible: false,
-    });
-  }
+  tiles.push(...senderRepairTiles(i.senders, i.draftsHeld, tz));
+  const payment = paymentFailedTile(i.billing, i.now, tz);
+  if (payment) tiles.push(payment);
 
   // P1 — the work. A workspace that never connected LinkedIn is not "stopped" (state.ts keeps
   // zero senders steady — sourcing runs either way), but sending can't start until it does.
-  if (i.senders.length === 0) {
-    tiles.push({
-      kind: "sender_missing",
-      priority: 1,
-      tone: "attention",
-      glyph: "plug",
-      title: "No LinkedIn connected yet",
-      meta: "Your agent is finding prospects. Connect to start sending.",
-      href: "/settings/senders",
-      dismissible: false,
-    });
-  }
+  if (i.senders.length === 0) tiles.push(senderMissingTile());
   if (i.drafts > 0) {
     const slot = nextSendWindow(i.now, x.topDraftLocation);
     const sends = slot.openNow ? fmtWindow(slot.startsAt, slot.endsAt, tz) : `${slot.dayLabel} ${fmtTime(slot.startsAt, tz)}`;
@@ -206,19 +235,7 @@ export function tilesFor(i: TodayInputs, x: TileExtras): ActionTileSpec[] {
       dismissible: false,
     });
   }
-  if (i.pausedAt) {
-    tiles.push({
-      kind: "engine_paused",
-      priority: 2,
-      tone: "routine",
-      glyph: "play",
-      title: "Resume the engine",
-      meta: `paused by you ‹${fmtTime(new Date(i.pausedAt), tz)}› · approvals still open`,
-      href: "#resume",
-      dismissible: false,
-      inline: "resume",
-    });
-  }
+  if (i.pausedAt) tiles.push(enginePausedTile(i.pausedAt, tz));
 
   // P3/P4 — asks, one slot each, once per day, dismissible
   const asks: ActionTileSpec[] = [];

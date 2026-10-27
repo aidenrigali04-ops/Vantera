@@ -5,7 +5,10 @@ import { getGateData, toGateContext } from "@/lib/auth/context";
 import { loginRedirect, resolveGate } from "@/lib/auth/gate";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "./actions";
-import { pauseEngine, resumeEngine } from "./engine-actions";
+import { pauseEngine, resumeEngine, setAgentGroup } from "./engine-actions";
+import { buildEngineState } from "@/lib/engine/build";
+import { chipFor, groupsFor } from "@/lib/engine/chip";
+import { readEngineRows } from "@/lib/engine/state";
 import { TopChrome } from "@/components/chrome";
 import { AppFrame } from "@/components/app/app-frame";
 import { landingFont } from "@/components/landing/font";
@@ -80,11 +83,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // slot) is decided on the client in AppFrame: this layout is not re-rendered on navigation.
 
   const supabase = await createClient();
+  const now = new Date();
   const [
     { count: reviewCount },
     { data: notes },
     { data: billing },
-    { count: unhealthyConnections },
+    engineRows,
     { data: profile },
     { data: waitingReplies },
   ] = await Promise.all([
@@ -101,7 +105,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       >(),
     supabase
       .from("accounts")
-      .select("name, plan, subscription_status, trial_ends_at, paused_at, stripe_subscription_id, website_scan, website_url")
+      .select("name, plan, subscription_status, trial_ends_at, paused_at, stripe_subscription_id, current_period_end, website_scan, website_url")
       .limit(1)
       .maybeSingle<{
         name: string | null;
@@ -110,12 +114,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         trial_ends_at: string | null;
         paused_at: string | null;
         stripe_subscription_id: string | null;
+        current_period_end: string | null;
         website_scan: { faviconUrl?: string } | null;
         website_url: string | null;
       }>(),
-    // Dead LinkedIn connection = every agent silently stopped (no sourcing, no sends, no
-    // replies coming in) — the one state that must never be invisible (2026-07-08 incident).
-    supabase.from("linkedin_accounts").select("id", { count: "exact", head: true }).in("status", ["disconnected", "restricted"]),
+    // The engine reads (senders, agents, today's sends) for the run-state chip — and the
+    // connection banner: a dead LinkedIn connection = every agent silently stopped (no
+    // sourcing, no sends, no replies coming in), the one state that must never be invisible
+    // (2026-07-08 incident).
+    readEngineRows(supabase, now),
     supabase.from("user_profiles").select("display_name").maybeSingle<{ display_name: string | null }>(),
     // The Inbox badge: replies with no delivered message after them (the waiting rule).
     supabase
@@ -228,8 +235,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     };
   }
 
+  // The run-state chip: computed here on the server; the chrome gets only serializable data.
+  // (draftsHeld is not read for the chip — it only feeds the Approvals blockers stack.)
+  const engine = buildEngineState(billing, engineRows, { now, skipsPayment });
+  const chip = chipFor(engine, now);
+  const groups = groupsFor(engine);
+
+  const unhealthyConnections = engineRows.senders.filter((s) => s.status === "disconnected" || s.status === "restricted").length;
   const connectionBanner: TrialBannerProps | null =
-    unhealthyConnections && unhealthyConnections > 0
+    unhealthyConnections > 0
       ? {
           tone: "urgent",
           message: "Your LinkedIn connection dropped — your agents are paused and replies aren't coming in. Reconnect to resume.",
@@ -274,6 +288,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             signOut={signOut}
             pauseEngine={pauseEngine}
             resumeEngine={resumeEngine}
+            chip={chip}
+            groups={groups}
+            setAgentGroup={setAgentGroup}
           />
         </>
       }

@@ -529,6 +529,9 @@ export async function setAgentStatus(
     .eq("id", agentId);
   if (error) return { error: "Could not update the agent. Only workspace admins can do this." };
   revalidatePath("/playbook");
+  // The chrome's run-state chip lives in the app layout, which doesn't re-render on navigation.
+  revalidatePath("/", "layout");
+  revalidatePath("/today");
   return {};
 }
 

@@ -11,6 +11,7 @@ import { setAgentStatus, updateSendMode, type AgentActionState } from "./actions
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { RunNowButton } from "./run-now";
 import { runLine, type AgentRunRow } from "./agent-health";
+import { useUntil } from "@/lib/use-until";
 
 /* Each agent gets the landing's pastel icon tile (components/landing/frame.tsx TONES). */
 const KIND_TILE = {
@@ -36,20 +37,6 @@ export type AgentRow = {
   agent_icps?: { position: number; icps: { name: string } | null }[];
 };
 
-function formatRun(at: string | null, timezone: string): string | null {
-  if (!at) return null;
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      weekday: "short",
-      hour: "numeric",
-      minute: "2-digit",
-      timeZone: timezone,
-    }).format(new Date(at));
-  } catch {
-    return new Date(at).toLocaleString();
-  }
-}
-
 export function AgentCard({
   agent,
   roleLabel,
@@ -58,6 +45,9 @@ export function AgentCard({
   attention = null,
   lastRun = null,
   lastRunAgo = null,
+  nextRunLabel,
+  nextRunTitle = null,
+  lastRanLabel = null,
 }: {
   agent: AgentRow;
   roleLabel: string;
@@ -68,6 +58,12 @@ export function AgentCard({
   /** T4: the latest recorded run, for the what-happened line */
   lastRun?: AgentRunRow | null;
   lastRunAgo?: string | null;
+  /** server-formatted `fmtUntil(next_run_at)`; re-ticked client-side every 60s */
+  nextRunLabel: string;
+  /** absolute next run ("Thu 10:30am", agent timezone) for the hover title */
+  nextRunTitle?: string | null;
+  /** server-formatted "5h ago" of last_run_at */
+  lastRanLabel?: string | null;
 }) {
   const [state, action] = useActionState<AgentActionState, FormData>(setAgentStatus, {});
   const [modeState, switchMode, switchingMode] = useActionState<AgentActionState, FormData>(
@@ -82,8 +78,7 @@ export function AgentCard({
     .sort((a, b) => a.position - b.position)
     .map((l) => l.icps?.name)
     .filter((n): n is string => Boolean(n));
-  const nextRun = formatRun(agent.next_run_at, agent.timezone);
-  const lastRanLabel = formatRun(agent.last_run_at, agent.timezone);
+  const nextRun = useUntil(agent.next_run_at, nextRunLabel);
 
   return (
     <Panel index={index} interactive className="flex flex-col gap-4">
@@ -190,9 +185,9 @@ export function AgentCard({
                 {runLine(lastRun)}
               </p>
             )}
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground" title={live && nextRunTitle ? `Next run ${nextRunTitle}` : undefined}>
               {live
-                ? nextRun
+                ? agent.next_run_at
                   ? `Next run ${nextRun}`
                   : "First run starts within 15 minutes"
                 : lastRanLabel
