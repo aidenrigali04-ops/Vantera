@@ -1,6 +1,6 @@
 export { TopChrome, type TopChromeProps } from "./top-chrome";
 export { LogoTile } from "./logo-tile";
-export { WorkspacePill, type WorkspacePillProps, type EngineAction } from "./workspace-pill";
+export { WorkspacePill, type WorkspacePillProps } from "./workspace-pill";
 export { NavPill } from "./nav-pill";
 export { NavTab, type NavTabProps } from "./nav-tab";
 export { NAV_ITEMS, isActivePath, formatBadge, badgeFor, type NavBadges, type NavItem, type NavKey } from "./nav-items";
@@ -13,4 +13,4 @@ export { CommandPalette, openCommandPalette, OPEN_SEARCH_EVENT } from "./command
 export { PALETTE_DESTINATIONS, filterDestinations, type PaletteDestination, type PaletteKey } from "./palette-search";
 export { MobileChrome, type MobileChromeProps } from "./mobile-chrome";
 export { StatusChip, ChipDotGlyph, type StatusChipProps } from "./status-chip";
-export { EnginePopover, type EnginePopoverProps, type GroupAction } from "./engine-popover";
+export { EnginePopover, type EnginePopoverProps, type GroupAction, type EngineAction } from "./engine-popover";

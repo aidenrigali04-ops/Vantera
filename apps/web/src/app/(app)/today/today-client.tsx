@@ -150,7 +150,7 @@ export function TodayClient({ view, tab, openDraftId }: { view: TodayView; tab: 
   );
 
   const emptyTiles = view.paused
-    ? "Nothing needs you right now. The engine is paused — resume it from the workspace menu."
+    ? "Nothing needs you right now. The engine is paused — resume it from the status chip in the top bar."
     : view.nextRunLabel
       ? `Nothing needs you right now. Next drafts are expected around ‹${view.nextRunLabel}›.`
       : "Nothing needs you right now.";

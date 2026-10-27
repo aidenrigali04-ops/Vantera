@@ -4,13 +4,13 @@ import type { AppNotification } from "@/components/notifications/notifications-b
 import type { ChipState, EngineGroups } from "@/lib/engine/chip-state";
 import { AvatarTile } from "./avatar-tile";
 import { CommandPalette } from "./command-palette";
-import { EnginePopover, type GroupAction } from "./engine-popover";
+import { EnginePopover, type EngineAction, type GroupAction } from "./engine-popover";
 import { LogoTile } from "./logo-tile";
 import { MobileChrome } from "./mobile-chrome";
 import type { NavBadges } from "./nav-items";
 import { NavPill } from "./nav-pill";
 import { UtilityCluster } from "./utility-cluster";
-import { WorkspacePill, type EngineAction } from "./workspace-pill";
+import { WorkspacePill } from "./workspace-pill";
 
 export type TopChromeProps = {
   workspaceName: string;
@@ -22,6 +22,7 @@ export type TopChromeProps = {
   notifications: AppNotification[];
   account: { initial: string; displayName: string | null; email: string };
   signOut: () => Promise<void>;
+  /** pause / resume — wired to the status chip's popover, the one pause control */
   pauseEngine: EngineAction;
   resumeEngine: EngineAction;
   /** The run-state chip, computed on the server (`chipFor`) — serializable only. */
@@ -61,7 +62,7 @@ export function TopChrome({
       >
         <div className="flex items-center gap-3">
           <LogoTile />
-          <WorkspacePill name={workspaceName} iconCandidates={workspaceIconCandidates} paused={paused} pauseEngine={pauseEngine} resumeEngine={resumeEngine} />
+          <WorkspacePill name={workspaceName} iconCandidates={workspaceIconCandidates} paused={paused} />
         </div>
 
         <div className="absolute left-1/2 top-3 -translate-x-1/2">
