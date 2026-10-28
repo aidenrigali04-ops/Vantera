@@ -1,0 +1,116 @@
+{
+  "id": "prod-founder-cto-pitch-dump",
+  "lead": {
+    "firstName": "Marek",
+    "lastName": "Novak",
+    "title": "Founder & CTO",
+    "companyName": "Northwind Labs",
+    "industry": "B2B software"
+  },
+  "insights": {
+    "summary": "Founder & CTO at Northwind Labs. Strong ICP fit on founder title and inferred B2B tech/software space. No timing signals, but role and industry alignment are clear.",
+    "triggers": [],
+    "aha_moment": "Booking 10+ qualified technical and commercial prospect meetings per week without hiring additional sales staff.",
+    "motivations": [
+      "Growing revenue and market presence",
+      "Reaching new verticals or geographies",
+      "Reducing time to first customer meetings"
+    ],
+    "pain_points": [
+      "Scaling outreach to enterprise or mid-market prospects",
+      "Building pipeline without large sales team or SDRs",
+      "Qualifying technical vs commercial decision-makers"
+    ],
+    "value_angle": "Vantera can help identify and book qualified technical decision-makers and buyers at scale, freeing the founder-CTO to focus on product and delivery.",
+    "prospect_offering": "Tech/software services or platform (inferred from Northwind Labs name and Founder-CTO role); serves businesses needing technical solutions."
+  },
+  "context": {
+    "cta": "a short walkthrough of how Vantera books qualified meetings",
+    "accountName": "Vantera",
+    "accountIndustry": "LinkedIn outreach software",
+    "valueProp": "Vantera finds in-market prospects on LinkedIn, drafts personal messages, and books qualified meetings while the founder approves every send",
+    "websiteUrl": "https://www.vanterasystem.dev",
+    "bookingUrl": null,
+    "contentLinks": [],
+    "proofPoints": []
+  },
+  "turns": [
+    {
+      "ref": "t0",
+      "role": "agent",
+      "text": "Founder-CTO building and selling at the same time is a tough combination. Wanted to connect with someone navigating both sides of that.",
+      "at": "2026-10-23T09:03:59Z",
+      "stage": "invite"
+    },
+    {
+      "ref": "t1",
+      "role": "agent",
+      "text": "Running product and pipeline as a Founder-CTO means one of them usually loses. Which one's taking the hit right now?",
+      "at": "2026-10-24T22:11:36Z",
+      "stage": "message"
+    },
+    {
+      "ref": "t2",
+      "role": "lead",
+      "text": "Hi Sam,\n\nPipeline is probably the bigger challenge at the moment. The product side is progressing well, but finding the right customers and scaling distribution is a different game. What do you have in mind?",
+      "at": "2026-10-25T22:43:28Z"
+    },
+    {
+      "ref": "t3",
+      "role": "human",
+      "text": "Glad you asked. Vantera is our product, this system finds intent from your target audience such as likes, comments, posts and activity. Then it will qualify it as a lead based on how much value you provide. Vantera will send personalize messages not templates for each lead in your pipeline.",
+      "at": "2026-10-26T00:32:56Z"
+    },
+    {
+      "ref": "t4",
+      "role": "human",
+      "text": "Quality and personalize with your audiences pain points is what converts not strandardized messaging. That is our solution for LinkedIn outreach.",
+      "at": "2026-10-26T00:32:56Z"
+    },
+    {
+      "ref": "t5",
+      "role": "human",
+      "text": "The outreach message sent to you was form our system. If you have any further question you can ask here or visit our website:)",
+      "at": "2026-10-26T00:32:57Z"
+    },
+    {
+      "ref": "t6",
+      "role": "agent",
+      "text": "Vantera automates that side of it, AI finds in-market prospects, drafts personalized messages, and scores leads, you just approve before anything sends. Founders usually get 10+ qualified meetings a week without adding headcount. Happy to walk you through how it works if you're curious.",
+      "at": "2026-10-27T09:40:15Z",
+      "stage": "message"
+    }
+  ],
+  "expect": {
+    "readouts": [
+      {
+        "turn": "t2",
+        "stance": "positive",
+        "intent": "states_problem",
+        "explicitOptOut": false,
+        "identitySuspicion": false,
+        "newProblems": [
+          "finding the right customers and scaling distribution"
+        ]
+      }
+    ],
+    "flaggedTurns": [
+      {
+        "index": 1,
+        "rule": "hook-reuse"
+      }
+    ],
+    "finalTrigger": "followup",
+    "finalLegal": [
+      "observe",
+      "offer_value",
+      "wait"
+    ],
+    "finalVetoed": [
+      "propose_times",
+      "soft_ask"
+    ],
+    "suppression": "none"
+  },
+  "notes": "Interested founder; the human-typed pitch dump and the agent's product pitch show what a reply at 'exploring' must not be. The first message re-used the note's founder-CTO hook (flagged)."
+}

@@ -1,0 +1,84 @@
+{
+  "id": "prod-one-word-answer",
+  "lead": {
+    "firstName": "Rohan",
+    "lastName": "Mehta",
+    "title": "Founder & CEO",
+    "companyName": "Lumen AI",
+    "industry": "AI software"
+  },
+  "insights": {
+    "summary": "Founder & CEO of Lumen AI™ (US-based). Company name confirms AI software/tech focus; founder/CEO is a textbook ICP match. Strong candidate for Vantera—founder actively building sales motion for an AI product and would benefit from AI-driven lead scoring and outreach automation.",
+    "triggers": [
+      "AI product company in growth phase"
+    ],
+    "aha_moment": "Booking 8-12 qualified discovery calls per week from target decision-makers without expanding the sales team.",
+    "motivations": [
+      "Proving product-market fit for AI tool",
+      "Scaling customer acquisition efficiently"
+    ],
+    "pain_points": [
+      "Establishing market presence for AI product",
+      "Reaching target buyer personas for AI platform",
+      "Qualifying inbound interest and building qualified pipeline"
+    ],
+    "value_angle": "Vantera could help Lumen AI's founder automate identification and outreach to likely buyer personas (e.g., enterprises, SMBs evaluating AI solutions), enabling rapid pipeline generation without man",
+    "prospect_offering": "Lumen AI™ appears to provide an AI-powered software platform or service (exact domain unclear from name alone)."
+  },
+  "context": {
+    "cta": "a short walkthrough of how Vantera books qualified meetings",
+    "accountName": "Vantera",
+    "accountIndustry": "LinkedIn outreach software",
+    "valueProp": "Vantera finds in-market prospects on LinkedIn, drafts personal messages, and books qualified meetings while the founder approves every send",
+    "websiteUrl": "https://www.vanterasystem.dev",
+    "bookingUrl": null,
+    "contentLinks": [],
+    "proofPoints": []
+  },
+  "turns": [
+    {
+      "ref": "t0",
+      "role": "agent",
+      "text": "Founder building an AI platform in growth phase is one of the more interesting GTM challenges out there. Wanted to connect.",
+      "at": "2026-10-23T08:25:13Z",
+      "stage": "invite"
+    },
+    {
+      "ref": "t1",
+      "role": "agent",
+      "text": "Growing an AI product means the window to lock in your first category buyers is shorter than it looks. Who's the one persona you're most focused on converting right now?",
+      "at": "2026-10-23T23:18:44Z",
+      "stage": "message"
+    },
+    {
+      "ref": "t2",
+      "role": "lead",
+      "text": "CFO",
+      "at": "2026-10-23T23:19:39Z"
+    }
+  ],
+  "expect": {
+    "readouts": [
+      {
+        "turn": "t2",
+        "stance": "neutral",
+        "intent": "answers_question",
+        "explicitOptOut": false,
+        "answeredQuestionRef": "t1"
+      }
+    ],
+    "flaggedTurns": [],
+    "finalTrigger": "reply",
+    "finalLegal": [
+      "observe",
+      "ask_discovery",
+      "acknowledge"
+    ],
+    "finalVetoed": [
+      "propose_times",
+      "soft_ask"
+    ],
+    "suppression": "none"
+  },
+  "notes": "A one-word answer to our question; it was left unanswered for four days in production (provider outage). 'CFO' states a focus, not a problem: stage stays engaged."
+}
