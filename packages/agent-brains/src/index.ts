@@ -70,6 +70,13 @@ export {
   type LinkedInStage,
 } from "./copy/linkedin";
 export {
+  draftLinkedInNote,
+  validateLinkedInNote,
+  linkedinNoteSchema,
+  LINKEDIN_NOTE_SYSTEM,
+  type LinkedInNoteDraft,
+} from "./copy/linkedin-note";
+export {
   leadBlock,
   strategyDirectives,
   proofSection,
