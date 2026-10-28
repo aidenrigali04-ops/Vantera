@@ -58,6 +58,7 @@ describe("conversation state", () => {
   it("seedState flags a likely reverse-seller from the headline at low confidence", () => {
     const s = seedState({ ...lead, title: "Helping founders grow | Business Development @ Agency" }, null);
     expect(s.person.role).toBe("seller_to_us");
+    expect(s.person.roleConfidence).toBe(0.4);
     expect(s.person.notes).toContain("headline reads like a service provider");
   });
 

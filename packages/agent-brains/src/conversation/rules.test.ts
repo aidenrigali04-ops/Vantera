@@ -29,7 +29,7 @@ const engaged = (p: P = {}) => mk({ stage: "engaged", counters: { agentTurns: 1,
 const neutral = (o: Partial<ReadoutLike> = {}): ReadoutLike => ({
   stance: "neutral",
   confidence: 0.7,
-  intent: "shares_info",
+  intent: "small_talk",
   explicitOptOut: false,
   identitySuspicion: false,
   ...o,
@@ -91,15 +91,20 @@ describe("legalMoves hard rules", () => {
     expect(r.legal).toEqual(["wait"]);
   });
   it("a seller_to_us role leaves answer, graceful_exit, hand_to_human", () => {
-    const s = engaged({ counters: { agentTurns: 2, leadTurns: 1 }, person: { role: "seller_to_us" }, memory: { openLoops: ["pricing?"] } });
+    const s = engaged({ counters: { agentTurns: 2, leadTurns: 1 }, person: { role: "seller_to_us", roleConfidence: 0.7 }, memory: { openLoops: ["pricing?"] } });
     const r = legalMoves({ state: s, trigger: "reply", readout: neutral({ confidence: 0.7 }), links: all });
     expect([...r.legal].sort()).toEqual(["answer", "graceful_exit", "hand_to_human"]);
     expect(r.vetoes.some((v) => v.rule === "seller-to-us")).toBe(true);
   });
   it("a low-confidence role read does not trigger the role rule", () => {
-    const s = engaged({ counters: { agentTurns: 2, leadTurns: 1 }, person: { role: "recruiter" } });
-    const r = legalMoves({ state: s, trigger: "reply", readout: neutral({ confidence: 0.4 }), links: all });
+    const s = engaged({ counters: { agentTurns: 2, leadTurns: 1 }, person: { role: "recruiter", roleConfidence: 0.4 } });
+    const r = legalMoves({ state: s, trigger: "reply", readout: neutral({ confidence: 0.9 }), links: all });
     expect(r.vetoes.map((v) => v.rule)).not.toContain("seller-to-us");
+  });
+  it("a sells_to_us intent counts as a role signal for this turn", () => {
+    const s = engaged({ counters: { agentTurns: 2, leadTurns: 1 }, memory: { openLoops: ["x"] } });
+    const r = legalMoves({ state: s, trigger: "reply", readout: neutral({ intent: "sells_to_us" }), links: all });
+    expect([...r.legal].sort()).toEqual(["answer", "graceful_exit", "hand_to_human"]);
   });
   it("identity suspicion leaves only hand_to_human", () => {
     const r = legalMoves({ state: engaged(), trigger: "reply", readout: neutral({ identitySuspicion: true }), links: all });
@@ -107,9 +112,9 @@ describe("legalMoves hard rules", () => {
     expect(r.vetoes.map((v) => v.rule)).toContain("identity-suspicion");
   });
   it("skeptical stance narrows to answer, acknowledge, poke, observe, graceful_exit (spec §6.4)", () => {
-    const s = exploring({ memory: { openLoops: ["why us?"] }, counters: { agentTurns: 2, leadTurns: 2 } });
+    const s = exploring({ memory: { openLoops: ["why us?"] }, counters: { agentTurns: 2, leadTurns: 2 }, person: { skepticism: { value: 0.8, confidence: 0.7 } } });
     const r = legalMoves({ state: s, trigger: "reply", readout: neutral({ stance: "skeptical" }), links: all });
-    expect([...r.legal].sort()).toEqual(["acknowledge", "answer", "graceful_exit", "observe", "poke"]);
+    expect([...r.legal].sort()).toEqual(["acknowledge", "answer", "graceful_exit", "observe", "poke", "wait"]);
     expect(r.vetoes.map((v) => v.rule)).toContain("skeptical-narrowing");
   });
   it("a high-confidence decline leaves graceful_exit and hand_to_human", () => {
@@ -158,11 +163,14 @@ describe("legalMoves hard rules", () => {
     expect(spent.legal).not.toContain("soft_ask");
   });
   it("narrow needs an unhandled info request; poke needs skepticism or an existing solution", () => {
+    const sk = legalMoves({ state: exploring(), trigger: "reply", readout: neutral({ stance: "skeptical" }), links: all });
+    expect(sk.vetoes.map((v) => v.rule)).toContain("skeptical-narrowing");
     const base = legalMoves({ state: exploring(), trigger: "reply", readout: neutral(), links: all });
     expect(base.vetoes.map((v) => v.rule)).toEqual(expect.arrayContaining(["narrow-needs-info-request", "poke-needs-skepticism"]));
     const obj = (kind: "info_request" | "existing_solution") =>
       exploring({ memory: { objections: [{ kind, text: "x", handled: false }] } });
     expect(legalMoves({ state: obj("info_request"), trigger: "reply", readout: neutral(), links: all }).legal).toContain("narrow");
+    expect(legalMoves({ state: exploring(), trigger: "reply", readout: neutral({ intent: "requests_info" }), links: all }).legal).toContain("narrow");
     expect(legalMoves({ state: obj("existing_solution"), trigger: "reply", readout: neutral(), links: all }).legal).toContain("poke");
   });
   it("confirm needs an agreement on an asked stage", () => {
@@ -186,15 +194,12 @@ describe("legalMoves hard rules", () => {
     expect(legalMoves({ state: exploring(), trigger: "reply", readout: neutral(), links: all }).legal).toContain("wait");
   });
   it("hand_to_human fires on the turn cap", () => {
-    const r = legalMoves({ state: exploring({ counters: { agentTurns: 14, leadTurns: 8 } }), trigger: "reply", readout: neutral(), links: all });
-    expect(r.legal).toContain("hand_to_human");
+    const r = legalMoves({ state: exploring({ counters: { agentTurns: 6, leadTurns: 5 } }), trigger: "reply", readout: neutral(), links: all });
+    expect(r.legal).toEqual(["wait", "hand_to_human"].sort((a, b) => MOVES.indexOf(a as never) - MOVES.indexOf(b as never)));
+    expect(r.vetoes.map((v) => v.rule)).toContain("turn-cap");
   });
   it("a closed or handed-off thread only waits", () => {
     expect(legalMoves({ state: exploring({ memory: { handedOff: true } }), trigger: "reply", readout: neutral(), links: all }).legal).toEqual(["wait"]);
-  });
-  it("never returns an empty menu", () => {
-    const r = legalMoves({ state: exploring({ lastMove: "graceful_exit" }), trigger: "reply", readout: neutral({ stance: "skeptical", intent: "asks_question" }), links: all });
-    expect(r.legal.length).toBeGreaterThan(0);
   });
 });
 

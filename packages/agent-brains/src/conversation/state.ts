@@ -39,6 +39,8 @@ export const conversationStateSchema = z.object({
     verbosity: trait,
     seniority: z.enum(["ic", "manager", "director", "vp", "cxo", "founder", "unknown"]),
     role: z.enum(["buyer", "influencer", "seller_to_us", "gatekeeper", "recruiter", "unknown"]),
+    /** how sure we are of `role` (0..1); a headline cue seeds 0.4, the reader raises it */
+    roleConfidence: z.number().min(0).max(1).default(0),
     register: z.object({
       greeting: z.string().nullable(),
       signoff: z.string().nullable(),
@@ -114,6 +116,7 @@ export function emptyState(): ConversationState {
       verbosity: null,
       seniority: "unknown",
       role: "unknown",
+      roleConfidence: 0,
       register: { greeting: null, signoff: null, emoji: false, avgSentenceWords: null, language: "en" },
       notes: [],
     },
@@ -168,9 +171,11 @@ export function seedState(lead: CopyLead, _insights: StoredInsights | null): Con
   s.person.seniority = seniorityFromTitle(title);
   if (/recruit|talent acquisition/i.test(title)) {
     s.person.role = "recruiter";
+    s.person.roleConfidence = 0.4;
     s.person.notes.push("headline reads like a recruiter");
   } else if (/helping|we help|agency|growth partner|business development|lead gen/i.test(title)) {
     s.person.role = "seller_to_us";
+    s.person.roleConfidence = 0.4;
     s.person.notes.push("headline reads like a service provider");
   }
   return s;

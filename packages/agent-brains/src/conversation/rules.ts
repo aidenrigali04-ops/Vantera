@@ -5,7 +5,9 @@ import type { ConversationState, Stage } from "./state";
 export type ReadoutLike = {
   stance: "positive" | "neutral" | "skeptical" | "negative" | "opt_out";
   confidence: number;
-  intent: string;
+  intent:
+    | "answers_question" | "asks_question" | "small_talk" | "states_problem" | "objects" | "requests_info"
+    | "agrees_next_step" | "declines" | "opts_out" | "ooo" | "sells_to_us" | "other";
   explicitOptOut: boolean;
   identitySuspicion: boolean;
 };
@@ -21,8 +23,8 @@ export type LegalInput = {
 };
 
 const SPEC = "spec §6.1";
-/** Agent turns after which a thread goes to a person. */
-export const TURN_CAP = 14;
+/** Agent turns after which a thread goes to a person. Must equal the pipeline's MAX_AGENT_TURNS. */
+export const TURN_CAP = 6;
 const QUESTION_BUDGET = 5;
 const DECLINE_CONFIDENCE = 0.8;
 const ROLE_CONFIDENCE = 0.6;
@@ -64,6 +66,7 @@ const veto = (rule: string, source = SPEC) => ({ rule, source });
 
 const hasUnhandled = (s: ConversationState, kind: ConversationState["memory"]["objections"][number]["kind"]) =>
   s.memory.objections.some((o) => o.kind === kind && !o.handled);
+const skepticismKnownHigh = (s: ConversationState) => !!s.person.skepticism && s.person.skepticism.confidence >= 0.5 && s.person.skepticism.value >= 0.5;
 const QUESTION_MOVES = new Set<string>(["ask_discovery", "poke", "narrow", "soft_ask"]);
 const SENIOR = new Set(["director", "vp", "cxo", "founder"]);
 
@@ -81,7 +84,7 @@ const CHECKS: Record<Move, Check[]> = {
   ],
   poke: [
     (c) =>
-      hasUnhandled(c.s, "existing_solution") || c.r?.intent === "existing_solution" || c.r?.stance === "skeptical"
+      hasUnhandled(c.s, "existing_solution") || (c.r?.stance === "skeptical" && skepticismKnownHigh(c.s))
         ? null
         : veto("poke-needs-skepticism", "R §1 Braun"),
   ],
@@ -91,7 +94,7 @@ const CHECKS: Record<Move, Check[]> = {
         ? null
         : veto("reframe-needs-seniority", "R §1 Challenger"),
   ],
-  narrow: [(c) => (hasUnhandled(c.s, "info_request") || c.r?.intent === "info_request" ? null : veto("narrow-needs-info-request", "R §3"))],
+  narrow: [(c) => (hasUnhandled(c.s, "info_request") || c.r?.intent === "requests_info" ? null : veto("narrow-needs-info-request", "R §3"))],
   offer_value: [
     (c) => (atLeast(c.s.stage, "engaged") ? null : veto("offer-needs-engagement")),
     (c) => (c.links.content ? null : veto("no-content-to-offer")),
@@ -137,6 +140,8 @@ function narrowing(c: Ctx): { keep: ReadonlySet<Move>; rule: string; source: str
     const keep: ReadonlySet<Move> = s.lastMove?.move === "graceful_exit" ? new Set(["wait"]) : new Set(["graceful_exit", "hand_to_human"]);
     return { keep, ...veto("declined", "spec §6.2 rule 9") };
   }
+  if (c.trigger === "reply" && s.counters.agentTurns >= TURN_CAP)
+    return { keep: new Set(["hand_to_human", "wait"]), ...veto("turn-cap") };
   if (s.lastMove?.move === "breakup" || s.counters.followupsSinceLastReply >= 3)
     return { keep: new Set(["wait"]), ...veto("followups-exhausted", "R rule 14") };
   if (c.isLastTouch) return { keep: new Set(["breakup", "wait"]), ...veto("last-touch-breakup-only", "R rule 14") };
@@ -145,7 +150,7 @@ function narrowing(c: Ctx): { keep: ReadonlySet<Move>; rule: string; source: str
     return { keep: new Set(["observe", "ask_discovery", "wait", "hand_to_human"]), ...veto("first-message-menu") };
   if (s.counters.followupsSinceLastReply >= 2) return { keep: new Set(["breakup", "wait"]), ...veto("followups-exhausted", "R rule 14") };
   if (r?.stance === "skeptical")
-    return { keep: new Set(["answer", "acknowledge", "poke", "observe", "graceful_exit"]), ...veto("skeptical-narrowing", "spec §6.4") };
+    return { keep: new Set(["answer", "acknowledge", "poke", "observe", "graceful_exit", "wait"]), ...veto("skeptical-narrowing", "spec §6.4") };
   if (s.stage === "booked") return { keep: new Set(["confirm", "answer", "wait", "hand_to_human"]), ...veto("already-booked") };
   return null;
 }
@@ -162,11 +167,11 @@ export function legalMoves(input: LegalInput): { legal: Move[]; vetoes: Veto[] }
     state.memory.explicitOptOut ||
     !!readout?.explicitOptOut ||
     readout?.stance === "opt_out" ||
+    readout?.intent === "opts_out" ||
     (readout?.stance === "negative" && readout.confidence >= DECLINE_CONFIDENCE);
   const roleBlocked =
-    (state.person.role === "seller_to_us" || state.person.role === "recruiter") &&
-    state.counters.leadTurns >= 1 &&
-    (readout?.confidence ?? 1) >= ROLE_CONFIDENCE;
+    ((state.person.role === "seller_to_us" || state.person.role === "recruiter") && state.person.roleConfidence >= ROLE_CONFIDENCE) ||
+    readout?.intent === "sells_to_us";
   const ctx: Ctx = { s: state, trigger, r: readout, links, isLastTouch: !!input.isLastTouch, declined, roleBlocked };
 
   const vetoes: Veto[] = [];
@@ -190,9 +195,5 @@ export function legalMoves(input: LegalInput): { legal: Move[]; vetoes: Veto[] }
     legal = legal.filter((m) => narrow.keep.has(m));
   }
 
-  if (legal.length === 0) {
-    // Never hand the policy an empty menu: stay quiet unless a question is hanging, then hand over.
-    legal = [trigger === "reply" && readout?.intent === "asks_question" ? "hand_to_human" : "wait"];
-  }
   return { legal, vetoes };
 }
