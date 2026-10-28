@@ -78,6 +78,8 @@ export interface TileExtras {
   avgDealValueCents: number | null;
   /** all-time replies count (the ask waits for the first reply) */
   repliesTotal: number;
+  /** the session user is an owner/admin of the account (admin-only asks) */
+  isAdmin: boolean;
 }
 
 export const MAX_TILES = 4;
@@ -271,7 +273,7 @@ export function tilesFor(i: TodayInputs, x: TileExtras): ActionTileSpec[] {
       dismissible: true,
     });
   }
-  const dealSize = dealSizeTile(x.avgDealValueCents, x.repliesTotal);
+  const dealSize = dealSizeTile(x.avgDealValueCents, x.repliesTotal, x.isAdmin);
   if (dealSize) asks.push(dealSize);
   if (x.crmHandoff) {
     asks.push({

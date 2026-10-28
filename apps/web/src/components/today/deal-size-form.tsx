@@ -15,8 +15,8 @@ import { toneClasses } from "./tile-tone";
 type SaveState = { ok: true } | { ok: false; message: string } | null;
 
 /**
- * The deal-size ask's inline body (a P3 tile): `$` + whole-dollar input + Save. A save
- * unlocks dollar figures on Results; the tile leaves on the refresh. The action's message
+ * The deal-size ask's inline body (a P3 tile, admins only): `$` + whole-dollar input + Save.
+ * A save unlocks pipeline dollars on the Results overview; the tile leaves on the refresh. The action's message
  * (bad amount, not an admin) replaces the meta line.
  */
 export function DealSizeForm({ tile, className }: { tile: ActionTileSpec; className?: string }) {
@@ -26,7 +26,7 @@ export function DealSizeForm({ tile, className }: { tile: ActionTileSpec; classN
 
   useEffect(() => {
     if (state?.ok) {
-      toast("Deal size saved. Results now show dollars.", {
+      toast("Deal size saved. Your pipeline now shows dollars.", {
         action: { label: "Open Results", onClick: () => router.push(tile.href) },
       });
       router.refresh();

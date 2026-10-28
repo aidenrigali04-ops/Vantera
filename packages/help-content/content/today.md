@@ -32,7 +32,7 @@ When nothing needs you, the row says so in one line and the dark button disappea
 
 ### Set your average deal size
 
-Once at least one person has replied and you haven't set a deal size, **Needs you** asks: **Set your average deal size**. Type a whole-dollar amount straight into the tile and press **Save**. No page change needed. Saving turns on the dollar figures on Results: pipeline value right away, plus return on spend and cost per meeting and per close once you're on a plan. The confirmation offers **Open Results**. Only a workspace admin can set it. If you're not ready, dismiss it and it stays hidden for the rest of the day. You can also set it any time in Settings.
+Once at least one person has replied and no deal size is set, **Needs you** asks a workspace admin: **Set your average deal size**. Type a whole-dollar amount straight into the tile and press **Save**. No page change needed. Saving turns on the dollar figures on Results: pipeline value right away, plus return on spend and cost per meeting and per close once you're on a plan. The confirmation offers **Open Results**, which opens the Results overview where pipeline value shows. Only workspace admins can set it, so only admins see this ask. If you're not ready, dismiss it and it stays hidden for the rest of the day. You can also set it any time in Settings.
 
 ## Get started
 

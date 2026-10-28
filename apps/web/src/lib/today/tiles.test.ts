@@ -15,6 +15,7 @@ const extras = (over: Partial<TileExtras> = {}): TileExtras => ({
   dismissedAsks: {},
   avgDealValueCents: 500_000,
   repliesTotal: 0,
+  isAdmin: true,
   ...over,
 });
 
@@ -112,13 +113,16 @@ describe("tilesFor — the deal-size ask", () => {
       inline: "deal_size",
       title: "Set your average deal size",
       meta: "to see pipeline in dollars",
-      href: "/dashboard?view=analytics",
+      href: "/dashboard",
       dismissible: true,
     });
   });
   it("stays away when the value is set or there are no replies", () => {
     expect(tilesFor(free(), extras({ avgDealValueCents: 100, repliesTotal: 4 })).map((x) => x.kind)).not.toContain("deal_size");
     expect(tilesFor(free(), extras({ avgDealValueCents: null, repliesTotal: 0 })).map((x) => x.kind)).not.toContain("deal_size");
+  });
+  it("is admin-only: a member never sees the ask", () => {
+    expect(tilesFor(free(), extras({ avgDealValueCents: null, repliesTotal: 3, isAdmin: false })).map((x) => x.kind)).not.toContain("deal_size");
   });
   it("hides for a day once dismissed", () => {
     const x = { avgDealValueCents: null, repliesTotal: 2 };
