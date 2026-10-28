@@ -60,11 +60,27 @@ describe("shortlistMoves", () => {
     expect(out.candidates).toEqual([
       { move: "wait", style: { lengthBand: "short", question: false, link: "none", mirror: false }, rationale: "no legal move fits; waiting" },
     ]);
+    expect(out.degraded).toBe("no_legal_candidates");
+  });
+
+  it("keeps the legal candidate when another is illegal, with no degraded flag", async () => {
+    const out = await shortlistMoves(input(), mockOf({ candidates: [cand("propose_times"), cand("answer")] }));
+    expect(out.candidates.map((c) => c.move)).toEqual(["answer"]);
+    expect(out.degraded).toBeUndefined();
+  });
+
+  it("flags degraded no_object when the model output cannot be parsed", async () => {
+    const out = await shortlistMoves(input(), mockOf({ nope: true }));
+    expect(out.degraded).toBe("no_object");
+    expect(out.candidates[0]?.move).toBe("wait");
   });
 
   it("falls back to the first legal move when wait is illegal, and to an empty list when nothing is legal", async () => {
     const a = await shortlistMoves(input({ legal: ["answer", "poke"] }), mockOf({ candidates: [cand("reframe")] }));
-    expect(a.candidates[0]?.move).toBe("answer");
+    expect(a.candidates).toEqual([
+      { move: "answer", style: { lengthBand: "short", question: false, link: "none", mirror: false }, rationale: "fallback: first legal move" },
+    ]);
+    expect(a.degraded).toBe("no_legal_candidates");
     const b = await shortlistMoves(input({ legal: [] }), mockOf({ candidates: [cand("wait")] }));
     expect(b.candidates).toEqual([]);
   });
@@ -136,7 +152,7 @@ describe("decideMove", () => {
       expect(d.propensity).toBeLessThanOrEqual(1);
       expect(d.shortlist).toEqual(list.candidates);
     }
-    expect(picks.size).toBeGreaterThan(0);
+    expect(picks.size).toBeGreaterThan(1);
   });
 
   it("throws on an empty shortlist", () => {

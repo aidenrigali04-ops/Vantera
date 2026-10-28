@@ -62,15 +62,21 @@ export type PolicyInput = {
   cta: string;
 };
 
-export type Shortlist = { candidates: { move: Move; style: Style; rationale: string }[] };
+export type Shortlist = {
+  candidates: { move: Move; style: Style; rationale: string }[];
+  /** Set when a fallback produced the result: generation/schema failure vs. every candidate filtered out. */
+  degraded?: "no_object" | "no_legal_candidates";
+};
 
 const LENGTH_BANDS = ["one_line", "short", "standard"] as const;
 const LINK_KINDS = ["none", "website", "content", "booking"] as const;
 const NO_QUESTION: ReadonlySet<Move> = new Set<Move>(["wait", "hand_to_human", "graceful_exit", "breakup", "confirm"]);
 const DEFAULT_STYLE: Style = { lengthBand: "short", question: false, link: "none", mirror: false };
 
-function outputSchema(legal: Move[]) {
-  const move = legal.length > 0 ? z.enum(legal as [Move, ...Move[]]) : z.literal("wait");
+/** `move` is a plain string: the legal menu is in the prompt and illegal candidates are dropped one by
+ *  one after parsing, so one bad candidate never rejects the whole response. */
+function outputSchema() {
+  const move = z.string();
   return z.object({
     candidates: z
       .array(
@@ -133,32 +139,37 @@ function normalize(c: Shortlist["candidates"][number], input: PolicyInput): Shor
 }
 
 export async function shortlistMoves(input: PolicyInput, model: LanguageModel = getModel()): Promise<Shortlist> {
-  let raw: Shortlist["candidates"] = [];
+  let raw: { move: string; style: Style; rationale: string }[] = [];
+  let degraded: Shortlist["degraded"];
   try {
     const { object } = await generateObject({
       model,
-      schema: outputSchema(input.legal),
+      schema: outputSchema(),
       system: POLICY_SYSTEM.text,
       prompt: renderPolicyPrompt(input),
       maxOutputTokens: 600,
     });
-    raw = object.candidates as Shortlist["candidates"];
+    raw = object.candidates;
   } catch (err) {
-    // An output that violates the schema (e.g. a move outside the legal menu) is treated as "no usable
-    // candidate" and falls to the safe default below; transport/provider errors still propagate.
+    // Unparseable / schema-violating output falls to the safe default below, flagged degraded: "no_object"
+    // so a prompt regression is visible; transport/provider errors still propagate.
     if (!NoObjectGeneratedError.isInstance(err)) throw err;
+    degraded = "no_object";
   }
   const legal = new Set<Move>(input.legal);
   const candidates = raw
-    .filter((c) => legal.has(c.move) && c.rationale.trim().length > 0)
+    .filter((c): c is Shortlist["candidates"][number] => legal.has(c.move as Move) && c.rationale.trim().length > 0)
     .map((c) => normalize(c, input))
     .slice(0, 3);
   if (candidates.length > 0) return { candidates };
-  if (legal.has("wait")) return { candidates: [{ move: "wait", style: { ...DEFAULT_STYLE }, rationale: "no legal move fits; waiting" }] };
+  degraded ??= "no_legal_candidates";
+  if (legal.has("wait")) {
+    return { candidates: [{ move: "wait", style: { ...DEFAULT_STYLE }, rationale: "no legal move fits; waiting" }], degraded };
+  }
   const first = input.legal[0];
   return first
-    ? { candidates: [{ move: first, style: { ...DEFAULT_STYLE }, rationale: "no legal move fits; waiting" }] }
-    : { candidates: [] };
+    ? { candidates: [{ move: first, style: { ...DEFAULT_STYLE }, rationale: "fallback: first legal move" }], degraded }
+    : { candidates: [], degraded };
 }
 
 export function decideMove(
