@@ -191,8 +191,9 @@ export default async function AgentsPage({
                 { label: "Prospects sourced", value: sourced ?? 0 },
                 { label: "Qualified", value: qualified ?? 0 },
               ]}
-              funnel={funnels.scout}
-              funnelEmpty={funnelEmpty("scout", funnels)}
+              funnel={funnels?.scout ?? null}
+              funnelCaption={funnels?.captions.scout ?? null}
+              funnelEmpty={funnels ? funnelEmpty("scout", funnels) : undefined}
               {...health(scout)}
             />
           ) : (
@@ -211,8 +212,9 @@ export default async function AgentsPage({
               roleLabel="Intent detection"
               index={1}
               stats={[{ label: "Intent prospects", value: intentLeads ?? 0 }]}
-              funnel={funnels.intent}
-              funnelEmpty={funnelEmpty("intent", funnels)}
+              funnel={funnels?.intent ?? null}
+              funnelCaption={funnels?.captions.intent ?? null}
+              funnelEmpty={funnels ? funnelEmpty("intent", funnels) : undefined}
               {...health(intent)}
             />
           ) : (
@@ -231,8 +233,9 @@ export default async function AgentsPage({
               roleLabel="Outreach & conversations"
               index={2}
               stats={[{ label: "Drafts awaiting approval", value: drafts ?? 0 }]}
-              funnel={funnels.copy}
-              funnelEmpty={funnelEmpty("copy", funnels)}
+              funnel={funnels?.copy ?? null}
+              funnelCaption={funnels?.captions.copy ?? null}
+              funnelEmpty={funnels ? funnelEmpty("copy", funnels) : undefined}
               {...health(copy)}
             />
           ) : (

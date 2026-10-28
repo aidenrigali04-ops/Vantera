@@ -132,7 +132,14 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
           ))}
         </div>
 
-        <MiniFunnel stages={agent.funnel} label={`${agent.name} funnel`} empty={agent.funnelEmpty} />
+        {agent.funnel && (
+          <MiniFunnel
+            stages={agent.funnel}
+            label={`${agent.name} funnel`}
+            caption={agent.funnelCaption}
+            empty={agent.funnelEmpty}
+          />
+        )}
 
         {agent.progress && (
           <div className="space-y-2">

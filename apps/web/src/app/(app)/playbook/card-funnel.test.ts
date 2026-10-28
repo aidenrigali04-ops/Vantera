@@ -11,7 +11,7 @@ const proof = (agents: ProofRow[]): ProofModel => ({
 
 describe("cardFunnels", () => {
   it("scout: found → contacted → replied from the scout row, pct vs previous stage", () => {
-    const f = cardFunnels(proof([row("agent:scout", { found: 40, contacted: 20, replied: 5 })]), { intentSummary: null });
+    const f = cardFunnels(proof([row("agent:scout", { found: 40, contacted: 20, replied: 5 })]), { intentSummary: null, intentRan: false });
     expect(f.scout).toEqual([
       { label: "Found", count: 40, pct: null },
       { label: "Contacted", count: 20, pct: 50 },
@@ -22,7 +22,7 @@ describe("cardFunnels", () => {
   it("copy: contacted → accepted → replied → interested from the outreach row", () => {
     const f = cardFunnels(
       proof([row("agent:outreach", { found: null, contacted: 30, accepted: 10, replied: 3, interested: 1 })]),
-      { intentSummary: null },
+      { intentSummary: null, intentRan: false },
     );
     expect(f.copy).toEqual([
       { label: "Contacted", count: 30, pct: null },
@@ -33,7 +33,7 @@ describe("cardFunnels", () => {
   });
 
   it("intent: observed → intent → qualified from the latest run summary", () => {
-    const f = cardFunnels(proof([]), { intentSummary: { observed: 200, intent: 12, qualified: 3 } });
+    const f = cardFunnels(proof([]), { intentSummary: { observed: 200, intent: 12, qualified: 3 }, intentRan: true });
     expect(f.intent).toEqual([
       { label: "Observed", count: 200, pct: null },
       { label: "Intent", count: 12, pct: 6 },
@@ -42,7 +42,7 @@ describe("cardFunnels", () => {
   });
 
   it("missing rows and no intent run read as zeros with null pct, never NaN", () => {
-    const f = cardFunnels(proof([]), { intentSummary: null });
+    const f = cardFunnels(proof([]), { intentSummary: null, intentRan: false });
     for (const stages of [f.scout, f.intent, f.copy]) {
       for (const s of stages) expect(s).toMatchObject({ count: 0, pct: null });
     }
@@ -52,19 +52,20 @@ describe("cardFunnels", () => {
   it("a zero previous stage gives a null pct for the next one", () => {
     const f = cardFunnels(proof([row("agent:scout", { found: 0, contacted: 0, replied: 0 })]), {
       intentSummary: { observed: 0, intent: 0 },
+      intentRan: true,
     });
     expect(f.scout[1].pct).toBeNull();
     expect(f.intent[2]).toEqual({ label: "Qualified", count: 0, pct: null });
   });
 
   it("non-monotonic rows give pct over 100, never NaN", () => {
-    const f = cardFunnels(proof([row("agent:scout", { found: 4, contacted: 10, replied: 2 })]), { intentSummary: null });
+    const f = cardFunnels(proof([row("agent:scout", { found: 4, contacted: 10, replied: 2 })]), { intentSummary: null, intentRan: false });
     expect(f.scout[1]).toEqual({ label: "Contacted", count: 10, pct: 250 });
     expect(f.scout.every((s) => s.pct === null || Number.isFinite(s.pct))).toBe(true);
   });
 
   it("a missing outreach row beside an existing scout row reads as zeros", () => {
-    const f = cardFunnels(proof([row("agent:scout", { found: 9, contacted: 3, replied: 1 })]), { intentSummary: null });
+    const f = cardFunnels(proof([row("agent:scout", { found: 9, contacted: 3, replied: 1 })]), { intentSummary: null, intentRan: false });
     expect(f.scout[0].count).toBe(9);
     expect(f.copy).toEqual([
       { label: "Contacted", count: 0, pct: null },
@@ -75,13 +76,25 @@ describe("cardFunnels", () => {
   });
 
   it("intent empty state distinguishes no run from a run that found nothing", () => {
-    const none = cardFunnels(proof([]), { intentSummary: null });
-    const ran = cardFunnels(proof([]), { intentSummary: { observed: 0 } });
+    const none = cardFunnels(proof([]), { intentSummary: null, intentRan: false });
+    const ran = cardFunnels(proof([]), { intentSummary: { observed: 0 }, intentRan: true });
     expect(none.intentRan).toBe(false);
     expect(ran.intentRan).toBe(true);
     expect(funnelEmpty("intent", none)).toBe(FUNNEL_EMPTY.intentNoRun);
     expect(funnelEmpty("intent", ran)).toBe("Last run found nothing");
     expect(funnelEmpty("scout", ran)).toBe(FUNNEL_EMPTY.scout);
     expect(funnelEmpty("copy", ran)).toBe(FUNNEL_EMPTY.copy);
+  });
+
+  it("a completed run with a null summary reads as a run that found nothing", () => {
+    const f = cardFunnels(proof([]), { intentSummary: null, intentRan: true });
+    expect(f.intentRan).toBe(true);
+    expect(f.intent.every((s) => s.count === 0)).toBe(true);
+    expect(funnelEmpty("intent", f)).toBe("Last run found nothing");
+  });
+
+  it("captions: scout and intent say what they count, outreach has none", () => {
+    const f = cardFunnels(proof([]), { intentSummary: null, intentRan: false });
+    expect(f.captions).toEqual({ scout: "Prospects this agent found", intent: "Last run", copy: null });
   });
 });

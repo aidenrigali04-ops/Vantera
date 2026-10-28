@@ -38,8 +38,12 @@ export function ProofFunnel({ funnel, nonMonotonic }: { funnel: ProofStage[]; no
           );
         })}
       </div>
+      <p className="mt-5 text-xs text-muted-foreground">
+        Contacted includes messages to existing connections; Meetings includes deals closed without
+        a recorded meeting.
+      </p>
       {nonMonotonic && (
-        <p className="mt-5 text-xs text-muted-foreground">
+        <p className="mt-2 text-xs text-muted-foreground">
           A stage can exceed the one before it when a prospect replied or booked without an invite
           from Vantera.
         </p>

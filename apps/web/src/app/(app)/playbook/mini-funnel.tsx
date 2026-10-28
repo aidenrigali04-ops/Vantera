@@ -7,11 +7,14 @@ import type { MiniStage } from "./card-funnel";
 export function MiniFunnel({
   stages,
   label,
+  caption,
   empty,
   className,
 }: {
   stages: MiniStage[];
   label: string;
+  /** visible line above the stages saying what they count, e.g. "Last run" */
+  caption?: string | null;
   /** shown under the row when every stage is zero, e.g. "No run yet" */
   empty?: string;
   className?: string;
@@ -19,6 +22,7 @@ export function MiniFunnel({
   const allZero = stages.every((s) => s.count === 0);
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
+      {caption && <p className="text-[11px] text-muted-foreground">{caption}</p>}
       <ol aria-label={label} className="flex flex-wrap items-end gap-x-2 gap-y-2">
         {stages.map((s, i) => (
           <Fragment key={s.label}>

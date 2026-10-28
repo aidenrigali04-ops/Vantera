@@ -51,6 +51,7 @@ export function AgentCard({
   nextRunTitle = null,
   lastRanLabel = null,
   funnel = null,
+  funnelCaption = null,
   funnelEmpty,
 }: {
   agent: AgentRow;
@@ -70,6 +71,8 @@ export function AgentCard({
   lastRanLabel?: string | null;
   /** UX-3: this agent's own mini funnel (card-funnel.ts), computed server-side */
   funnel?: MiniStage[] | null;
+  /** visible line above the funnel saying what it counts */
+  funnelCaption?: string | null;
   /** shown under the funnel when every stage is zero */
   funnelEmpty?: string;
 }) {
@@ -189,6 +192,7 @@ export function AgentCard({
           <MiniFunnel
             stages={funnel}
             label={`${agent.name} funnel`}
+            caption={funnelCaption}
             empty={funnelEmpty}
             className="border-t border-[var(--hairline)] pt-3"
           />

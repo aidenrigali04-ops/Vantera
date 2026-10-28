@@ -40,8 +40,9 @@ export type ShowcaseAgent = {
   lastRanLabel: string | null;
   /** T4: the last few recorded runs, newest first, server-formatted */
   runHistory: { agoLabel: string; line: string }[];
-  /** UX-3: this agent's own mini funnel (card-funnel.ts) */
-  funnel: MiniStage[];
+  /** UX-3: this agent's own mini funnel (card-funnel.ts); null when the proof read failed */
+  funnel: MiniStage[] | null;
+  funnelCaption: string | null;
   funnelEmpty: string;
 };
 
@@ -115,11 +116,16 @@ export function toShowcaseAgent(
   base: {
     attention: Attention;
     runHistory: { agoLabel: string; line: string }[];
-    funnels: CardFunnels;
+    funnels: CardFunnels | null;
   }
 ): ShowcaseAgent {
   const { funnels, ...rest } = base;
-  const health = { ...rest, funnel: funnels[row.kind], funnelEmpty: funnelEmpty(row.kind, funnels) };
+  const health = {
+    ...rest,
+    funnel: funnels?.[row.kind] ?? null,
+    funnelCaption: funnels?.captions[row.kind] ?? null,
+    funnelEmpty: funnels ? funnelEmpty(row.kind, funnels) : "",
+  };
   const icpNames = (row.agent_icps ?? [])
     .sort((a, b) => a.position - b.position)
     .map((l) => l.icps?.name)

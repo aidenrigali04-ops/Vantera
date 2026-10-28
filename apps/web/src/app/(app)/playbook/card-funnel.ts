@@ -3,18 +3,30 @@ import type { ProofModel, ProofRow } from "@/lib/proof/types";
 /** One step of a Playbook card's mini funnel; pct is vs the previous stage (null when it is 0). */
 export type MiniStage = { label: string; count: number; pct: number | null };
 
-/** The latest completed intent run's `agent_runs.summary`, or null before any run. */
+/**
+ * The latest completed intent run. `intentRan` is whether such a run exists at all;
+ * `intentSummary` is its `agent_runs.summary`, which can be null even on a completed run.
+ */
 export type RunFacts = {
   intentSummary: { observed?: number; intent?: number; qualified?: number } | null;
+  intentRan: boolean;
 };
 
 export type CardFunnels = {
   scout: MiniStage[];
   intent: MiniStage[];
   copy: MiniStage[];
-  /** false = no completed intent run yet (intentSummary was null) */
+  /** false = no completed intent run yet; a completed run with no summary still counts */
   intentRan: boolean;
+  /** visible line above each funnel saying what it counts (null = none) */
+  captions: { scout: string; intent: string; copy: null };
 };
+
+/** What each card funnel counts, so it never reads as the stat beside it. */
+export const FUNNEL_CAPTION = {
+  scout: "Prospects this agent found",
+  intent: "Last run",
+} as const;
 
 /** Empty-state lines under a mini funnel whose stages are all zero. */
 export const FUNNEL_EMPTY = {
@@ -66,6 +78,7 @@ export function cardFunnels(proof: ProofModel, runs: RunFacts): CardFunnels {
       ["Replied", num(out?.replied)],
       ["Interested", num(out?.interested)],
     ]),
-    intentRan: s !== null,
+    intentRan: runs.intentRan,
+    captions: { scout: FUNNEL_CAPTION.scout, intent: FUNNEL_CAPTION.intent, copy: null },
   };
 }
