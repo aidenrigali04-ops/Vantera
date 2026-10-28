@@ -39,7 +39,7 @@ Only people who clear both become prospects, each tagged with the "why now" sign
 
 1. **Name your agent.**
 2. **Watch** — the keywords and hashtags are already filled in from your website scan, brand, and ICP; edit them or add your own, then pick your signal types. You need a deployed Prospect Agent first, since the Intent Agent qualifies against its ICP.
-3. **Schedule** — pick a run time and a daily or weekly cadence.
+3. **Schedule** — pick a run time and a cadence: every day, every 6 hours, or every week.
 4. **Deploy** — its first run starts within about 15 minutes. Qualified intent prospects flow straight into Approvals — nothing sends without you.
 
 ## Changing what it watches
