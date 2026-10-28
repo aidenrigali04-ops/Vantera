@@ -241,3 +241,23 @@ export { STARTER_PLAYS, SOURCE_LABEL, matchStarterPlays, type StarterPlay } from
 export { pickWhyNow, findMissingWhyNow, WHY_NOW_MAX_AGE_DAYS, type WhyNow, type SignalLike } from "./copy/why-now";
 export { applyExclusions, normalizeTargetingRules, EMPTY_TARGETING, TARGETING_LIST_MAX, TARGETING_ENTRY_MAX, TARGETING_GUIDANCE_MAX, type TargetingRules } from "./prospect/exclusions";
 export { profileText, lookalikeCutpoints, lookalikeBucket, LOOKALIKE_MIN_POSITIVES, type LookalikeCutpoints, type ProfileFields } from "./targeting/lookalike";
+
+// Conversation intelligence (state, moves, rules, read, priors, learn, policy, compose, lint).
+export * from "./conversation/state";
+export * from "./conversation/moves";
+export * from "./conversation/rules";
+export {
+  readoutSchema,
+  READ_SYSTEM,
+  isSellerTurn,
+  readTurn,
+  applyReadout,
+  type Readout,
+  type LinkKind as ReadLinkKind,
+} from "./conversation/read";
+export * from "./conversation/priors";
+export * from "./conversation/learn";
+export * from "./conversation/policy";
+export * from "./conversation/compose";
+export * from "./conversation/lint";
+export { BUMP_PHRASES } from "./copy/humanizer";
