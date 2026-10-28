@@ -2,6 +2,7 @@ import {
   bigint,
   boolean,
   customType,
+  doublePrecision,
   foreignKey,
   index,
   integer,
@@ -798,6 +799,8 @@ export const replies = pgTable(
     }),
     classificationRationale: text("classification_rationale"),
     classifiedAt: timestamp("classified_at", { withTimezone: true }),
+    // 0074: structured readout of the reply (intent, objection, signals)
+    readout: jsonb("readout"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -834,6 +837,123 @@ export const nativeMessages = pgTable(
       name: "native_messages_lead_same_account",
     }).onDelete("cascade"),
   ]
+);
+
+// 0074: conversation intelligence — per-lead state, decision log, learned priors.
+export const conversationStates = pgTable(
+  "conversation_states",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id").notNull(),
+    state: jsonb("state").notNull(),
+    lastMessageRef: text("last_message_ref"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("conversation_states_lead_unique").on(t.leadId),
+    foreignKey({
+      columns: [t.leadId, t.accountId],
+      foreignColumns: [leads.id, leads.accountId],
+      name: "conversation_states_lead_same_account",
+    }).onDelete("cascade"),
+  ]
+);
+
+export const conversationDecisions = pgTable(
+  "conversation_decisions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id").notNull(),
+    scheduledSendId: uuid("scheduled_send_id"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().defaultNow(),
+    mode: text("mode", { enum: ["shadow", "live"] }).notNull(),
+    trigger: text("trigger", { enum: ["reply", "first_message", "followup"] }).notNull(),
+    phase: text("phase").notNull(),
+    archetype: text("archetype").notNull(),
+    move: text("move").notNull(),
+    styleKey: text("style_key").notNull(),
+    propensity: doublePrecision("propensity").notNull(),
+    seed: integer("seed").notNull(),
+    legalMoves: jsonb("legal_moves").notNull(),
+    vetoes: jsonb("vetoes").notNull(),
+    stateSnapshot: jsonb("state_snapshot").notNull(),
+    composedBody: text("composed_body"),
+    policyVersion: integer("policy_version").notNull(),
+    promptHash: text("prompt_hash"),
+    outcome: jsonb("outcome"),
+    reward: doublePrecision("reward"),
+    scoredAt: timestamp("scored_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("conversation_decisions_account_decided_idx").on(t.accountId, t.decidedAt.desc()),
+    index("conversation_decisions_lead_idx").on(t.leadId),
+    index("conversation_decisions_unscored_idx").on(t.scoredAt).where(sql`${t.scoredAt} is null`),
+    foreignKey({
+      columns: [t.leadId, t.accountId],
+      foreignColumns: [leads.id, leads.accountId],
+      name: "conversation_decisions_lead_same_account",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.scheduledSendId, t.accountId],
+      foreignColumns: [scheduledSends.id, scheduledSends.accountId],
+      name: "conversation_decisions_send",
+    }).onDelete("set null"),
+  ]
+);
+
+export const conversationPriors = pgTable(
+  "conversation_priors",
+  {
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    level: text("level", { enum: ["move", "move_phase", "move_phase_archetype"] }).notNull(),
+    phase: text("phase").notNull().default(""),
+    archetype: text("archetype").notNull().default(""),
+    move: text("move").notNull(),
+    count: integer("count").notNull().default(0),
+    n: integer("n").notNull().default(0),
+    positives: integer("positives").notNull().default(0),
+    rewardSum: doublePrecision("reward_sum").notNull().default(0),
+    rewardSq: doublePrecision("reward_sq").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.level, t.phase, t.archetype, t.move] })]
+);
+
+// Cross-tenant counts only (service-role; RLS on, no policies). No account_id by design.
+export const conversationPriorsGlobal = pgTable(
+  "conversation_priors_global",
+  {
+    level: text("level", { enum: ["move", "move_phase", "move_phase_archetype"] }).notNull(),
+    phase: text("phase", {
+      enum: ["", "pre_reply", "engaged", "exploring", "asked", "after_no"],
+    })
+      .notNull()
+      .default(""),
+    archetype: text("archetype").notNull().default(""),
+    move: text("move", {
+      enum: [
+        "answer", "acknowledge", "observe", "ask_discovery", "poke", "reframe", "narrow",
+        "offer_value", "soft_ask", "propose_times", "confirm", "graceful_exit", "breakup",
+        "wait", "hand_to_human",
+      ],
+    }).notNull(),
+    source: text("source", { enum: ["research", "sim", "real"] }).notNull(),
+    count: integer("count").notNull().default(0),
+    n: integer("n").notNull().default(0),
+    positives: integer("positives").notNull().default(0),
+    rewardSum: doublePrecision("reward_sum").notNull().default(0),
+    rewardSq: doublePrecision("reward_sq").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.level, t.phase, t.archetype, t.move, t.source] })]
 );
 
 export const unsubscribeTokens = pgTable(
