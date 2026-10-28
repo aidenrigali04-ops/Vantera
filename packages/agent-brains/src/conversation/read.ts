@@ -109,6 +109,7 @@ export function applyReadout(state: ConversationState, turn: StoredTurn, readout
 
   if (isSellerTurn(turn)) {
     s.lastAgentMessageAt = at;
+    if (s.counters.agentTurnsSinceLastLead >= 1) s.counters.followupsSinceLastReply += 1;
     s.counters.agentTurnsSinceLastLead += 1;
     if (turn.role === "agent") s.counters.agentTurns += 1;
     if (readout.hookUsed) s.memory.hooksUsed.push({ ...readout.hookUsed, messageRef: turn.ref });

@@ -162,4 +162,21 @@ describe("applyReadout", () => {
     expect(s.qualification.painIdentified).toBe(true);
     expect(s.memory.objections[0]).toEqual({ kind: "not_now", text: "busy", handled: false });
   });
+
+  it("three consecutive agent turns count two follow-ups", () => {
+    let s = emptyState();
+    for (const r of ["a1", "a2", "a3"]) s = applyReadout(s, turn("agent", "m", r), ro());
+    expect(s.counters.followupsSinceLastReply).toBe(2);
+  });
+
+  it("a lead turn in between resets follow-ups to 0", () => {
+    let s = emptyState();
+    s = applyReadout(s, turn("agent", "m", "a1"), ro());
+    s = applyReadout(s, turn("agent", "m", "a2"), ro());
+    expect(s.counters.followupsSinceLastReply).toBe(1);
+    s = applyReadout(s, turn("lead", "hi", "l1"), ro());
+    expect(s.counters.followupsSinceLastReply).toBe(0);
+    s = applyReadout(s, turn("agent", "m", "a3"), ro());
+    expect(s.counters.followupsSinceLastReply).toBe(0);
+  });
 });
