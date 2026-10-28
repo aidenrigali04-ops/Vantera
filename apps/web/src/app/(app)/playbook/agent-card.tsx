@@ -132,7 +132,7 @@ export function AgentCard({
         <div className="flex items-center gap-1">
           <Button asChild variant="ghost" size="sm">
             <Link href={`/playbook/${agent.kind}/edit`}>
-              <Settings2 className="size-4" /> Edit config
+              <Settings2 className="size-4" /> Edit settings
             </Link>
           </Button>
           {agent.kind === "scout" && (

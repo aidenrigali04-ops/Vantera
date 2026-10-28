@@ -136,6 +136,7 @@ describe("sources", () => {
     expect(a.map((r) => [r.key, r.found])).toEqual([
       ["agent:scout", 1], ["agent:intent", 1], ["agent:added", 2], ["agent:outreach", null],
     ]);
+    expect(a.map((r) => r.label)).toEqual(["Prospect agent", "Intent agent", "Added by you", "Outreach agent"]);
     expect(a[3]!.contacted).toBe(buildProof(i).funnel[2]!.count);
     expect(sourceRows(i, leadSets(i)).at(-1)!.key).toBe("none");
   });

@@ -129,8 +129,12 @@ const SIGNAL_KIND_LABELS: Record<string, string> = {
   other: "Other signals",
 };
 
+/** Known kinds get their friendly label; an unknown code is humanized ("new_kind" → "New kind"), never shown raw. */
 export function signalKindLabel(kind: string): string {
-  return SIGNAL_KIND_LABELS[kind] ?? kind;
+  const known = SIGNAL_KIND_LABELS[kind];
+  if (known) return known;
+  const words = kind.replace(/_/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : kind;
 }
 
 export type SignalAttribution = { kind: string; label: string; wins: number };

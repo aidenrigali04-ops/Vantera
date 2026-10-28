@@ -119,10 +119,10 @@ export function agentRows(input: ProofInput, sets: LeadSets): ProofRow[] {
     new Set(input.leads.filter((l) => f(l.source)).map((l) => l.id));
   const all = new Set(input.leads.map((l) => l.id));
   return [
-    makeRow("agent:scout", "Scout", "agent", pick((s) => s === "discovery"), sets),
-    makeRow("agent:intent", "Intent", "agent", pick((s) => s === "intent"), sets),
+    makeRow("agent:scout", "Prospect agent", "agent", pick((s) => s === "discovery"), sets),
+    makeRow("agent:intent", "Intent agent", "agent", pick((s) => s === "intent"), sets),
     makeRow("agent:added", "Added by you", "agent",
       pick((s) => ["manual", "import", "inbound", "ad"].includes(s)), sets),
-    makeRow("agent:outreach", "Outreach", "agent", all, sets, null),
+    makeRow("agent:outreach", "Outreach agent", "agent", all, sets, null),
   ];
 }

@@ -44,7 +44,7 @@ Only people who clear both become prospects, each tagged with the "why now" sign
 
 ## Changing what it watches
 
-Open the agent on the Playbook page and choose **Edit config**. You can rename it, add or remove keywords, competitors, hashtags, and creators, switch signal types on or off, and change the run time or cadence. **Save changes** keeps the agent live, and it starts a fresh run with the new watchlist within about 15 minutes, then follows the new schedule. If you paused the agent, saving keeps it paused: "Runs resume when you unpause the agent." Only workspace admins can change an agent. Anyone else sees "Only an admin can change this agent."
+Open the agent on the Playbook page and choose **Edit settings**. You can rename it, add or remove keywords, competitors, hashtags, and creators, switch signal types on or off, and change the run time or cadence. **Save changes** keeps the agent live, and it starts a fresh run with the new watchlist within about 15 minutes, then follows the new schedule. If you paused the agent, saving keeps it paused: "Runs resume when you unpause the agent." Only workspace admins can change an agent. Anyone else sees "Only an admin can change this agent."
 
 ## Seeing what it found
 

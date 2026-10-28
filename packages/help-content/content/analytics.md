@@ -14,7 +14,7 @@ Until your agents have found anyone, the tab says so and links to **Set up your 
 
 The funnel has eight stages, top to bottom. Each one counts people, not messages:
 
-- **Found** — every prospect in your workspace, however they arrived.
+- **Found** — the prospects in your workspace, however they arrived.
 - **Qualified** — prospects that passed your quality bar.
 - **Contacted** — prospects Vantera sent a message to or sent a connection invite to.
 - **Accepted** — prospects who accepted your connection request.
@@ -34,11 +34,11 @@ Below the funnel, the **Where prospects come from** table breaks the same people
 - **Signals** — one row per kind of buying signal captured on your prospects, such as a funding round or an executive hire. The biggest rows come first.
 - **Intent watchlist** — people your Intent Agent surfaced, grouped by what they were reacting to: **Keyword mentions**, **Competitor engagers**, **Creator engagers**, and **Hashtag activity**. **Removed watch targets** holds people surfaced by something you have since taken off the watchlist, so they are still counted.
 - **Other** — **No signal captured** is everyone who arrived with no signal and no watchlist match.
-- **Agents** — the same people by who brought them in: **Scout** (your Prospect Agent), **Intent** (your Intent Agent), and **Added by you** (prospects you added, imported, or received yourself). The **Outreach** row follows everyone your Outreach Agent worked. Its Found cell shows a dash, because the Outreach Agent reaches people but doesn't find them.
+- **Agents** — the same people by who brought them in: **Prospect agent**, **Intent agent**, and **Added by you** (prospects you added, imported, or received yourself). The **Outreach agent** row counts outreach across all your prospects. Its Found cell shows a dash, because the Outreach Agent reaches people but doesn't find them.
 
-"A prospect with several signals counts once in each row." So someone with a funding round and an executive hire appears in both rows, and the signal rows can add up to more than your Found total. The Scout, Intent, and Added by you rows don't overlap: each prospect counts in only one of them.
+"A prospect with several signals counts once in each row." So someone with a funding round and an executive hire appears in both rows, and the signal rows can add up to more than your Found total. The Prospect agent, Intent agent, and Added by you rows don't overlap: each prospect counts in only one of them.
 
-On a very large workspace the table reads up to 5,000 records of each kind. When that limit is reached, the note under the table adds "Showing the first 5,000 rows."
+On a very large workspace, the funnel and the table both read up to 5,000 records of each kind, so their counts can stop short of your full totals. When that limit is reached, the note under the table adds "Showing the first 5,000 rows."
 
 ## Dollars: return on spend
 
