@@ -7,6 +7,7 @@ import type { ActionTileSpec, TileKind } from "@/lib/today/tiles";
 import { cn } from "@/lib/utils";
 
 import { FOCUS_RING } from "./buttons";
+import { DealSizeForm } from "./deal-size-form";
 import { EmptyLine } from "./empty-line";
 import { Glyph } from "./glyphs";
 import { MonoText } from "./mono-text";
@@ -67,7 +68,9 @@ export function ActionTile({ tile, onDismiss, onResume, className }: ActionTileP
 
   return (
     <div className={cn("group relative", className)}>
-      {tile.inline === "resume" ? (
+      {tile.inline === "deal_size" ? (
+        <DealSizeForm tile={tile} />
+      ) : tile.inline === "resume" ? (
         <button type="button" onClick={onResume} className={ROW}>
           {body}
         </button>
@@ -84,8 +87,10 @@ export function ActionTile({ tile, onDismiss, onResume, className }: ActionTileP
           aria-label="Dismiss"
           onClick={dismiss}
           className={cn(
-            "absolute right-[52px] top-[calc(50%_+_10px)] z-10 flex size-6 -translate-y-1/2 items-center justify-center rounded-[var(--r-chip)] text-[var(--ink-dim)] opacity-0",
+            "absolute z-10 flex size-6 items-center justify-center rounded-[var(--r-chip)] text-[var(--ink-dim)] opacity-0",
             "transition-[opacity,background-color,color] duration-120 ease-out hover:bg-[var(--surface-2)] hover:text-[var(--ink)] focus-visible:opacity-100 group-hover:opacity-100",
+            // the inline form has no chevron and owns the meta line: its × sits top-right
+            tile.inline === "deal_size" ? "right-2 top-2" : "right-[52px] top-[calc(50%_+_10px)] -translate-y-1/2",
             FOCUS_RING,
           )}
         >

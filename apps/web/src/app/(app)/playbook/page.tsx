@@ -8,6 +8,8 @@ import { agentAttention, type AgentRunRow } from "./agent-health";
 import { PageHeader } from "@/components/app/surface";
 import { fmtDayTime, fmtUntil } from "@/lib/today/metrics";
 import { safeZone } from "@/lib/today/sender-facts";
+import { loadCardFunnels } from "./card-funnel-data";
+import { funnelEmpty } from "./card-funnel";
 
 export const metadata = { title: "Playbook" };
 
@@ -46,7 +48,7 @@ export default async function AgentsPage({
   // only the waiting pool made a healthy 40+ look like "3 qualified" the instant the
   // pipeline drained them into outreach.
   const QUALIFIED_PLUS = ["qualified", "enriched", "in_campaign", "replied", "converted"];
-  const [{ count: qualified }, { count: sourced }, { count: drafts }, { count: intentLeads }, { data: runRows }, { count: liActive }] =
+  const [{ count: qualified }, { count: sourced }, { count: drafts }, { count: intentLeads }, { data: runRows }, { count: liActive }, funnels] =
     await Promise.all([
       supabase.from("leads").select("id", { count: "exact", head: true }).in("status", QUALIFIED_PLUS),
       supabase.from("leads").select("id", { count: "exact", head: true }),
@@ -66,6 +68,8 @@ export default async function AgentsPage({
         .from("linkedin_accounts")
         .select("id", { count: "exact", head: true })
         .eq("status", "active"),
+      // UX-3: one proof read per request, shared by all three card funnels.
+      loadCardFunnels(supabase),
     ]);
 
   const latestRunByAgent = new Map<string, AgentRunRow>();
@@ -187,6 +191,9 @@ export default async function AgentsPage({
                 { label: "Prospects sourced", value: sourced ?? 0 },
                 { label: "Qualified", value: qualified ?? 0 },
               ]}
+              funnel={funnels?.scout ?? null}
+              funnelCaption={funnels?.captions.scout ?? null}
+              funnelEmpty={funnels ? funnelEmpty("scout", funnels) : undefined}
               {...health(scout)}
             />
           ) : (
@@ -205,6 +212,9 @@ export default async function AgentsPage({
               roleLabel="Intent detection"
               index={1}
               stats={[{ label: "Intent prospects", value: intentLeads ?? 0 }]}
+              funnel={funnels?.intent ?? null}
+              funnelCaption={funnels?.captions.intent ?? null}
+              funnelEmpty={funnels ? funnelEmpty("intent", funnels) : undefined}
               {...health(intent)}
             />
           ) : (
@@ -223,6 +233,9 @@ export default async function AgentsPage({
               roleLabel="Outreach & conversations"
               index={2}
               stats={[{ label: "Drafts awaiting approval", value: drafts ?? 0 }]}
+              funnel={funnels?.copy ?? null}
+              funnelCaption={funnels?.captions.copy ?? null}
+              funnelEmpty={funnels ? funnelEmpty("copy", funnels) : undefined}
               {...health(copy)}
             />
           ) : (

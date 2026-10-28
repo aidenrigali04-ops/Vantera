@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCopyForm, parseIntentForm, parseScoutForm } from "./validation";
+import { intentConfig, intentFormFields, parseCopyForm, parseIntentForm, parseScoutForm, type IntentFormValues } from "./validation";
 
 function scoutForm(overrides: Record<string, string> = {}): FormData {
   const fd = new FormData();
@@ -160,6 +160,32 @@ describe("parseIntentForm", () => {
     const r = parseIntentForm(intentForm({ creators: "[]", competitors: JSON.stringify(["Salesforce", "Gainsight"]) }));
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.values.watch.competitors).toEqual(["Salesforce", "Gainsight"]);
+  });
+});
+
+describe("intent edit round-trip", () => {
+  const edit: IntentFormValues = {
+    name: "Sonar",
+    watch: {
+      creators: ["https://www.linkedin.com/in/creator"],
+      competitors: ["Salesforce"],
+      keywords: ["onboarding churn"],
+      hashtags: ["#revops"],
+    },
+    signals: { engagement: true, content: false, follows: true },
+    runAtTime: "07:00",
+    cadence: "intraday",
+    timezone: "Europe/London",
+  };
+
+  it("a form built from the saved agent parses back to the identical values and config", () => {
+    const fd = new FormData();
+    for (const [k, v] of intentFormFields(edit)) fd.set(k, v);
+    const r = parseIntentForm(fd);
+    expect(r).toEqual({ ok: true, values: edit });
+    if (r.ok) {
+      expect(intentConfig(r.values)).toEqual({ watch: edit.watch, signals: edit.signals, min_score: 70 });
+    }
   });
 });
 

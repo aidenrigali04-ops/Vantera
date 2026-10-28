@@ -1,7 +1,7 @@
 ---
 title: Your Outreach Agent
 surface: agents
-routes: /playbook, /playbook/new/copy
+routes: /playbook, /playbook/new/copy, /playbook/copy
 ---
 
 # Your Outreach Agent
@@ -44,6 +44,10 @@ When you deploy, you choose how outreach and replies leave the agent:
 - **Automatic** — clean messages send on their own; any message the style guard flags falls back to Approvals. Flagged copy never sends silently.
 
 Either way, anyone on your suppression list is never drafted to at all — unsubscribes and opt-outs are honored before a single word is written.
+
+## Seeing what it produced
+
+The Outreach Agent's card on Playbook shows a small funnel: **Contacted → Accepted → Replied → Interested**, with each step as a share of the one before. It counts everyone the agent has reached, and it matches the Outreach agent row on Results. Until anything has gone out, it reads "Nothing sent yet". The agent's page also ends with an **Activity** list, newest first, showing your setup moments (for example "Outreach agent live") and your agents' recorded runs.
 
 ## Who goes first when the day's limit is tight
 

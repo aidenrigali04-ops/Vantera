@@ -22,9 +22,12 @@ describe("aggregateSignalAttribution", () => {
 });
 
 describe("signalKindLabel", () => {
-  it("maps known kinds to friendly labels and passes through the unknown", () => {
+  it("maps known kinds to friendly labels", () => {
     expect(signalKindLabel("funding")).toBe("Funding rounds");
     expect(signalKindLabel("intent")).toBe("Buying intent");
-    expect(signalKindLabel("some_new_kind")).toBe("some_new_kind");
+  });
+
+  it("humanizes an unknown kind instead of showing the raw code", () => {
+    expect(signalKindLabel("some_new_kind")).toBe("Some new kind");
   });
 });

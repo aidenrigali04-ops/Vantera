@@ -119,15 +119,21 @@ export function agentAttention(input: AttentionInput): Attention {
   return null;
 }
 
+/** Human reason for a skipped run's note code; null for unknown/absent notes (codes never surface). */
+export function skipReason(note: string | null): string | null {
+  if (note === "low_credits") return "sourcing capacity";
+  if (note === "no_connection") return "no LinkedIn connection";
+  if (note === "empty_watchlist") return "nothing on the watchlist";
+  return null;
+}
+
 /** One human line per recorded run, e.g. "25 sourced → 20 passed gate → 5 qualified". */
 export function runLine(run: AgentRunRow): string {
   if (run.status === "failed") return "Run failed — retried automatically";
   const s = run.summary;
   if (run.status === "skipped") {
-    if (run.note === "low_credits") return "Skipped — sourcing capacity";
-    if (run.note === "no_connection") return "Skipped — no LinkedIn connection";
-    if (run.note === "empty_watchlist") return "Skipped — nothing on the watchlist";
-    return "Skipped";
+    const reason = skipReason(run.note);
+    return reason ? `Skipped — ${reason}` : "Skipped";
   }
   if (run.kind === "scout") {
     if (s.reason === "trial_cap") return "Sourcing paused — trial lead limit reached";

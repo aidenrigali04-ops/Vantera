@@ -1,7 +1,7 @@
 ---
 title: Your Intent Agent
 surface: agents
-routes: /playbook, /playbook/new/intent, /playbook/intent
+routes: /playbook, /playbook/new/intent, /playbook/intent, /playbook/intent/edit
 ---
 
 # Your Intent Agent
@@ -39,8 +39,16 @@ Only people who clear both become prospects, each tagged with the "why now" sign
 
 1. **Name your agent.**
 2. **Watch** — the keywords and hashtags are already filled in from your website scan, brand, and ICP; edit them or add your own, then pick your signal types. You need a deployed Prospect Agent first, since the Intent Agent qualifies against its ICP.
-3. **Schedule** — pick a run time and a daily or weekly cadence.
+3. **Schedule** — pick a run time and a cadence: every day, every 6 hours, or every week.
 4. **Deploy** — its first run starts within about 15 minutes. Qualified intent prospects flow straight into Approvals — nothing sends without you.
+
+## Changing what it watches
+
+Open the agent on the Playbook page and choose **Edit settings**. You can rename it, add or remove keywords, competitors, hashtags, and creators, switch signal types on or off, and change the run time or cadence. **Save changes** keeps the agent live, and it starts a fresh run with the new watchlist within about 15 minutes, then follows the new schedule. If you paused the agent, saving keeps it paused: "Runs resume when you unpause the agent." Only workspace admins can change an agent. Anyone else sees "Only an admin can change this agent."
+
+## Seeing what it found
+
+The Intent Agent's card on Playbook shows a small funnel from its last completed run: **Observed → Intent → Qualified**. That's the people it saw react to what you watch, the ones whose activity showed buying intent, and the ones who also fit your ICP. Before its first run finishes it reads "No run yet". If the last run found no one, it reads "Last run found nothing". The agent's page ends with an **Activity** list, newest first, showing your setup moments (for example "Intent agent live") and each recorded run.
 
 ## Company events, too (Growth and Scale)
 

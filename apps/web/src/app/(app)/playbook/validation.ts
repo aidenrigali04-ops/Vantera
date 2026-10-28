@@ -174,6 +174,28 @@ export function parseIntentForm(form: FormData): Result<IntentFormValues> {
   return { ok: true, values: { name, watch, signals, runAtTime, cadence, timezone } };
 }
 
+/** The agents.config shape for an Intent agent — one builder for deploy and edit, so the scanner's
+ *  reader (getIntentContext) sees identical keys either way. min_score = the rule-06 default bar. */
+export function intentConfig(values: Pick<IntentFormValues, "watch" | "signals">) {
+  return { watch: values.watch, signals: values.signals, min_score: 70 };
+}
+
+/** The wizard's hidden form fields for a set of values — the inverse of parseIntentForm. */
+export function intentFormFields(values: IntentFormValues): [string, string][] {
+  const fields: [string, string][] = [
+    ["name", values.name],
+    ["creators", JSON.stringify(values.watch.creators)],
+    ["competitors", JSON.stringify(values.watch.competitors)],
+    ["keywords", JSON.stringify(values.watch.keywords)],
+    ["hashtags", JSON.stringify(values.watch.hashtags)],
+  ];
+  if (values.signals.engagement) fields.push(["signalEngagement", "on"]);
+  if (values.signals.content) fields.push(["signalContent", "on"]);
+  if (values.signals.follows) fields.push(["signalFollows", "on"]);
+  fields.push(["runAtTime", values.runAtTime], ["cadence", values.cadence], ["timezone", values.timezone]);
+  return fields;
+}
+
 // ── ML-5 targeting rules (Scout agents.config.targeting) ─────────────────────────────────────
 export const TARGETING_LIST_MAX = 50;
 export const TARGETING_ENTRY_MAX = 80;

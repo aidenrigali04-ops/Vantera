@@ -6,6 +6,7 @@ import { tasks } from "@trigger.dev/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { deriveIntentWatchlist } from "@vantera/agent-brains";
 import {
+  intentConfig,
   parseCopyForm,
   parseIntentForm,
   parseScoutForm,
@@ -224,7 +225,7 @@ export async function deployIntentAgent(
       name,
       status: "live",
       // snake_case jsonb — the pipeline's getIntentContext reads this shape (rule 13)
-      config: { watch, signals, min_score: 70 },
+      config: intentConfig({ watch, signals }),
       run_at_time: runAtTime,
       cadence,
       timezone,
@@ -443,6 +444,45 @@ export async function updateScoutAgent(
 
   revalidatePath("/playbook");
   redirect("/playbook?updated=scout");
+}
+
+/**
+ * Edit a deployed Intent agent's watchlist, signals and schedule. Same validation and the same
+ * agents.config shape as deploy (intentConfig), so the scanner reads it unchanged. status and
+ * deployed_at are left alone; next_run_at resets to null exactly as deploy does (null = due),
+ * so the new watchlist is read on the next scheduler cycle and then follows the new schedule.
+ */
+export async function updateIntentAgent(
+  _prev: AgentActionState,
+  formData: FormData
+): Promise<AgentActionState> {
+  const parsed = parseIntentForm(formData);
+  if (!parsed.ok) return { error: parsed.error };
+  const { name, watch, signals, runAtTime, cadence, timezone } = parsed.values;
+
+  const { supabase, user, account } = await sessionAccount();
+  if (!user || !account) return { error: "Your session expired. Sign in again." };
+
+  // RLS scopes the write to the admin's account (rule 02); a refused write returns 0 rows, not an error
+  const { data: rows, error } = await supabase
+    .from("agents")
+    .update({
+      name,
+      config: intentConfig({ watch, signals }),
+      run_at_time: runAtTime,
+      cadence,
+      timezone,
+      next_run_at: null,
+    })
+    .eq("account_id", account.id)
+    .eq("kind", "intent")
+    .select("id");
+  if (error) return { error: "Could not save changes. Please try again." };
+  if (!rows || rows.length === 0) return { error: "Only an admin can change this agent." };
+
+  revalidatePath("/playbook");
+  revalidatePath("/playbook/intent");
+  redirect("/playbook/intent");
 }
 
 /**

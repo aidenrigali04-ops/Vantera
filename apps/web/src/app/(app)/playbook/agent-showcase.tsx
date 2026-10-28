@@ -14,7 +14,9 @@ import { cn } from "@/lib/utils";
 import { SEGMENT_TRACK, segmentClass } from "@/components/app/surface";
 import { setAgentStatus, type AgentActionState } from "./actions";
 import { RunNowButton } from "./run-now";
-import type { ShowcaseAgent, ShowcaseKind } from "./agent-showcase-data";
+import type { ShowcaseActivity, ShowcaseAgent, ShowcaseKind } from "./agent-showcase-data";
+import { MiniFunnel } from "./mini-funnel";
+import { ActivityFeedView } from "./activity-feed-view";
 import { useUntil } from "@/lib/use-until";
 
 function statusLabel(s: ShowcaseAgent["status"]): string {
@@ -130,6 +132,15 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
           ))}
         </div>
 
+        {agent.funnel && (
+          <MiniFunnel
+            stages={agent.funnel}
+            label={`${agent.name} funnel`}
+            caption={agent.funnelCaption}
+            empty={agent.funnelEmpty}
+          />
+        )}
+
         {agent.progress && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
@@ -186,13 +197,11 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
 
       {/* actions */}
       <div className="mt-5 flex flex-wrap items-center gap-2">
-        {agent.kind !== "intent" && (
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/playbook/${agent.kind}/edit`}>
-              <Settings2 className="size-4" /> Edit config
-            </Link>
-          </Button>
-        )}
+        <Button asChild variant="outline" size="sm">
+          <Link href={`/playbook/${agent.kind}/edit`}>
+            <Settings2 className="size-4" /> Edit settings
+          </Link>
+        </Button>
         {agent.kind === "scout" && (
           <Button asChild variant="outline" size="sm">
             <Link href="/playbook/scout/targeting">Targeting rules</Link>
@@ -234,9 +243,12 @@ function ChannelChip({ on, icon, label }: { on: boolean; icon: React.ReactNode; 
 // ── main ─────────────────────────────────────────────────────────────────────
 export function AgentShowcase({
   agents,
+  activity,
   initialKind,
 }: {
   agents: ShowcaseAgent[];
+  /** UX-3: account-wide narrated feed (setup milestones + runs), server-built */
+  activity: ShowcaseActivity[];
   initialKind: ShowcaseKind;
 }) {
   const has = (k: ShowcaseKind) => agents.some((a) => a.kind === k);
@@ -266,6 +278,11 @@ export function AgentShowcase({
           <AgentDetails agent={current} />
         </motion.div>
       </AnimatePresence>
+
+      {/* outside the crossfade: the feed is account-wide, so it stays put on switch */}
+      <div className="mt-8">
+        <ActivityFeedView items={activity} />
+      </div>
     </div>
   );
 }

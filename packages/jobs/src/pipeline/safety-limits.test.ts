@@ -3,6 +3,7 @@ import {
   LINKEDIN_WEEKLY_INVITE_CEILING,
   LINKEDIN_STEADY_DAILY_INVITES,
   LINKEDIN_STEADY_DAILY_MESSAGES,
+  LINKEDIN_RAMP,
   dailyAllowance,
   paceWithJitter,
 } from "./safety-limits";
@@ -59,5 +60,22 @@ describe("linkedin message cap", () => {
   });
   it("defaults to invite behavior when kind is omitted", () => {
     expect(dailyAllowance("linkedin", 3)).toBe(5); // ramp step unchanged
+  });
+});
+
+describe("LINKEDIN_RAMP", () => {
+  it("is exported, ascending, and stays below the steady daily rate", () => {
+    expect(LINKEDIN_RAMP.length).toBeGreaterThan(0);
+    for (let i = 1; i < LINKEDIN_RAMP.length; i++) {
+      expect(LINKEDIN_RAMP[i]!.maxAgeDays).toBeGreaterThan(LINKEDIN_RAMP[i - 1]!.maxAgeDays);
+      expect(LINKEDIN_RAMP[i]!.daily).toBeGreaterThan(LINKEDIN_RAMP[i - 1]!.daily);
+    }
+    expect(LINKEDIN_RAMP.at(-1)!.daily).toBeLessThan(LINKEDIN_STEADY_DAILY_INVITES);
+  });
+
+  it("is what dailyAllowance enforces", () => {
+    for (const step of LINKEDIN_RAMP) {
+      expect(dailyAllowance("linkedin", step.maxAgeDays - 1)).toBe(step.daily);
+    }
   });
 });

@@ -5,7 +5,7 @@ import { AgentShowcase } from "../agent-showcase";
 export const metadata = { title: "Outreach" };
 
 export default async function CopyAgentPage() {
-  const agents = await loadAgentShowcase();
+  const { agents, activity } = await loadAgentShowcase();
   if (!agents.some((a) => a.kind === "copy")) redirect("/playbook");
-  return <AgentShowcase agents={agents} initialKind="copy" />;
+  return <AgentShowcase agents={agents} activity={activity} initialKind="copy" />;
 }

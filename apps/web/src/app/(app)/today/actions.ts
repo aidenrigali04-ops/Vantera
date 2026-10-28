@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { GET_STARTED_ASK } from "@/lib/today/checklist";
+import { parseDealValue } from "@/lib/today/deal-value";
 import { REJECT_REASON_ORDER, type RejectReason } from "@/components/today/work-card/reject-reasons";
 
 /**
@@ -17,7 +18,7 @@ const REJECT_REASONS: ReadonlySet<string> = new Set<string>(REJECT_REASON_ORDER)
 
 // The tile asks hide for a day (tiles.ts); GET_STARTED_ASK hides the checklist for good —
 // its permanence lives in `checklistFor`, not in tiles.ts.
-const DISMISSIBLE: ReadonlySet<string> = new Set(["playbook_suggestion", "style_memory", "crm_handoff", "calendar_link", GET_STARTED_ASK]);
+const DISMISSIBLE: ReadonlySet<string> = new Set(["playbook_suggestion", "style_memory", "crm_handoff", "calendar_link", "deal_size", GET_STARTED_ASK]);
 
 async function sessionUser() {
   const supabase = await createClient();
@@ -43,6 +44,34 @@ export async function dismissAsk(kind: string): Promise<{ error?: string }> {
   if (error) return { error: "Could not dismiss that. Please try again." };
   revalidatePath("/today");
   return {};
+}
+
+/**
+ * The deal-size ask's inline save: sets accounts.avg_deal_value_cents, which unlocks the
+ * dollar figures on Results. RLS lets only admins update the account — a non-admin's update
+ * matches zero rows, so the `.select("id")` count is the authorization signal.
+ */
+export async function setDealValue(formData: FormData): Promise<{ ok: true } | { ok: false; message: string }> {
+  const parsed = parseDealValue(String(formData.get("dealValue") ?? ""));
+  if (!parsed.ok) return parsed;
+  const { supabase, user } = await sessionUser();
+  if (!user) return { ok: false, message: "Your session expired. Sign in again." };
+
+  const { data: account } = await supabase.from("accounts").select("id").limit(1).maybeSingle<{ id: string }>();
+  if (!account) return { ok: false, message: "No workspace found." };
+  const { data, error } = await supabase
+    .from("accounts")
+    .update({ avg_deal_value_cents: parsed.cents })
+    .eq("id", account.id)
+    .select("id");
+  if (error) return { ok: false, message: "Could not save that. Please try again." };
+  if (!data || data.length === 0) return { ok: false, message: "Only an admin can set this." };
+  // every surface that reads avg_deal_value_cents
+  revalidatePath("/today");
+  revalidatePath("/dashboard");
+  revalidatePath("/settings");
+  revalidatePath("/prospects");
+  return { ok: true };
 }
 
 /**

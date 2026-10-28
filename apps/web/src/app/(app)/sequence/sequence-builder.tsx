@@ -13,6 +13,7 @@ import { Panel } from "@/components/ui/panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { capsTrustLine, type CapsInput } from "@/lib/safety/caps-line";
 import { saveSequenceConfig, type SequenceState } from "./actions";
 import type { SequenceConfig, SequenceStage } from "@vantera/jobs/pipeline/types";
 
@@ -23,9 +24,11 @@ const STAGE_META: { key: SequenceStage; label: string; icon: LucideIcon }[] = [
 export function SequenceBuilder({
   config,
   hasCampaign,
+  caps,
 }: {
   config: SequenceConfig;
   hasCampaign: boolean;
+  caps: CapsInput;
 }) {
   const [state, action, pending] = useActionState<SequenceState, FormData>(saveSequenceConfig, {});
 
@@ -66,6 +69,9 @@ export function SequenceBuilder({
             )}
           </div>
         ))}
+
+        {/* The caps are the scheduler's real constants (safety-limits.ts), passed in by the page. */}
+        <p className="text-xs text-muted-foreground">{capsTrustLine(caps)}</p>
 
         <div className="flex flex-wrap items-center gap-4 pt-2">
           <Button type="submit" disabled={pending}>

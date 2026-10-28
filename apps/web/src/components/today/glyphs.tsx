@@ -2,6 +2,7 @@ import {
   CalendarCheck,
   ChevronRight,
   CreditCard,
+  DollarSign,
   Link2,
   type LucideIcon,
   MessageSquare,
@@ -39,6 +40,7 @@ const GLYPHS: Record<GlyphName, LucideIcon> = {
   "pen-line": PenLine,
   plug: Plug,
   link: Link2,
+  "dollar-sign": DollarSign,
   "chevron-right": ChevronRight,
   x: X,
 };
