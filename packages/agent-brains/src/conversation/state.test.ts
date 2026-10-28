@@ -126,4 +126,70 @@ describe("conversation state", () => {
     expect(out.length).toBeGreaterThan(0);
     expect(out.length).toBeLessThan(800);
   });
+
+  describe("asked / precedence boundaries", () => {
+    const base = (): ConversationState => ({
+      ...withPatch(emptyState(), {
+        counters: { agentTurns: 2, leadTurns: 1, asksMade: 1 } as never,
+        memory: { problemsStated: ["pipeline"] },
+      }),
+    });
+    const T1 = "2026-10-01T10:00:00Z";
+    const T2 = "2026-10-02T10:00:00Z";
+
+    it("lead replied after the agent: asked is dropped, exploring follows", () => {
+      const s = { ...base(), lastAgentMessageAt: T1, lastLeadMessageAt: T2 };
+      expect(deriveStage(s)).toBe("exploring");
+    });
+    it("lead replied after the agent with nothing substantive: engaged", () => {
+      const s = {
+        ...withPatch(emptyState(), { counters: { agentTurns: 2, leadTurns: 1, asksMade: 1 } as never }),
+        lastAgentMessageAt: T1,
+        lastLeadMessageAt: T2,
+      };
+      expect(deriveStage(s)).toBe("engaged");
+    });
+    it("agent spoke after the lead: asked", () => {
+      expect(deriveStage({ ...base(), lastLeadMessageAt: T1, lastAgentMessageAt: T2 })).toBe("asked");
+    });
+    it("lastAgentMessageAt null with a lead message: lead is newer, not asked", () => {
+      expect(deriveStage({ ...base(), lastLeadMessageAt: T2, lastAgentMessageAt: null })).toBe("exploring");
+    });
+    it("lastAgentMessageAt set, lastLeadMessageAt null: asked", () => {
+      expect(deriveStage({ ...base(), lastAgentMessageAt: T1, lastLeadMessageAt: null })).toBe("asked");
+    });
+    it("dormant beats asked and qualified", () => {
+      const q = withPatch(base(), {
+        counters: { followupsSinceLastReply: 3 } as never,
+        qualification: { painIdentified: true, authority: "decides" },
+      });
+      expect(deriveStage(q)).toBe("dormant");
+    });
+    it("asked beats qualified", () => {
+      const q = withPatch(base(), { qualification: { painIdentified: true, authority: "decides" } });
+      expect(deriveStage(q)).toBe("asked");
+    });
+    it("qualification.timing never changes the stage", () => {
+      for (const timing of ["now", "later", "never", "unknown"] as const) {
+        expect(deriveStage(withPatch(base(), { qualification: { timing } }))).toBe("asked");
+      }
+      const open = withPatch(emptyState(), { counters: { agentTurns: 1, leadTurns: 1 } as never, qualification: { timing: "never" } });
+      expect(deriveStage(open)).toBe("engaged");
+    });
+    it("authority none blocks qualified", () => {
+      const s = withPatch(emptyState(), {
+        counters: { agentTurns: 1, leadTurns: 1 } as never,
+        memory: { problemsStated: ["x"] },
+        qualification: { painIdentified: true, authority: "none" },
+      });
+      expect(deriveStage(s)).toBe("exploring");
+    });
+    it("schema rejects more than 6 notes", () => {
+      const s = emptyState();
+      s.person.notes = Array.from({ length: 7 }, (_, i) => `n${i}`);
+      expect(conversationStateSchema.safeParse(s).success).toBe(false);
+      s.person.notes = s.person.notes.slice(0, 6);
+      expect(conversationStateSchema.safeParse(s).success).toBe(true);
+    });
+  });
 });
