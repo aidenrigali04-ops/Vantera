@@ -141,15 +141,24 @@ describe("applyReadout", () => {
     expect(s.lastAgentMessageAt).not.toBeNull();
   });
 
-  it("role confidence: personDelta.role raises it; sells_to_us sets seller_to_us at >= 0.7", () => {
-    let s = emptyState();
-    s.person.roleConfidence = 0.4;
-    s = applyReadout(s, turn("lead", "x"), ro({ personDelta: { ...base.personDelta, role: "recruiter", roleConfidence: 0.3 } }));
-    expect(s.person.role).toBe("recruiter");
-    expect(s.person.roleConfidence).toBe(0.4);
-    s = applyReadout(s, turn("lead", "we do lead gen"), ro({ intent: "sells_to_us" }));
+  it("role updates are confidence-aware: weaker never replaces stronger, stronger does", () => {
+    const delta = (role: Readout["personDelta"]["role"], c: number) => ro({ personDelta: { ...base.personDelta, role, roleConfidence: c } });
+    let s = applyReadout(emptyState(), turn("lead", "x"), delta("seller_to_us", 0.9));
+    s = applyReadout(s, turn("lead", "y"), delta("buyer", 0.1));
     expect(s.person.role).toBe("seller_to_us");
-    expect(s.person.roleConfidence).toBeGreaterThanOrEqual(0.7);
+    expect(s.person.roleConfidence).toBe(0.9);
+    s = applyReadout(s, turn("lead", "z"), delta("buyer", 0.95));
+    expect(s.person.role).toBe("buyer");
+    expect(s.person.roleConfidence).toBe(0.95);
+  });
+
+  it("sells_to_us sets seller_to_us at >= 0.7 and a later weaker delta cannot clobber it", () => {
+    let s = applyReadout(emptyState(), turn("lead", "we do lead gen"), ro({ intent: "sells_to_us" }));
+    expect(s.person.role).toBe("seller_to_us");
+    expect(s.person.roleConfidence).toBe(0.7);
+    s = applyReadout(s, turn("lead", "ok"), ro({ personDelta: { ...base.personDelta, role: "buyer", roleConfidence: 0.3 } }));
+    expect(s.person.role).toBe("seller_to_us");
+    expect(s.person.roleConfidence).toBe(0.7);
   });
 
   it("does not mutate its input and never sets handedOff/closed", () => {

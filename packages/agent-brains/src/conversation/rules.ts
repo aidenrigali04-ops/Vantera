@@ -26,7 +26,7 @@ const SPEC = "spec §6.1";
 /** Agent turns after which a thread goes to a person. Must equal the pipeline's MAX_AGENT_TURNS. */
 export const TURN_CAP = 6;
 const QUESTION_BUDGET = 5;
-const DECLINE_CONFIDENCE = 0.8;
+export const DECLINE_CONFIDENCE = 0.8;
 const ROLE_CONFIDENCE = 0.6;
 
 /** Exploration may pick any move except these; they are only chosen by the model's top rank. */

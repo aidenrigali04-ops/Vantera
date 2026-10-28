@@ -2,6 +2,7 @@ import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 import { getModel, registerPrompt } from "@vantera/ai";
 import { preClassify } from "../reply/classify";
+import { DECLINE_CONFIDENCE } from "./rules";
 import { deriveStage, renderState, type ConversationState, type StoredTurn } from "./state";
 
 const trait = z.object({ value: z.number().min(0).max(1), confidence: z.number().min(0).max(1) }).nullable();
@@ -146,21 +147,22 @@ export function applyReadout(state: ConversationState, turn: StoredTurn, readout
   const d = readout.personDelta;
   for (const t of TRAITS) s.person[t] = mergeTrait(s.person[t], d[t]);
   if (d.seniority && d.seniority !== "unknown") s.person.seniority = d.seniority;
-  if (d.role && d.role !== "unknown") {
-    s.person.role = d.role;
-    s.person.roleConfidence = Math.max(s.person.roleConfidence, d.roleConfidence ?? 0);
-  }
-  if (readout.intent === "sells_to_us") {
-    s.person.role = "seller_to_us";
-    s.person.roleConfidence = Math.max(s.person.roleConfidence, 0.7);
-  }
+  // role updates are confidence-aware: a weaker reading never replaces a stronger one
+  const setRole = (role: ConversationState["person"]["role"], conf: number) => {
+    if (conf >= s.person.roleConfidence || role === s.person.role) {
+      s.person.roleConfidence = role === s.person.role ? Math.max(s.person.roleConfidence, conf) : conf;
+      s.person.role = role;
+    }
+  };
+  if (d.role && d.role !== "unknown") setRole(d.role, d.roleConfidence ?? 0);
+  if (readout.intent === "sells_to_us") setRole("seller_to_us", 0.7);
   if (d.language) s.person.register.language = d.language;
   if (d.emoji !== null) s.person.register.emoji = s.person.register.emoji || d.emoji;
   s.person.notes = dedupeCap([...s.person.notes, ...d.notes], 6);
 
   if (readout.booked) s.memory.booked = true;
   if (optOut) s.memory.explicitOptOut = true;
-  if (readout.stance === "negative" && readout.confidence >= 0.8 && readout.intent === "declines") s.memory.declined = true;
+  if (readout.stance === "negative" && readout.confidence >= DECLINE_CONFIDENCE && readout.intent === "declines") s.memory.declined = true;
 
   s.stage = deriveStage(s);
   return s;
