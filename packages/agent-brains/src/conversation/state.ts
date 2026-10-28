@@ -90,6 +90,8 @@ export const conversationStateSchema = z.object({
     questionsBudgetUsed: z.number(),
     asksMade: z.number(),
     followupsSinceLastReply: z.number(),
+    /** agent turns sent since the latest lead turn (reducer-maintained; drives register mirroring) */
+    agentTurnsSinceLastLead: z.number().default(0),
     labelsUsed: z.number(),
     connection: z.object({ invited: z.boolean(), connected: z.boolean() }),
   }),
@@ -139,6 +141,7 @@ export function emptyState(): ConversationState {
       questionsBudgetUsed: 0,
       asksMade: 0,
       followupsSinceLastReply: 0,
+      agentTurnsSinceLastLead: 0,
       labelsUsed: 0,
       connection: { invited: false, connected: false },
     },

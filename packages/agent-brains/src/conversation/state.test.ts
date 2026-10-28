@@ -33,6 +33,7 @@ describe("conversation state", () => {
   it("emptyState parses against the schema with stage pre_contact", () => {
     expect(STATE_VERSION).toBe(1);
     expect(conversationStateSchema.parse(emptyState()).stage).toBe("pre_contact");
+    expect(emptyState().counters.agentTurnsSinceLastLead).toBe(0);
   });
 
   it("seedState infers seniority from the title and nothing else", () => {
