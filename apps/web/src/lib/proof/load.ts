@@ -11,25 +11,36 @@ type ReplyRow = { lead_id: string | null; classification: string | null };
 type SignalRow = { lead_id: string | null; kind: string };
 type ObsRow = { lead_id: string | null; watch_target: string | null };
 
+/** Thrown when the prospects read fails: the route error boundary shows it, never provider text. */
+export const PROOF_LOAD_ERROR = "Couldn't load your results.";
+
 /**
  * PostgREST truncates every response at max-rows (1000), so a single `.limit(5000)` would
  * silently under-count. Page sequentially until a short page or PROOF_ROW_CAP. A failed
- * page is logged server-side and the whole table reads as empty — provider text never
- * reaches the UI.
+ * page is logged server-side; the rows read so far are kept and the table reads as capped
+ * (an incomplete count, never a false zero). `required` tables (leads) throw instead,
+ * because without them every number on the page would be wrong.
  */
-async function readAll<T>(table: string, page: Page<T>): Promise<Paged<T>> {
+async function readAll<T>(table: string, page: Page<T>, required = false): Promise<Paged<T>> {
   const rows: T[] = [];
   for (let from = 0; from < PROOF_ROW_CAP; from += PROOF_PAGE_SIZE) {
     const res = await page(from, Math.min(from + PROOF_PAGE_SIZE, PROOF_ROW_CAP) - 1);
     if (res.error) {
       console.error(`proof: ${table} read failed`, res.error);
-      return { rows: [], capped: false };
+      if (required) throw new Error(PROOF_LOAD_ERROR);
+      return { rows, capped: true };
     }
     const data = res.data ?? [];
     rows.push(...data);
     if (data.length < PROOF_PAGE_SIZE) break;
   }
   return { rows, capped: rows.length >= PROOF_ROW_CAP };
+}
+
+/** Offset paging while a run inserts newer rows can serve the same lead twice; keep the first. */
+function uniqueById<T extends { id: string }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  return rows.filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
 }
 
 const hasLead = <R extends { lead_id: string | null }>(r: R): r is R & { lead_id: string } =>
@@ -63,7 +74,8 @@ async function readWatch(db: SupabaseClient): Promise<ProofInput["watch"]> {
 /**
  * Lead-level proof rows for the session's own workspace. Takes only the session client:
  * RLS does the scoping (rule 02) — this never accepts or filters by a workspace key.
- * Each table pages in a stable order (own timestamp desc, then id desc).
+ * Each table pages in a stable order (own timestamp desc, then id desc). Throws
+ * PROOF_LOAD_ERROR when the prospects read fails.
  */
 export async function loadProof(db: SupabaseClient): Promise<ProofModel> {
   const desc = { ascending: false } as const;
@@ -71,7 +83,7 @@ export async function loadProof(db: SupabaseClient): Promise<ProofModel> {
     readAll<ProofLead>("leads", (f, t) =>
       db.from("leads")
         .select("id,status,source,linkedin_invited_at,linkedin_connected_at,meeting_booked_at")
-        .order("created_at", desc).order("id", desc).range(f, t)),
+        .order("created_at", desc).order("id", desc).range(f, t), true),
     readAll<SendRow>("outreach_sends", (f, t) =>
       db.from("outreach_sends").select("lead_id").not("lead_id", "is", null)
         .order("sent_at", desc).order("id", desc).range(f, t)),
@@ -88,7 +100,7 @@ export async function loadProof(db: SupabaseClient): Promise<ProofModel> {
   ]);
 
   return buildProof({
-    leads: leads.rows,
+    leads: uniqueById(leads.rows),
     sendLeadIds: sends.rows.filter(hasLead).map((s) => s.lead_id),
     replies: replies.rows.filter(hasLead),
     signals: signals.rows.filter(hasLead),

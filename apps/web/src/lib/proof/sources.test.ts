@@ -40,19 +40,23 @@ describe("sources", () => {
     }));
   };
   const rng = () => { let seed = 7; return () => ((seed = (seed * 16807) % 2147483647) / 2147483647); };
-  it("source columns are bounded by the funnel (max <= N <= sum) on overlapping data", () => {
+  /** Overlapping fixture: leads can carry several signals and observations at once. */
+  const overlapping = (): ProofInput => {
     const rnd = rng();
     const leads = mk(20, rnd);
     const kinds = ["funding", "hiring", "follow"];
     const targets = ["revenue ops", "acme", "#AI", "gone", null];
     const ids = leads.map((l) => l.id);
-    const i: ProofInput = {
+    return {
       ...empty(), watch, leads,
       sendLeadIds: ids.filter(() => rnd() < 0.3),
       replies: ids.filter(() => rnd() < 0.3).map((lead_id) => ({ lead_id, classification: rnd() < 0.5 ? "interested" : "neutral" })),
       signals: ids.filter(() => rnd() < 0.5).map((lead_id) => ({ lead_id, kind: kinds[Math.floor(rnd() * 3)]! })),
       observations: ids.filter(() => rnd() < 0.4).map((lead_id) => ({ lead_id, watch_target: targets[Math.floor(rnd() * 5)]! })),
     };
+  };
+  it("source columns are bounded by the funnel (max <= N <= sum) on overlapping data", () => {
+    const i = overlapping();
     const m = buildProof(i);
     const N = stageSize(i);
     for (const c of COLS) {
@@ -139,5 +143,34 @@ describe("sources", () => {
     expect(a.map((r) => r.label)).toEqual(["Prospect agent", "Intent agent", "Added by you", "Outreach agent"]);
     expect(a[3]!.contacted).toBe(buildProof(i).funnel[2]!.count);
     expect(sourceRows(i, leadSets(i)).at(-1)!.key).toBe("none");
+  });
+  it("per lead and column: in at least one source row iff in the stage set (overlapping data)", () => {
+    const i = overlapping();
+    const sets = leadSets(i);
+    const inStage = (c: (typeof COLS)[number], id: string) => (c === "found" ? true : sets[c].has(id));
+    expect(i.signals.length + i.observations.length).toBeGreaterThan(i.leads.length / 2);
+    for (const l of i.leads) {
+      // A one-lead input makes each row's count that lead's membership (0 or 1).
+      const solo: ProofInput = { ...i, leads: [l] };
+      const rows = sourceRows(solo, leadSets(solo));
+      for (const c of COLS) {
+        const inSomeRow = rows.some((r) => (r[c] as number) > 0);
+        expect([l.id, c, inSomeRow]).toEqual([l.id, c, inStage(c, l.id)]);
+      }
+    }
+  });
+  it("Prospect + Intent + Added agent rows sum to the funnel for every column", () => {
+    // Every leads.source value in packages/db/src/schema.ts: a new one must land in a row.
+    const SOURCES = ["discovery", "manual", "import", "inbound", "ad", "intent"];
+    const base = overlapping();
+    const i: ProofInput = { ...base, leads: base.leads.map((l, k) => ({ ...l, source: SOURCES[k % SOURCES.length]! })) };
+    const m = buildProof(i);
+    const N = stageSize(i);
+    const own = m.agents.filter((r) => r.key !== "agent:outreach");
+    expect(own.map((r) => r.key)).toEqual(["agent:scout", "agent:intent", "agent:added"]);
+    expect(own.reduce((a, r) => a + (r.found ?? 0), 0)).toBe(m.funnel[0]!.count);
+    for (const c of ["contacted", "replied", "closed"] as const) {
+      expect(own.reduce((a, r) => a + r[c], 0)).toBe(N[c]);
+    }
   });
 });

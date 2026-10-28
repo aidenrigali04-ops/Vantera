@@ -94,18 +94,40 @@ describe("loadProof", () => {
     expect(exact.calls.filter((c) => c.table === "lead_signals")).toHaveLength(5);
   });
 
-  it("a page-2 error logs and empties that table, never throws", async () => {
+  it("a replies page-2 error keeps the rows read so far and marks the model capped", async () => {
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
-    const full = signalTable(2500);
     const boom = { message: "provider exploded on page 2" };
+    const leads = Array.from({ length: 1500 }, (_, k) => lead(`l${k}`));
     const m = await loadProof(fakeDb({
-      leads: ok([lead("l0"), lead("l1")]),
-      lead_signals: (f, t) => (f === PROOF_PAGE_SIZE ? { data: null, error: boom } : full(f, t)),
+      leads: (f, t) => ok(leads.slice(f, t + 1)),
+      replies: (f, t) => f === PROOF_PAGE_SIZE
+        ? { data: null, error: boom }
+        : ok(Array.from({ length: t - f + 1 }, (_, k) => ({ lead_id: `l${f + k}`, classification: null }))),
     }).db);
-    expect(err).toHaveBeenCalledWith("proof: lead_signals read failed", boom);
-    expect(m.sources.filter((r) => r.group === "signal")).toHaveLength(0);
-    expect(m.sources.find((r) => r.key === "none")!.found).toBe(2);
+    expect(err).toHaveBeenCalledWith("proof: replies read failed", boom);
+    expect(m.funnel.find((s) => s.key === "replied")!.count).toBe(PROOF_PAGE_SIZE);
+    expect(m.capped).toBe(true);
     expect(JSON.stringify(m)).not.toContain("provider exploded");
+  });
+
+  it("a leads page-2 error throws a plain error, never provider text", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const boom = { message: "provider exploded on page 2" };
+    const leads = Array.from({ length: 1500 }, (_, k) => lead(`l${k}`));
+    const run = loadProof(fakeDb({
+      leads: (f, t) => (f === PROOF_PAGE_SIZE ? { data: null, error: boom } : ok(leads.slice(f, t + 1))),
+    }).db);
+    await expect(run).rejects.toThrow("Couldn't load your results.");
+    await expect(run).rejects.not.toThrow(/provider/);
+    expect(err).toHaveBeenCalledWith("proof: leads read failed", boom);
+  });
+
+  it("a lead served on two pages (paging during a run) counts once in Found", async () => {
+    const page1 = Array.from({ length: PROOF_PAGE_SIZE }, (_, k) => lead(`l${k}`));
+    const page2 = [lead(`l${PROOF_PAGE_SIZE - 1}`), lead("new")];
+    const m = await loadProof(fakeDb({ leads: (f) => ok(f === 0 ? page1 : page2) }).db);
+    expect(m.funnel[0]).toMatchObject({ key: "found", count: PROOF_PAGE_SIZE + 1 });
+    expect(m.funnel[1]).toMatchObject({ key: "qualified", count: PROOF_PAGE_SIZE + 1 });
   });
 
   it("a failed lead_signals read degrades to 'No signal captured' without leaking provider text", async () => {
@@ -119,6 +141,7 @@ describe("loadProof", () => {
     expect(none?.label).toBe("No signal captured");
     expect(none?.found).toBe(2);
     expect(model.funnel[0]!.count).toBe(2);
+    expect(model.capped).toBe(true);
     expect(JSON.stringify(model)).not.toContain("provider exploded");
   });
 
