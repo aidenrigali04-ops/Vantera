@@ -77,7 +77,14 @@ describe("conversation state", () => {
       { counters: { agentTurns: 1, leadTurns: 1 } as never, memory: { problemsStated: ["x"] }, qualification: { painIdentified: true, authority: "decides" } },
       "qualified",
     ],
-    [{ counters: { agentTurns: 2, leadTurns: 1 } as never, lastMove: { move: "booked", at: "t" } }, "booked"],
+    [{ memory: { booked: true } }, "booked"],
+    [{ memory: { declined: true } }, "declined"],
+    [{ memory: { handedOff: true } }, "handed_off"],
+    [{ memory: { closed: true } }, "closed"],
+    [{ memory: { closed: true, booked: true, explicitOptOut: true, handedOff: true } }, "closed"],
+    [{ memory: { booked: true, declined: true, handedOff: true } }, "booked"],
+    [{ memory: { declined: true, handedOff: true } }, "declined"],
+    [{ memory: { handedOff: true }, counters: { followupsSinceLastReply: 3 } as never }, "handed_off"],
   ])("deriveStage is a pure function of memory + counters: %j → %s", (patch, stage) => {
     expect(deriveStage(withPatch(emptyState(), patch))).toBe(stage);
   });

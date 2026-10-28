@@ -72,6 +72,11 @@ export const conversationStateSchema = z.object({
     commitments: z.array(z.string()),
     explicitPositive: z.boolean(),
     explicitOptOut: z.boolean(),
+    // terminal flags, set by the reader/pipeline (never by move names)
+    booked: z.boolean(),
+    declined: z.boolean(),
+    handedOff: z.boolean(),
+    closed: z.boolean(),
   }),
   qualification: z.object({
     painIdentified: z.boolean(),
@@ -122,6 +127,10 @@ export function emptyState(): ConversationState {
       commitments: [],
       explicitPositive: false,
       explicitOptOut: false,
+      booked: false,
+      declined: false,
+      handedOff: false,
+      closed: false,
     },
     qualification: { painIdentified: false, impactStated: false, authority: "unknown", timing: "unknown" },
     counters: {
@@ -148,7 +157,7 @@ function seniorityFromTitle(title: string): ConversationState["person"]["seniori
   return "ic";
 }
 
-/** Pre-contact seed: seniority from the title and a low-confidence role cue — nothing else. */
+/** Pre-contact seed (CopyLead has no headline field; `title` is the headline text): seniority from the title and a low-confidence role cue — nothing else. */
 export function seedState(lead: CopyLead, _insights: StoredInsights | null): ConversationState {
   const s = emptyState();
   const title = (lead.title ?? "").trim();
@@ -164,20 +173,17 @@ export function seedState(lead: CopyLead, _insights: StoredInsights | null): Con
   return s;
 }
 
-const ASK_MOVES = new Set(["soft_ask", "propose_times"]);
-
-/** Stage is a pure function of memory + counters, never set by an LLM. */
+/** Stage is a pure function of memory + counters, never set by an LLM or read from move names. */
 export function deriveStage(state: ConversationState): Stage {
-  const { memory, counters, qualification, lastMove } = state;
-  const move = lastMove?.move;
-  if (memory.explicitOptOut || qualification.timing === "never") return "declined";
-  if (move === "booked") return "booked";
-  if (move === "handoff" || move === "handed_off") return "handed_off";
-  if (move === "closed") return "closed";
+  const { memory, counters, qualification } = state;
+  if (memory.closed) return "closed";
+  if (memory.booked) return "booked";
+  if (memory.explicitOptOut || memory.declined) return "declined";
+  if (memory.handedOff) return "handed_off";
   if (counters.followupsSinceLastReply >= 3) return "dormant";
   const leadAfterAgent =
     !!state.lastLeadMessageAt && (!state.lastAgentMessageAt || state.lastLeadMessageAt > state.lastAgentMessageAt);
-  if (counters.asksMade > 0 && !leadAfterAgent && (!move || ASK_MOVES.has(move))) return "asked";
+  if (counters.asksMade > 0 && !leadAfterAgent) return "asked";
   if (qualification.painIdentified && qualification.authority !== "none") return "qualified";
   if (memory.problemsStated.length > 0 || memory.prioritiesStated.length > 0) return "exploring";
   if (counters.leadTurns > 0) return "engaged";
