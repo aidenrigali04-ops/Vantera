@@ -129,7 +129,25 @@ describe("composeMessage", () => {
     expect(sink[0]).not.toContain("propose a specific short call");
   });
 
-  it("registers a system prompt and calls with a 300 token cap", () => {
+  it("calls the model with a 300 token cap", async () => {
+    const caps: unknown[] = [];
+    const m = new MockLanguageModelV3({
+      doGenerate: async (opts: { maxOutputTokens?: number }) => {
+        caps.push(opts.maxOutputTokens);
+        return reply("It flags the leads worth your time.");
+      },
+    });
+    await composeMessage(input(), m);
+    expect(caps).toEqual([300]);
+  });
+
+  it("surfaces length-band after the regenerate when the draft stays over length", async () => {
+    const long = `It flags the leads worth your time ${"before outreach ".repeat(20)}`;
+    const out = await composeMessage(input(), model([long]));
+    expect(out.violations.map((v) => v.rule)).toContain("length-band");
+  });
+
+  it("registers a system prompt", () => {
     expect(COMPOSE_SYSTEM.text).toContain("Seller company");
     expect(COMPOSE_SYSTEM.text).not.toContain("Reply mode");
   });

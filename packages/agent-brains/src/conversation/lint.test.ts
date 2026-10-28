@@ -91,4 +91,45 @@ describe("lintForMove", () => {
     state.counters.labelsUsed = 1;
     expect(rules("It sounds like you are busy.", ctx({ state }))).toContain("label-overuse");
   });
+
+  it("pronoun-balance is skipped for non-English registers", () => {
+    const es = emptyState();
+    es.person.register.language = "es";
+    expect(rules("Es una buena oficina.", ctx({ state: es }))).not.toContain("pronoun-balance");
+    const en = emptyState();
+    en.person.register.language = "en";
+    expect(rules("Es una buena oficina.", ctx({ state: en }))).toContain("pronoun-balance");
+  });
+
+  it("the you/your arm is exempt for short moves but caps still apply", () => {
+    expect(rules("That is a nice office.", ctx({ move: "answer" }))).not.toContain("pronoun-balance");
+    expect(rules("That is a nice office.", ctx({ move: "observe" }))).toContain("pronoun-balance");
+    expect(rules("We think we can do it.", ctx({ move: "answer" }))).toContain("pronoun-balance");
+  });
+
+  it("pitch-before-exploring exempts answer but not observe", () => {
+    const engaged = emptyState();
+    engaged.counters.leadTurns = 1;
+    expect(rules("Vantera qualifies leads for you.", ctx({ move: "answer", state: engaged }))).not.toContain("pitch-before-exploring");
+    expect(rules("Vantera qualifies leads for you.", ctx({ move: "observe", state: engaged }))).toContain("pitch-before-exploring");
+  });
+
+  it("URL query strings do not count as questions", () => {
+    const m = `Is this useful to you? ${BOOK}?month=2026-11`;
+    const c = ctx({ style: { ...style, link: "booking" } });
+    expect(rules(m, c)).not.toContain("too-many-questions");
+    expect(rules(`Useful to you? ${BOOK}?month=2026-11`, { ...c, style: { ...c.style, question: false } })).toContain("question-not-allowed");
+    expect(rules(`See ${BOOK}?month=2026-11 for you.`, { ...c, style: { ...c.style, question: false } })).not.toContain("question-not-allowed");
+  });
+
+  it("link kinds: default order fallback, content kind, unlisted URL", () => {
+    const noKinds = ctx({ linkKinds: undefined, style: { ...style, link: "booking" } });
+    expect(rules(`Book you: ${BOOK}`, noKinds)).not.toContain("link-not-allowed");
+    expect(rules(`See you: ${SITE}`, noKinds)).toContain("link-not-allowed");
+    expect(rules(`See you: ${SITE}`, { ...noKinds, style: { ...style, link: "website" } })).not.toContain("link-not-allowed");
+    const content = ctx({ allowedLinks: [BOOK, "https://acme.io/post"], linkKinds: ["booking", "content"], style: { ...style, link: "content" } });
+    expect(rules("Read this, you: https://acme.io/post", content)).not.toContain("link-not-allowed");
+    expect(rules(`Book you: ${BOOK}`, content)).toContain("link-not-allowed");
+    expect(rules("See you: https://evil.example/x", content)).toContain("link-not-allowed");
+  });
 });

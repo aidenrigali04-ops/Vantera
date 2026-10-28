@@ -19,6 +19,8 @@ export type LintContext = {
 };
 
 const HOOK_MIN_WORDS = 4;
+/** Moves long enough to need "you/your"; short moves (answer, confirm, exits, acknowledge) are exempt. */
+const NEEDS_YOU = new Set<Move>(["observe", "ask_discovery", "poke", "reframe", "soft_ask", "offer_value", "narrow", "propose_times"]);
 const URL_RE = /https?:\/\/[^\s)>\]]+/gi;
 const LABEL_RE = /\b(?:sounds like|seems like|it sounds as if)\b/i;
 
@@ -55,7 +57,7 @@ export function lintForMove(message: string, ctx: LintContext): Violation[] {
   }
 
   const phase = phaseOf(deriveStage(state));
-  if ((phase === "pre_reply" || phase === "engaged") && pitchPattern(ctx.sellerName).test(message)) {
+  if (ctx.move !== "answer" && (phase === "pre_reply" || phase === "engaged") && pitchPattern(ctx.sellerName).test(message)) {
     out.push({ rule: "pitch-before-exploring", detail: "pitch language (seller name, platform, AI, all-in-one, ROI or a percentage) before they have described a problem" });
   }
 
@@ -67,14 +69,16 @@ export function lintForMove(message: string, ctx: LintContext): Violation[] {
     }
   }
 
-  const questions = count(message, /\?/g);
+  const questions = count(message.replace(URL_RE, " "), /\?/g);
   if (questions > 1) out.push({ rule: "too-many-questions", detail: `${questions} questions; ask at most one` });
   if (questions > 0 && style.question === false) out.push({ rule: "question-not-allowed", detail: "this message must not ask a question" });
 
   const we = count(message, /\bwe\b/gi);
   const i = count(message, /\bI\b/g);
   const you = count(message, /\byou\b|\byour\b/gi);
-  if (we > 1 || i > 2 || you === 0) {
+  const lang = (state.person.register.language ?? "").toLowerCase();
+  const english = lang === "" || lang === "en" || lang.startsWith("en-");
+  if (english && (we > 1 || i > 2 || (you === 0 && NEEDS_YOU.has(ctx.move)))) {
     out.push({ rule: "pronoun-balance", detail: `keep the focus on them: "we" x${we} (max 1), "I" x${i} (max 2), and use "you/your"` });
   }
 

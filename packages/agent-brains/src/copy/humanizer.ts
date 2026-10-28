@@ -93,12 +93,12 @@ const BANNED_PHRASES = [
   "i noticed",
 ];
 
-// Phrases that re-introduce or cold-open — always wrong MID-CONVERSATION: a reply or scripted
-// follow-up must build on the thread, never restart. Enforced for the conversation responder only,
-// not the first-touch copy (where introducing yourself is the whole point).
 /** Follow-up "bump" phrases: they add nothing and read as a nudge (conversation lint `bump-phrase`). Literal, lowercase substrings. */
 export const BUMP_PHRASES = ["thoughts?", "following up", "never heard back", "circling back", "bubbling this up", "just checking in", "bumping this"];
 
+// Phrases that re-introduce or cold-open — always wrong MID-CONVERSATION: a reply or scripted
+// follow-up must build on the thread, never restart. Enforced for the conversation responder only,
+// not the first-touch copy (where introducing yourself is the whole point).
 const RESTART_PHRASES = [
   "wanted to connect",
   "saw you reacted",
