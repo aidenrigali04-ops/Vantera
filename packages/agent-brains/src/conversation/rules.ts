@@ -48,7 +48,7 @@ export function pitchPattern(sellerName: string | null): RegExp {
   const parts = ["platform", "ai", "all-in-one", "roi"].map((w) => `\\b${w}\\b`);
   parts.push("\\d+(?:\\.\\d+)?\\s?%");
   const name = sellerName?.trim();
-  if (name && name.length >= 2) parts.push(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (name && name.length >= 2) parts.push(`(?<!\\w)${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?!\\w)`);
   return new RegExp(parts.join("|"), "i");
 }
 
@@ -101,6 +101,12 @@ const CHECKS: Record<Move, Check[]> = {
     (c) => (c.s.memory.linksShared.content < 1 ? null : veto("offer-already-shared")),
   ],
   soft_ask: [
+    (c) => {
+      const last = c.s.lastMove;
+      const leadSince = !!c.s.lastLeadMessageAt && !!last && c.s.lastLeadMessageAt > last.at;
+      return last?.move === "soft_ask" && !leadSince ? veto("soft-ask-twice", "R rule 6") : null;
+    },
+    (c) => (c.s.lastMove?.move === "propose_times" || c.s.stage === "booked" ? veto("soft-ask-after-hard-ask", "R rule 6") : null),
     (c) => (atLeast(c.s.stage, "exploring") ? null : veto("soft-ask-needs-exploring")),
     (c) => (c.s.counters.asksMade < 2 ? null : veto("asks-exhausted", "R rule 6")),
   ],
@@ -123,6 +129,9 @@ const CHECKS: Record<Move, Check[]> = {
         s.counters.agentTurns >= TURN_CAP ||
         !!r?.identitySuspicion ||
         (c.roleBlocked && turns >= 2) ||
+        c.declined ||
+        s.memory.closed ||
+        s.memory.handedOff ||
         r?.stance === "negative" ||
         r?.stance === "opt_out";
       return warranted ? null : veto("handoff-not-warranted");
@@ -133,22 +142,23 @@ const CHECKS: Record<Move, Check[]> = {
 /** Moves allowed under a narrowing rule; everything else survives only if listed. */
 function narrowing(c: Ctx): { keep: ReadonlySet<Move>; rule: string; source: string } | null {
   const { s, r } = c;
-  if (s.memory.closed || s.memory.handedOff) return { keep: new Set(["wait"]), ...veto("thread-closed") };
+  if (s.memory.closed || s.memory.handedOff) return { keep: new Set(["wait", "hand_to_human"]), ...veto("thread-closed") };
   if (r?.identitySuspicion) return { keep: new Set(["hand_to_human"]), ...veto("identity-suspicion", "spec §6.2 rule 8") };
   if (c.declined) {
     // one graceful exit, then silence
-    const keep: ReadonlySet<Move> = s.lastMove?.move === "graceful_exit" ? new Set(["wait"]) : new Set(["graceful_exit", "hand_to_human"]);
+    const keep: ReadonlySet<Move> = s.lastMove?.move === "graceful_exit" ? new Set(["wait", "hand_to_human"]) : new Set(["graceful_exit", "hand_to_human"]);
     return { keep, ...veto("declined", "spec §6.2 rule 9") };
   }
   if (c.trigger === "reply" && s.counters.agentTurns >= TURN_CAP)
     return { keep: new Set(["hand_to_human", "wait"]), ...veto("turn-cap") };
-  if (s.lastMove?.move === "breakup" || s.counters.followupsSinceLastReply >= 3)
+  // follow-up limits govern unanswered follow-ups only; a lead who replies gets a normal menu
+  if (c.trigger === "followup" && (s.lastMove?.move === "breakup" || s.counters.followupsSinceLastReply >= 3))
     return { keep: new Set(["wait"]), ...veto("followups-exhausted", "R rule 14") };
   if (c.isLastTouch) return { keep: new Set(["breakup", "wait"]), ...veto("last-touch-breakup-only", "R rule 14") };
   if (c.roleBlocked) return { keep: new Set(["answer", "graceful_exit", "hand_to_human"]), ...veto("seller-to-us", "spec §6.2 rule 7") };
   if (c.trigger === "first_message")
     return { keep: new Set(["observe", "ask_discovery", "wait", "hand_to_human"]), ...veto("first-message-menu") };
-  if (s.counters.followupsSinceLastReply >= 2) return { keep: new Set(["breakup", "wait"]), ...veto("followups-exhausted", "R rule 14") };
+  if (c.trigger === "followup" && s.counters.followupsSinceLastReply >= 2) return { keep: new Set(["breakup", "wait"]), ...veto("followups-exhausted", "R rule 14") };
   if (r?.stance === "skeptical")
     return { keep: new Set(["answer", "acknowledge", "poke", "observe", "graceful_exit", "wait"]), ...veto("skeptical-narrowing", "spec §6.4") };
   if (s.stage === "booked") return { keep: new Set(["confirm", "answer", "wait", "hand_to_human"]), ...veto("already-booked") };
@@ -168,7 +178,7 @@ export function legalMoves(input: LegalInput): { legal: Move[]; vetoes: Veto[] }
     !!readout?.explicitOptOut ||
     readout?.stance === "opt_out" ||
     readout?.intent === "opts_out" ||
-    (readout?.stance === "negative" && readout.confidence >= DECLINE_CONFIDENCE);
+    (readout?.stance === "negative" && readout.confidence >= DECLINE_CONFIDENCE && readout.intent === "declines");
   const roleBlocked =
     ((state.person.role === "seller_to_us" || state.person.role === "recruiter") && state.person.roleConfidence >= ROLE_CONFIDENCE) ||
     readout?.intent === "sells_to_us";
@@ -177,11 +187,14 @@ export function legalMoves(input: LegalInput): { legal: Move[]; vetoes: Veto[] }
   const vetoes: Veto[] = [];
   let legal: Move[] = [];
   for (const move of MOVES) {
-    let failed = null as { rule: string; source: string } | null;
-    if (move !== "wait" && move !== "hand_to_human" && move !== "graceful_exit" && state.lastMove?.move === move) {
-      failed = veto("same-move-twice", "spec §6.2 rule 6");
-    }
-    for (const check of CHECKS[move]) {
+    const sameMove = (): { rule: string; source: string } | null =>
+      move !== "wait" && move !== "hand_to_human" && move !== "graceful_exit" && state.lastMove?.move === move
+        ? veto("same-move-twice", "spec §6.2 rule 6")
+        : null;
+    // soft_ask reports its own (more specific) vetoes before the generic repeat guard
+    const checks = move === "soft_ask" ? [...CHECKS[move], sameMove] : [sameMove, ...CHECKS[move]];
+    let failed: { rule: string; source: string } | null = null;
+    for (const check of checks) {
       if (failed) break;
       failed = check(ctx);
     }

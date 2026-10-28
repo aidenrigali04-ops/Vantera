@@ -106,6 +106,36 @@ describe("legalMoves hard rules", () => {
     const r = legalMoves({ state: s, trigger: "reply", readout: neutral({ intent: "sells_to_us" }), links: all });
     expect([...r.legal].sort()).toEqual(["answer", "graceful_exit", "hand_to_human"]);
   });
+  it("a reply after a breakup gets a normal menu (follow-up limits apply to follow-ups only)", () => {
+    const r = legalMoves({ state: engaged({ lastMove: "breakup", counters: { agentTurns: 3, leadTurns: 1, followupsSinceLastReply: 3 } }), trigger: "reply", readout: neutral({ intent: "asks_question" }), links: all });
+    expect(r.legal).toContain("answer");
+    expect(r.vetoes.map((v) => v.rule)).not.toContain("followups-exhausted");
+    const r2 = legalMoves({ state: engaged({ counters: { agentTurns: 3, leadTurns: 1, followupsSinceLastReply: 2 } }), trigger: "reply", readout: neutral(), links: all });
+    expect(r2.legal.length).toBeGreaterThan(2);
+  });
+  it("a question on a closed, handed-off or declined-after-exit thread hands to the human", () => {
+    const q = neutral({ intent: "asks_question" });
+    for (const s of [
+      engaged({ memory: { closed: true } }),
+      engaged({ memory: { handedOff: true } }),
+      engaged({ lastMove: "graceful_exit", memory: { declined: true } }),
+    ]) {
+      expect(legalMoves({ state: s, trigger: "reply", readout: q, links: all }).legal).toEqual(["hand_to_human"]);
+    }
+  });
+  it("a negative stance without the declines intent is not a decline", () => {
+    const r = legalMoves({ state: engaged(), trigger: "reply", readout: neutral({ stance: "negative", confidence: 0.9, intent: "answers_question" }), links: all });
+    expect(r.vetoes.map((v) => v.rule)).not.toContain("declined");
+    expect(r.legal.length).toBeGreaterThan(2);
+  });
+  it("soft_ask is vetoed twice in a row without a lead turn between, and after a hard ask", () => {
+    const twice = legalMoves({ state: { ...exploring({ lastMove: "soft_ask" }), lastLeadMessageAt: "2025-12-31T00:00:00Z" }, trigger: "followup", links: all });
+    expect(twice.vetoes).toContainEqual({ move: "soft_ask", rule: "soft-ask-twice", source: "R rule 6" });
+    const replied = legalMoves({ state: { ...exploring({ lastMove: "soft_ask" }), lastLeadMessageAt: "2026-01-02T00:00:00Z" }, trigger: "reply", readout: neutral(), links: all });
+    expect(replied.vetoes.find((v) => v.move === "soft_ask")?.rule).not.toBe("soft-ask-twice");
+    const hard = legalMoves({ state: exploring({ lastMove: "propose_times" }), trigger: "reply", readout: neutral(), links: all });
+    expect(hard.vetoes).toContainEqual({ move: "soft_ask", rule: "soft-ask-after-hard-ask", source: "R rule 6" });
+  });
   it("identity suspicion leaves only hand_to_human", () => {
     const r = legalMoves({ state: engaged(), trigger: "reply", readout: neutral({ identitySuspicion: true }), links: all });
     expect(r.legal).toEqual(["hand_to_human"]);
@@ -198,8 +228,8 @@ describe("legalMoves hard rules", () => {
     expect(r.legal).toEqual(["wait", "hand_to_human"].sort((a, b) => MOVES.indexOf(a as never) - MOVES.indexOf(b as never)));
     expect(r.vetoes.map((v) => v.rule)).toContain("turn-cap");
   });
-  it("a closed or handed-off thread only waits", () => {
-    expect(legalMoves({ state: exploring({ memory: { handedOff: true } }), trigger: "reply", readout: neutral(), links: all }).legal).toEqual(["wait"]);
+  it("a closed or handed-off thread only waits or hands over", () => {
+    expect(legalMoves({ state: exploring({ memory: { handedOff: true } }), trigger: "reply", readout: neutral(), links: all }).legal).toEqual(["wait", "hand_to_human"]);
   });
 });
 
@@ -222,6 +252,10 @@ describe("rule helpers", () => {
     for (const t of ["how do you handle hiring", "said hello"]) expect(re.test(t)).toBe(false);
     expect(pitchPattern(null).test("our platform")).toBe(true);
     expect(pitchPattern("a.b").test("axb")).toBe(false);
+    const ox = pitchPattern("Ox");
+    expect(ox.test("a box of good things")).toBe(false);
+    expect(ox.test("ask Ox about it")).toBe(true);
+    expect(pitchPattern("C++").test("we use C++ daily")).toBe(true);
   });
   it("styleKey and definitions", () => {
     expect(styleKey({ lengthBand: "short", question: true, link: "none", mirror: true })).toBe("short|q|none|m");
