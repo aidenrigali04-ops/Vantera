@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MIN_REAL_N, posteriorFor, researchPriors, thompsonPick, type PriorCell, type PriorTable } from "./priors";
+import { MIN_REAL_N, beta, posteriorFor, researchPriors, thompsonPick, winShares, type PriorCell, type PriorTable } from "./priors";
 
 const A = "dir_vp:high:high" as const;
 const cell = (p: Partial<PriorCell>): PriorCell => ({
   level: "move_phase", move: "observe", phase: "pre_reply", archetype: "", source: "real",
-  n: 0, positives: 0, rewardSum: 0, rewardSq: 0, ...p,
+  count: p.n ?? 0, n: 0, positives: 0, rewardSum: 0, rewardSq: 0, ...p,
 });
 const mean = (p: { alpha: number; beta: number }) => p.alpha / (p.alpha + p.beta);
 function seeded(seed: number) {
@@ -56,32 +56,54 @@ describe("priors", () => {
     expect(sim.n).toBe(5);
   });
 
-  it("thompsonPick with a seeded rng is deterministic and propensity sums to 1 over candidates", () => {
-    const post = new Map([
-      ["observe", { alpha: 30, beta: 10 }],
-      ["poke", { alpha: 5, beta: 30 }],
-    ] as const);
-    const cands = ["observe", "poke", "wait"] as const;
-    const a = thompsonPick([...cands], post as never, seeded(7));
-    const b = thompsonPick([...cands], post as never, seeded(7));
-    expect(a).toEqual(b);
-    expect(a.index).toBe(0);
-    // propensities for each forced candidate set sum to 1: sample by re-running with candidate-specific counting
-    let total = 0;
-    const samples = 200;
-    const wins = [0, 0, 0];
-    const rng = seeded(11);
-    for (let i = 0; i < 40; i++) {
-      const r = thompsonPick([...cands], post as never, rng, samples);
-      wins[r.index] = (wins[r.index] ?? 0) + r.propensity;
-      total += 1;
+  it("IPW-heavy single observation does not satisfy MIN_REAL_N; posterior is self-normalised", () => {
+    const one = cell({ count: 1, n: 10, positives: 10 });
+    expect(posteriorFor([one], "observe", "pre_reply", A).source).toBe("research");
+    const five = cell({ count: 5, n: 20, positives: 10 });
+    const p = posteriorFor([five], "observe", "pre_reply", A);
+    expect(p.n).toBe(5);
+    expect(p.alpha).toBeCloseTo(6 + 10 * (5 / 20));
+    expect(p.beta).toBeCloseTo(4 + 10 * (5 / 20));
+  });
+
+  it("beta sampler mean matches a/(a+b), including shape < 1", () => {
+    for (const [a, b] of [[0.5, 0.5], [0.3, 2], [5, 30], [30, 10]] as const) {
+      const rng = seeded(42);
+      let sum = 0;
+      for (let i = 0; i < 2000; i++) sum += beta(a, b, rng);
+      expect(Math.abs(sum / 2000 - a / (a + b))).toBeLessThan(0.05);
     }
-    expect(total).toBe(40);
-    expect(a.propensity).toBeGreaterThan(0.5);
-    expect(a.propensity).toBeLessThanOrEqual(1);
-    // single candidate always wins fully
+  });
+
+  it("beta guards non-finite or non-positive shapes", () => {
+    const v = beta(NaN, -3, seeded(1));
+    expect(v).toBeGreaterThanOrEqual(0);
+    expect(v).toBeLessThanOrEqual(1);
+  });
+
+  it("thompsonPick is stochastic across seeds when posteriors overlap, deterministic per seed", () => {
+    const post = new Map([
+      ["observe", { alpha: 6, beta: 4 }],
+      ["poke", { alpha: 5, beta: 5 }],
+    ] as const);
+    const picks = new Set<number>();
+    for (let seed = 1; seed <= 30; seed++) picks.add(thompsonPick(["observe", "poke"], post as never, seeded(seed)).index);
+    expect(picks.size).toBe(2);
+    expect(thompsonPick(["observe", "poke"], post as never, seeded(9))).toEqual(thompsonPick(["observe", "poke"], post as never, seeded(9)));
+  });
+
+  it("propensity of a dominant candidate is >= 0.95 and win shares over 3 candidates sum to 1", () => {
+    const post = new Map([
+      ["observe", { alpha: 30, beta: 2 }],
+      ["poke", { alpha: 2, beta: 30 }],
+      ["wait", { alpha: 5, beta: 5 }],
+    ] as const);
+    const r = thompsonPick(["observe", "poke", "wait"], post as never, seeded(3));
+    expect(r.index).toBe(0);
+    expect(r.propensity).toBeGreaterThanOrEqual(0.95);
+    const shares = winShares(["observe", "poke", "wait"], post as never, seeded(4));
+    expect(Math.abs(shares.reduce((a, b) => a + b, 0) - 1)).toBeLessThan(0.01);
     expect(thompsonPick(["wait"], new Map(), seeded(1)).propensity).toBe(1);
-    // mean sanity
-    expect(mean({ alpha: 30, beta: 10 })).toBeGreaterThan(mean({ alpha: 5, beta: 30 }));
+    expect(mean({ alpha: 30, beta: 10 })).toBeGreaterThan(0.5);
   });
 });

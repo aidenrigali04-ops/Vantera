@@ -50,6 +50,7 @@ export function updateCell(cell: PriorCell, r: number, propensity: number): Prio
   const w = Math.min(1 / p, IPW_CLIP);
   return {
     ...cell,
+    count: cell.count + 1,
     n: cell.n + w,
     positives: cell.positives + (isPositive(r) ? w : 0),
     rewardSum: cell.rewardSum + w * r,
@@ -64,7 +65,7 @@ export function rollup(
   const cells = new Map<string, PriorCell>();
   const bump = (level: PriorCell["level"], move: Move, phase: Phase | "", archetype: Archetype | "", d: { reward: number; propensity: number }) => {
     const key = `${level}|${move}|${phase}|${archetype}`;
-    const cur = cells.get(key) ?? { level, move, phase, archetype, source, n: 0, positives: 0, rewardSum: 0, rewardSq: 0 };
+    const cur = cells.get(key) ?? { level, move, phase, archetype, source, count: 0, n: 0, positives: 0, rewardSum: 0, rewardSq: 0 };
     cells.set(key, updateCell(cur, d.reward, d.propensity));
   };
   for (const d of decisions) {

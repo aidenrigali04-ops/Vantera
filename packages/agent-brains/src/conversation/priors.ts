@@ -9,6 +9,8 @@ export type PriorCell = {
   phase: Phase | "";
   archetype: Archetype | "";
   source: PriorSource;
+  /** raw observations (+1 per decision, unweighted); gates MIN_REAL_N */
+  count: number;
   n: number;
   positives: number;
   rewardSum: number;
@@ -35,7 +37,7 @@ export function researchPriors(): PriorTable {
   for (const phase of PHASES) {
     for (const move of MOVES) {
       const [alpha, n] = RESEARCH[phase][move] ?? [5, 10];
-      out.push({ level: "move_phase", move, phase, archetype: "", source: "research", n, positives: alpha, rewardSum: 0, rewardSq: 0 });
+      out.push({ level: "move_phase", move, phase, archetype: "", source: "research", count: n, n, positives: alpha, rewardSum: 0, rewardSq: 0 });
     }
   }
   return out;
@@ -66,10 +68,12 @@ export function posteriorFor(
   for (const level of ["move_phase_archetype", "move_phase", "move"] as const) {
     const real = firstMatch(table, level, "real", move, phase, archetype);
     const sim = firstMatch(table, level, "sim", move, phase, archetype);
-    const n = (real?.n ?? 0) + SIM_WEIGHT * (sim?.n ?? 0);
-    if (n < MIN_REAL_N) continue;
-    const positives = (real?.positives ?? 0) + SIM_WEIGHT * (sim?.positives ?? 0);
-    return { alpha: rAlpha + positives, beta: rBeta + (n - positives), n, level, source: real ? "real" : "sim" };
+    const count = (real?.count ?? 0) + SIM_WEIGHT * (sim?.count ?? 0);
+    if (count < MIN_REAL_N) continue;
+    // self-normalised IPW: keep the weighted positive ratio, scale to the raw sample size
+    const pos = (c: PriorCell | undefined, w: number) => (c && c.n > 0 ? w * c.positives * (c.count / c.n) : 0);
+    const positives = pos(real, 1) + pos(sim, SIM_WEIGHT);
+    return { alpha: rAlpha + positives, beta: rBeta + (count - positives), n: count, level, source: real ? "real" : "sim" };
   }
   return { alpha: rAlpha, beta: rBeta, n: 0, level: "move_phase", source: "research" };
 }
@@ -97,12 +101,44 @@ function gamma(shape: number, rng: () => number): number {
   }
 }
 
-function beta(a: number, b: number, rng: () => number): number {
-  const x = gamma(a, rng);
-  const y = gamma(b, rng);
+const shapeOk = (x: number) => (Number.isFinite(x) && x > 0 ? x : 1);
+
+export function beta(a: number, b: number, rng: () => number): number {
+  const x = gamma(shapeOk(a), rng);
+  const y = gamma(shapeOk(b), rng);
   return x + y === 0 ? 0.5 : x / (x + y);
 }
 
+function drawWinner(candidates: Move[], posteriors: Map<Move, { alpha: number; beta: number }>, rng: () => number): number {
+  let best = 0;
+  let bestV = -1;
+  candidates.forEach((m, i) => {
+    const p = posteriors.get(m) ?? { alpha: 1, beta: 1 };
+    const v = beta(p.alpha, p.beta, rng);
+    if (v > bestV) {
+      bestV = v;
+      best = i;
+    }
+  });
+  return best;
+}
+
+/** Monte-Carlo win share per candidate over `samples` rounds (sums to 1). */
+export function winShares(
+  candidates: Move[],
+  posteriors: Map<Move, { alpha: number; beta: number }>,
+  rng: () => number,
+  samples = 200,
+): number[] {
+  const wins = new Array<number>(candidates.length).fill(0);
+  for (let s = 0; s < samples; s++) {
+    const w = drawWinner(candidates, posteriors, rng);
+    wins[w] = (wins[w] ?? 0) + 1;
+  }
+  return wins.map((w) => w / samples);
+}
+
+/** One Beta draw per candidate picks (genuine Thompson sampling); propensity is the pick's MC win share. */
 export function thompsonPick(
   candidates: Move[],
   posteriors: Map<Move, { alpha: number; beta: number }>,
@@ -110,21 +146,8 @@ export function thompsonPick(
   samples = 200,
 ): { index: number; propensity: number } {
   if (candidates.length === 0) return { index: -1, propensity: 0 };
-  const wins = new Array<number>(candidates.length).fill(0);
-  for (let s = 0; s < samples; s++) {
-    let best = 0;
-    let bestV = -1;
-    candidates.forEach((m, i) => {
-      const p = posteriors.get(m) ?? { alpha: 1, beta: 1 };
-      const v = beta(p.alpha, p.beta, rng);
-      if (v > bestV) {
-        bestV = v;
-        best = i;
-      }
-    });
-    wins[best] = (wins[best] ?? 0) + 1;
-  }
-  let index = 0;
-  for (let i = 1; i < wins.length; i++) if (wins[i]! > wins[index]!) index = i;
-  return { index, propensity: wins[index]! / samples };
+  const index = drawWinner(candidates, posteriors, rng);
+  const shares = winShares(candidates, posteriors, rng, samples);
+  // floor at one sample so inverse-propensity weights stay finite
+  return { index, propensity: Math.max(shares[index] ?? 0, 1 / samples) };
 }
