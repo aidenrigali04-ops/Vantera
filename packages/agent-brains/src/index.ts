@@ -260,4 +260,5 @@ export * from "./conversation/learn";
 export * from "./conversation/policy";
 export * from "./conversation/compose";
 export * from "./conversation/lint";
+export * from "./conversation/timing";
 export { BUMP_PHRASES } from "./copy/humanizer";
