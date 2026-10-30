@@ -12,6 +12,7 @@ import type {
   IntentVerdict,
   LeadInsights,
   LinkedInDraft,
+  LinkedInNoteDraft,
   DraftInput,
   RankCandidate,
   RankContext,
@@ -491,6 +492,15 @@ export interface StrategyStampStore {
 export interface CopyDraftDeps {
   store: CopyDraftStore;
   draftLinkedInFn: (input: DraftInput) => Promise<LinkedInDraft>;
+  /**
+   * The `conversation_policy` rollout knob, read once per run by the thin trigger (spec §7.2).
+   * "off" ⇒ today's invite+message pair from `draftLinkedInFn`, byte-identical. Any other mode ⇒
+   * the invite note ONLY, from `draftLinkedInNoteFn`; the first message is written at acceptance
+   * by the first-message scan through the conversation core.
+   */
+  conversationMode: ConversationMode;
+  /** Note-only first-touch brain (lints itself); used whenever `conversationMode !== "off"`. */
+  draftLinkedInNoteFn: (input: DraftInput) => Promise<LinkedInNoteDraft>;
   /**
    * One targeted EDIT of a style-flagged pair, run only on the AUTOMATIC send path before the
    * draft may auto-approve (review mode surfaces the flags + the queue's Fix button instead).

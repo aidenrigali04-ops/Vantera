@@ -1,9 +1,9 @@
 import { logger, task } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
-import { draftLinkedIn, rankLeads, scanWebsite } from "@vantera/agent-brains";
+import { draftLinkedIn, draftLinkedInNote, rankLeads, scanWebsite } from "@vantera/agent-brains";
 import { runFastPass } from "../pipeline/fast-pass";
 import { runCopyDraft } from "../pipeline/copy-draft";
-import { createPgStore } from "../pipeline/pg-store";
+import { createConversationStore, createPgStore } from "../pipeline/pg-store";
 import { createProspectData } from "../pipeline/prospect-source";
 
 /**
@@ -17,14 +17,23 @@ export const fastPass = task({
   queue: { concurrencyLimit: 1 },
   maxDuration: 900,
   run: async (payload: { accountId: string; revealRunId: string }) => {
-    const store = createPgStore(createDb());
+    const db = createDb();
+    const store = createPgStore(db);
+    // same first-touch shape as copy-draft (spec §7.2): note only unless conversation_policy is off
+    const conversationMode = await createConversationStore(db).getConversationPolicyMode().catch(() => "off" as const);
     try {
       const summary = await runFastPass(payload, {
         store,
         prospectData: createProspectData(),
         scanFn: scanWebsite,
         rankFn: rankLeads,
-        runDrafts: (p) => runCopyDraft(p, { store, draftLinkedInFn: (input) => draftLinkedIn(input) }),
+        runDrafts: (p) =>
+          runCopyDraft(p, {
+            store,
+            draftLinkedInFn: (input) => draftLinkedIn(input),
+            conversationMode,
+            draftLinkedInNoteFn: (input) => draftLinkedInNote(input),
+          }),
       });
       logger.info("fast pass finished", { ...summary, accountId: payload.accountId });
       return summary;

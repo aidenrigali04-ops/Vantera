@@ -10,8 +10,8 @@ import { computeNextRunAt } from "../pipeline/schedule";
  * dispatches its own run task.
  *
  * Also fires the account-health reconcile, the reply-backlog safeguard, the lifecycle-outreach
- * tick, the trial-ending heads-up, the pull-back email each run, and the hourly LinkedIn thread
- * sync (plain tasks piggybacking
+ * tick, the trial-ending heads-up, the pull-back email and the first-message scan each run, and the
+ * hourly LinkedIn thread sync (plain tasks piggybacking
  * this cron: the plan's schedule quota is at 10/10 — an 11th schedule fails every deploy).
  */
 export const agentScheduler = schedules.task({
@@ -44,6 +44,8 @@ export const agentScheduler = schedules.task({
       scope: "global",
     });
     await tasks.trigger("thread-sync", {}, { idempotencyKey: threadSyncKey });
+    // every tick, no key: the connected-without-first-message scan is cheap and idempotent
+    await tasks.trigger("first-message", {});
     logger.info("agent scheduler tick", { due: due.length });
     return { triggered: due.length };
   },
