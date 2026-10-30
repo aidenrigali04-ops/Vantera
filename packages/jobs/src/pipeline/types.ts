@@ -791,6 +791,9 @@ export interface InboundStore {
     /** the row already carries a classification — the processed marker (set LAST by runInbound),
      *  so an existing-but-unclassified row is a crashed run to finish, not a duplicate */
     classified: boolean;
+    /** the reader's readout already persisted on the row (a crashed run's retry reuses it, never
+     *  re-reading the turn against a state that already includes it); null on a fresh row */
+    readout: Readout | null;
   }>;
   /** Attribute a reply to the agent send it answered. `scheduledSendId` is the delivered
    *  scheduled_sends row (null = none); the store resolves it to its outreach_sends audit row. */

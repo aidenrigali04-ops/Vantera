@@ -88,7 +88,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     insertReply: async (r) => {
       replies.push(r);
       // ingestion time defaults to the provider time — tests that care about webhook lag override it
-      return { id: `reply_${++replyCounter}`, created: true, createdAt: r.receivedAt, classified: false };
+      return { id: `reply_${++replyCounter}`, created: true, createdAt: r.receivedAt, classified: false, readout: null };
     },
     setReplyClassification: async (replyId, verdict) => {
       effects.push("classify");
@@ -268,7 +268,7 @@ describe("runInbound — reply → send attribution", () => {
 
   it("does not attribute a duplicate reply", async () => {
     const store = linked({
-      insertReply: async (r) => ({ id: "reply_x", created: false, createdAt: r.receivedAt, classified: true }),
+      insertReply: async (r) => ({ id: "reply_x", created: false, createdAt: r.receivedAt, classified: true, readout: null }),
     });
     await runInbound({ source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE }, deps(store, { classifyFn: classify("interested") }));
     expect(store.replyAttributions).toHaveLength(0);
@@ -1206,7 +1206,7 @@ describe("runInbound — layered lead matching", () => {
       findLinkedInAccountByProviderRef: async () => ({ id: "li_id_1", accountId: "acc1" }),
       findLeadByLinkedInUrl: async () => null,
       findLeadByProviderRef: async () => ({ id: "lead1", campaignId: null }),
-      insertReply: async (r) => ({ id: "existing_reply", created: false, createdAt: r.receivedAt, classified: true }),
+      insertReply: async (r) => ({ id: "existing_reply", created: false, createdAt: r.receivedAt, classified: true, readout: null }),
     });
 
     const result = await runInbound(
@@ -1447,7 +1447,7 @@ describe("runInbound — a reply is never lost to a mid-processing failure", () 
 
   it("an existing but UNclassified reply row (a crashed run's retry) is processed in full", async () => {
     const store = storeForLead({
-      insertReply: async (r) => ({ id: "reply_existing", created: false, createdAt: r.receivedAt, classified: false }),
+      insertReply: async (r) => ({ id: "reply_existing", created: false, createdAt: r.receivedAt, classified: false, readout: null }),
     });
 
     const result = await runInbound(
@@ -1464,7 +1464,7 @@ describe("runInbound — a reply is never lost to a mid-processing failure", () 
 
   it("a classified existing row is the true duplicate — no effects", async () => {
     const store = storeForLead({
-      insertReply: async (r) => ({ id: "reply_existing", created: false, createdAt: r.receivedAt, classified: true }),
+      insertReply: async (r) => ({ id: "reply_existing", created: false, createdAt: r.receivedAt, classified: true, readout: null }),
     });
     const result = await runInbound({ source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE }, deps(store));
     expect(result).toEqual({ handled: true, action: "reply:duplicate" });
@@ -1483,9 +1483,9 @@ describe("runInbound — a reply is never lost to a mid-processing failure", () 
     const store = storeForLead({
       insertReply: async (r) => {
         const existing = rows.get(r.providerMessageRef!);
-        if (existing) return { id: existing.id, created: false, createdAt: r.receivedAt, classified: existing.classified };
+        if (existing) return { id: existing.id, created: false, createdAt: r.receivedAt, classified: existing.classified, readout: null };
         rows.set(r.providerMessageRef!, { id: "reply_1", classified: false });
-        return { id: "reply_1", created: true, createdAt: r.receivedAt, classified: false };
+        return { id: "reply_1", created: true, createdAt: r.receivedAt, classified: false, readout: null };
       },
       setLeadReplied: async () => {
         if (failOnce) {
@@ -1538,7 +1538,7 @@ describe("runInbound — responder freshness + thread hygiene", () => {
     const store = makeStore({
       findLinkedInAccountByProviderRef: async () => ({ id: "li", accountId: "acc1" }),
       findLeadByLinkedInUrl: async () => ({ id: "lead1", campaignId: "camp1" }),
-      insertReply: async () => ({ id: "r1", created: true, createdAt: new Date("2026-06-12T10:20:00.000Z"), classified: false }),
+      insertReply: async () => ({ id: "r1", created: true, createdAt: new Date("2026-06-12T10:20:00.000Z"), classified: false, readout: null }),
       getResponderBundle: async () => bundle({ newestUnsentMessageCreatedAt: new Date("2026-06-12T10:10:00.000Z") }),
     });
 
@@ -1756,12 +1756,15 @@ describe("handleLinkedInEvent — readout-driven actions and routing (spec §6.4
     mode: ConversationMode;
     leadReadout: Readout;
     bundle?: ResponderBundle | null;
+    readFails?: boolean;
+    storeOver?: Partial<InboundStore>;
   }) {
     const store = makeStore({
       findLinkedInAccountByProviderRef: async () => ({ id: "li", accountId: "acc1" }),
       findLeadByProviderRef: async () => ({ id: "lead1", campaignId: "camp1" }),
       getLeadLinkedInUrl: async () => STORED,
       getResponderBundle: async () => (opts.bundle === undefined ? bundle() : opts.bundle),
+      ...opts.storeOver,
     });
     let stored: { state: ConversationState; lastMessageRef: string | null } | null = null;
     const decisions: NewDecision[] = [];
@@ -1775,9 +1778,10 @@ describe("handleLinkedInEvent — readout-driven actions and routing (spec §6.4
         at: r.receivedAt.toISOString(),
       })),
     ];
-    const readFn = vi.fn(async (_s: ConversationState, t: StoredTurn, _g: string) =>
-      t.role === "lead" ? opts.leadReadout : readout()
-    );
+    const readFn = vi.fn(async (_s: ConversationState, t: StoredTurn, _g: string) => {
+      if (opts.readFails) throw new Error("model down");
+      return t.role === "lead" ? opts.leadReadout : readout();
+    });
     const shortlistFn = vi.fn(async (input: PolicyInput): Promise<Shortlist> => {
       const move = input.legal.includes("answer") ? "answer" : input.legal[0];
       return move
@@ -1975,14 +1979,69 @@ describe("handleLinkedInEvent — readout-driven actions and routing (spec §6.4
     expect(t.decisions).toEqual([]);
   });
 
-  it("an out-of-office readout takes no action (no suppression, no stop, no policy turn)", async () => {
-    const t = setup({ mode: "live_replies", leadReadout: readout({ stance: "negative", intent: "ooo", confidence: 0.95 }) });
+  it("a readout-only 'ooo' (classifier disagrees) is a normal reply: stamped, notified, decided", async () => {
+    const t = setup({ mode: "live_replies", leadReadout: readout({ stance: "neutral", intent: "ooo", confidence: 0.6 }) });
 
-    await t.run("Away until Monday.", "neutral");
+    await t.run("Back next week, but yes — by hand.", "neutral");
 
+    expect(t.store.repliedLeads.map((l) => l.leadId)).toEqual(["lead1"]);
+    expect(t.store.notifications).toContainEqual(expect.objectContaining({ kind: "reply", body: "neutral" }));
     expect(t.store.suppressions).toEqual([]);
-    expect(t.store.stoppedSequences).toEqual([]);
+    expect(t.decisions).toHaveLength(1);
+  });
+
+  it("a classifier out_of_office still stands down (no read, no action)", async () => {
+    const t = setup({ mode: "live_replies", leadReadout: readout() });
+
+    await t.run("Automatic reply: I am out of office until Monday.", "out_of_office");
+
+    expect(t.readFn).not.toHaveBeenCalled();
     expect(t.store.notifications).toEqual([]);
+    expect(t.store.repliedLeads).toEqual([]);
     expect(t.decisions).toEqual([]);
+  });
+
+  it("a reader failure never blocks the deterministic opt-out: an unsubscribe is still suppressed + classified", async () => {
+    const t = setup({ mode: "live_replies", leadReadout: readout(), readFails: true });
+
+    const result = await t.run("please remove me from your list", "unsubscribe");
+
+    expect(t.store.suppressions.map((s) => s[3])).toEqual(["unsubscribe", "unsubscribe"]);
+    expect(t.store.stoppedSequences).toEqual(["lead1"]);
+    expect(t.store.classifications[0]!.verdict.classification).toBe("unsubscribe");
+    expect(t.decisions).toEqual([]);
+    expect(result).toEqual({ handled: true, action: "reply:unsubscribe" });
+  });
+
+  it("a reader failure falls back to the classifier path: a plain reply is classified + notified, no decision", async () => {
+    const t = setup({ mode: "live_replies", leadReadout: readout(), readFails: true });
+
+    const result = await t.run("Sounds interesting, tell me more.", "interested");
+
+    expect(t.store.classifications[0]!.verdict.classification).toBe("interested");
+    expect(t.store.notifications).toContainEqual(expect.objectContaining({ kind: "reply", body: "interested" }));
+    expect(t.store.readouts).toEqual([]);
+    expect(t.decisions).toEqual([]);
+    expect(t.respondFn).toHaveBeenCalledTimes(1); // legacy responder, as with no conversation at all
+    expect(result.action).toBe("reply:interested+responded");
+  });
+
+  it("a crashed run's retry reuses the persisted readout: no re-read, same suppression decision", async () => {
+    const persisted = readout({ stance: "negative", intent: "declines", confidence: 0.9 });
+    const t = setup({
+      mode: "live_replies",
+      leadReadout: readout({ stance: "positive", intent: "answers_question" }),
+      storeOver: {
+        insertReply: async (r) => ({ id: "reply_1", created: false, createdAt: r.receivedAt, classified: false, readout: persisted }),
+      },
+    });
+
+    await t.run("No thanks, not for us.", "neutral");
+
+    expect(t.readFn).not.toHaveBeenCalled();
+    expect(t.store.readouts).toEqual([]); // already on the row
+    expect(t.store.suppressions.map((s) => s[3])).toEqual(["not_interested", "not_interested"]);
+    expect(t.store.stoppedSequences).toEqual(["lead1"]);
+    expect(t.store.classifications).toHaveLength(1);
   });
 });

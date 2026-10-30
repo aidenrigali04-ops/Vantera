@@ -2223,12 +2223,12 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           where: sql`provider_message_ref is not null`,
         })
         .returning({ id: replies.id, createdAt: replies.createdAt });
-      if (row) return { id: row.id, created: true, createdAt: row.createdAt, classified: false };
+      if (row) return { id: row.id, created: true, createdAt: row.createdAt, classified: false, readout: null };
       if (!r.providerMessageRef) throw new Error("failed to insert reply");
       // classified_at is the processed marker (runInbound writes it last): an existing row without
       // it belongs to a run that crashed mid-way, and the caller finishes it instead of deduping.
       const [existing] = await db
-        .select({ id: replies.id, createdAt: replies.createdAt, classifiedAt: replies.classifiedAt })
+        .select({ id: replies.id, createdAt: replies.createdAt, classifiedAt: replies.classifiedAt, readout: replies.readout })
         .from(replies)
         .where(
           and(
@@ -2238,7 +2238,13 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         )
         .limit(1);
       if (!existing) throw new Error("failed to insert reply");
-      return { id: existing.id, created: false, createdAt: existing.createdAt, classified: existing.classifiedAt !== null };
+      return {
+        id: existing.id,
+        created: false,
+        createdAt: existing.createdAt,
+        classified: existing.classifiedAt !== null,
+        readout: (existing.readout as import("@vantera/agent-brains").Readout | null) ?? null,
+      };
     },
 
     async getLeadLinkedInUrl(accountId: string, leadId: string) {
