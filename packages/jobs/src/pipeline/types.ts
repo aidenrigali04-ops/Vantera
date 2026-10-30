@@ -1298,7 +1298,7 @@ export type ConversationMode = "off" | "shadow" | "live_replies" | "live";
 export type ConversationTrigger =
   | { kind: "reply"; replyId: string; incoming: string; receivedAt: Date; readout: Readout }
   | { kind: "first_message" }
-  | { kind: "followup" };
+  | { kind: "followup"; runId: string; touchNo: number; isLast: boolean };
 
 export type NewDecision = {
   accountId: string;
