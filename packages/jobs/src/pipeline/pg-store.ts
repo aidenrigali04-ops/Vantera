@@ -39,6 +39,10 @@ import {
   sequenceRuns,
   suppressionEntries,
   appSettings,
+  conversationDecisions,
+  conversationPriors,
+  conversationPriorsGlobal,
+  conversationStates,
   userProfiles,
   webhookEvents,
   optimizationPlaybook,
@@ -57,6 +61,8 @@ import type {
   LeadOutcomeFlags,
   StrategyGenome,
   StrategySource,
+  ConversationState,
+  PriorCell,
 } from "@vantera/agent-brains";
 import {
   buildTargetingProfile,
@@ -139,7 +145,11 @@ import {
   type SequenceStore,
   type SequenceTouchStore,
   type StrategyStampStore,
+  type ConversationStore,
+  type ConversationMode,
+  type ScorableDecision,
 } from "./types";
+import { mergePriorTables, turnsFromRows } from "./conversation-store-pure";
 import type { ThreadSyncStore } from "./thread-sync";
 import { normalizeLinkedInUrl } from "./copy-draft";
 import { stampEnteredLead } from "./stamp";
@@ -4445,6 +4455,270 @@ export function createThreadSyncStore(db: Db): ThreadSyncStore {
 
     async markThreadSynced(leadId: string, at: Date) {
       await db.update(leads).set({ linkedinThreadSyncedAt: at }).where(eq(leads.id, leadId));
+    },
+  };
+}
+
+/**
+ * Conversation intelligence store (0074). Service role, cross-tenant by design like the other
+ * pipeline stores: every call carries its own accountId and every write re-states it.
+ */
+export function createConversationStore(db: Db): ConversationStore {
+  const MODES: readonly ConversationMode[] = ["off", "shadow", "live_replies", "live"];
+  type PriorRow = {
+    level: PriorCell["level"];
+    phase: string;
+    archetype: string;
+    move: string;
+    count: number;
+    n: number;
+    positives: number;
+    rewardSum: number;
+    rewardSq: number;
+  };
+  const toCell = (r: PriorRow, source: PriorCell["source"]): PriorCell => ({
+    level: r.level,
+    move: r.move as PriorCell["move"],
+    phase: r.phase as PriorCell["phase"],
+    archetype: r.archetype as PriorCell["archetype"],
+    source,
+    count: r.count,
+    n: r.n,
+    positives: r.positives,
+    rewardSum: r.rewardSum,
+    rewardSq: r.rewardSq,
+  });
+
+  return {
+    async getConversationPolicyMode() {
+      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "conversation_policy"));
+      const v = row?.value;
+      return typeof v === "string" && (MODES as readonly string[]).includes(v) ? (v as ConversationMode) : "off";
+    },
+
+    async getConversationState(accountId, leadId) {
+      const [row] = await db
+        .select({ state: conversationStates.state, ref: conversationStates.lastMessageRef })
+        .from(conversationStates)
+        .where(and(eq(conversationStates.accountId, accountId), eq(conversationStates.leadId, leadId)));
+      return row ? { state: row.state as ConversationState, lastMessageRef: row.ref } : null;
+    },
+
+    async saveConversationState(accountId, leadId, state, lastMessageRef) {
+      await db
+        .insert(conversationStates)
+        .values({ accountId, leadId, state, lastMessageRef })
+        .onConflictDoUpdate({
+          target: conversationStates.leadId,
+          set: { state, lastMessageRef, updatedAt: new Date() },
+          setWhere: eq(conversationStates.accountId, accountId),
+        });
+    },
+
+    async listThreadTurns(accountId, leadId) {
+      // Agent touches ordered by DELIVERY time, as getResponderBundle does.
+      const sent = await db
+        .select({
+          id: scheduledSends.id,
+          body: scheduledSends.body,
+          stage: scheduledSends.linkedinStage,
+          at: sql<Date>`coalesce((select max(o.sent_at) from ${outreachSends} o where o.scheduled_send_id = ${scheduledSends.id}), ${scheduledSends.updatedAt})`.mapWith(scheduledSends.updatedAt),
+        })
+        .from(scheduledSends)
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            eq(scheduledSends.leadId, leadId),
+            inArray(scheduledSends.linkedinStage, ["invite", "message"]),
+            eq(scheduledSends.status, "sent")
+          )
+        );
+      const native = await db
+        .select({ id: nativeMessages.id, body: nativeMessages.body, at: nativeMessages.sentAt })
+        .from(nativeMessages)
+        .where(and(eq(nativeMessages.accountId, accountId), eq(nativeMessages.leadId, leadId)));
+      const got = await db
+        .select({ id: replies.id, body: replies.body, at: replies.receivedAt })
+        .from(replies)
+        .where(
+          and(
+            eq(replies.accountId, accountId),
+            eq(replies.leadId, leadId),
+            // auto-responders aren't conversation
+            or(isNull(replies.classification), ne(replies.classification, "out_of_office"))
+          )
+        );
+      return turnsFromRows(
+        sent.map((r) => ({ ...r, stage: r.stage as "invite" | "message" | null })),
+        native,
+        got
+      );
+    },
+
+    async insertDecision(d) {
+      const [row] = await db
+        .insert(conversationDecisions)
+        .values({
+          accountId: d.accountId,
+          leadId: d.leadId,
+          scheduledSendId: d.scheduledSendId,
+          mode: d.mode,
+          trigger: d.trigger,
+          phase: d.phase,
+          archetype: d.archetype,
+          move: d.move,
+          styleKey: d.styleKey,
+          propensity: d.propensity,
+          seed: d.seed,
+          // legal_moves is an object { moves, degraded } so the policy's degraded reason rides
+          // along without a new column; only the learner and the readout read the decision log.
+          legalMoves: { moves: d.legalMoves, degraded: d.degraded },
+          vetoes: d.vetoes,
+          stateSnapshot: d.stateSnapshot,
+          composedBody: d.composedBody,
+          policyVersion: d.policyVersion,
+          promptHash: d.promptHash,
+        })
+        .returning({ id: conversationDecisions.id });
+      return row!.id;
+    },
+
+    async insertScheduledSendReturningId(send) {
+      const [row] = await db
+        .insert(scheduledSends)
+        .values({ ...toRow(send), scheduledFor: send.notBefore ?? null })
+        .returning({ id: scheduledSends.id });
+      return row!.id;
+    },
+
+    async readPriors(accountId) {
+      const acct = await db.select().from(conversationPriors).where(eq(conversationPriors.accountId, accountId));
+      const glob = await db.select().from(conversationPriorsGlobal);
+      return mergePriorTables(
+        acct.map((r) => toCell(r, "real")),
+        glob.map((r) => toCell(r, r.source))
+      );
+    },
+
+    async upsertPriors(accountId, cells) {
+      if (cells.length === 0) return;
+      const now = new Date();
+      const vals = (c: PriorCell) => ({
+        level: c.level,
+        phase: c.phase,
+        archetype: c.archetype,
+        move: c.move,
+        count: c.count,
+        n: c.n,
+        positives: c.positives,
+        rewardSum: c.rewardSum,
+        rewardSq: c.rewardSq,
+        updatedAt: now,
+      });
+      const replace = (c: PriorCell) => ({
+        count: c.count,
+        n: c.n,
+        positives: c.positives,
+        rewardSum: c.rewardSum,
+        rewardSq: c.rewardSq,
+        updatedAt: now,
+      });
+      await db.transaction(async (tx) => {
+        for (const c of cells) {
+          if (accountId) {
+            await tx
+              .insert(conversationPriors)
+              .values({ accountId, ...vals(c) })
+              .onConflictDoUpdate({
+                target: [
+                  conversationPriors.accountId,
+                  conversationPriors.level,
+                  conversationPriors.phase,
+                  conversationPriors.archetype,
+                  conversationPriors.move,
+                ],
+                set: replace(c),
+              });
+          } else {
+            await tx
+              .insert(conversationPriorsGlobal)
+              .values({ ...vals(c), source: c.source })
+              .onConflictDoUpdate({
+                target: [
+                  conversationPriorsGlobal.level,
+                  conversationPriorsGlobal.phase,
+                  conversationPriorsGlobal.archetype,
+                  conversationPriorsGlobal.move,
+                  conversationPriorsGlobal.source,
+                ],
+                set: replace(c),
+              });
+          }
+        }
+      });
+    },
+
+    async listUnscoredDecisions(olderThan, limit) {
+      const rows = await db
+        .select({
+          id: conversationDecisions.id,
+          accountId: conversationDecisions.accountId,
+          leadId: conversationDecisions.leadId,
+          scheduledSendId: conversationDecisions.scheduledSendId,
+          decidedAt: conversationDecisions.decidedAt,
+          move: conversationDecisions.move,
+          phase: conversationDecisions.phase,
+          archetype: conversationDecisions.archetype,
+          propensity: conversationDecisions.propensity,
+          composedBody: conversationDecisions.composedBody,
+          sentBody: scheduledSends.body,
+          sentAt: sql<Date | null>`(select max(o.sent_at) from ${outreachSends} o where o.scheduled_send_id = ${conversationDecisions.scheduledSendId})`,
+        })
+        .from(conversationDecisions)
+        .leftJoin(scheduledSends, eq(scheduledSends.id, conversationDecisions.scheduledSendId))
+        .where(
+          and(
+            eq(conversationDecisions.mode, "live"),
+            isNull(conversationDecisions.scoredAt),
+            lte(conversationDecisions.decidedAt, olderThan)
+          )
+        )
+        .orderBy(asc(conversationDecisions.decidedAt))
+        .limit(limit);
+      return rows.map((r) => ({
+        ...r,
+        move: r.move as ScorableDecision["move"],
+        phase: r.phase as ScorableDecision["phase"],
+        archetype: r.archetype as ScorableDecision["archetype"],
+        sentAt: r.sentAt ? new Date(r.sentAt) : null,
+      }));
+    },
+
+    async scoreDecision(id, outcome, reward) {
+      await db
+        .update(conversationDecisions)
+        .set({ outcome, reward, scoredAt: new Date() })
+        .where(eq(conversationDecisions.id, id));
+    },
+
+    async listConnectedWithoutFirstMessage(limit) {
+      const rows = (await db.execute(sql`
+        select l.account_id, l.id as lead_id, sr.campaign_id
+        from ${leads} l
+        join ${sequenceRuns} sr on sr.lead_id = l.id and sr.account_id = l.account_id and sr.status = 'active'
+        where l.linkedin_connected_at is not null
+          and not exists (
+            select 1 from ${scheduledSends} s
+            where s.lead_id = l.id and s.linkedin_stage = 'message' and s.status <> 'canceled'
+          )
+          and exists (
+            select 1 from ${agents} a
+            where a.account_id = l.account_id and a.kind = 'copy' and a.status = 'live'
+          )
+        order by l.linkedin_connected_at asc
+        limit ${limit}
+      `)) as unknown as { account_id: string; lead_id: string; campaign_id: string }[];
+      return rows.map((r) => ({ accountId: r.account_id, leadId: r.lead_id, campaignId: r.campaign_id }));
     },
   };
 }

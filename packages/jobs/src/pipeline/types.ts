@@ -34,6 +34,16 @@ import type {
   StrategySource,
   SendRecipe,
   JudgeFn,
+  ConversationState,
+  StoredTurn,
+  PriorTable,
+  Readout,
+  Move,
+  Phase,
+  Archetype,
+  Veto,
+  Trigger,
+  DecisionOutcome,
 } from "@vantera/agent-brains";
 import type { OutreachCapacity } from "./capacity";
 import type { SenderCandidate } from "./sender-assignment";
@@ -1277,4 +1287,80 @@ export interface MeetingEventStore {
   /** cancel queued drafts + stop the active sequence — a lead who booked gets no more nudges */
   standDownOutreach(accountId: string, leadId: string): Promise<void>;
   notifyMeetingBooked(accountId: string, leadId: string): Promise<void>;
+}
+
+// ---- Conversation intelligence store (Task 10) ----
+
+/** app_settings.conversation_policy rollout knob; anything but these four literals reads as "off". */
+export type ConversationMode = "off" | "shadow" | "live_replies" | "live";
+
+/** What woke the conversation policy for a lead. */
+export type ConversationTrigger =
+  | { kind: "reply"; replyId: string; incoming: string; receivedAt: Date; readout: Readout }
+  | { kind: "first_message" }
+  | { kind: "followup" };
+
+export type NewDecision = {
+  accountId: string;
+  leadId: string;
+  scheduledSendId: string | null;
+  mode: "shadow" | "live";
+  trigger: Trigger;
+  phase: Phase;
+  archetype: Archetype;
+  move: Move;
+  styleKey: string;
+  propensity: number;
+  seed: number;
+  legalMoves: Move[];
+  vetoes: Veto[];
+  /** Shortlist.degraded from the policy; persisted inside the legal_moves jsonb object */
+  degraded: string | null;
+  stateSnapshot: ConversationState;
+  composedBody: string | null;
+  policyVersion: number;
+  promptHash: string | null;
+};
+
+export type ScorableDecision = {
+  id: string;
+  accountId: string;
+  leadId: string;
+  scheduledSendId: string | null;
+  decidedAt: Date;
+  move: Move;
+  phase: Phase;
+  archetype: Archetype;
+  propensity: number;
+  composedBody: string | null;
+  sentBody: string | null;
+  sentAt: Date | null;
+};
+
+export interface ConversationStore {
+  getConversationPolicyMode(): Promise<ConversationMode>;
+  getConversationState(
+    accountId: string,
+    leadId: string
+  ): Promise<{ state: ConversationState; lastMessageRef: string | null } | null>;
+  saveConversationState(
+    accountId: string,
+    leadId: string,
+    state: ConversationState,
+    lastMessageRef: string | null
+  ): Promise<void>;
+  /** every stored message in the lead's thread, oldest first */
+  listThreadTurns(accountId: string, leadId: string): Promise<StoredTurn[]>;
+  insertDecision(d: NewDecision): Promise<string>;
+  /** notBefore persists a reply delay as scheduled_for; status stays as given */
+  insertScheduledSendReturningId(send: NewScheduledSend & { notBefore?: Date | null }): Promise<string>;
+  /** account rows (source real) first, then global rows */
+  readPriors(accountId: string): Promise<PriorTable>;
+  /** null = global table. Replaces the stored rollup for each cell (the learner sends full rollups). */
+  upsertPriors(accountId: string | null, cells: PriorTable): Promise<void>;
+  listUnscoredDecisions(olderThan: Date, limit: number): Promise<ScorableDecision[]>;
+  scoreDecision(id: string, outcome: DecisionOutcome, reward: number | null): Promise<void>;
+  listConnectedWithoutFirstMessage(
+    limit: number
+  ): Promise<{ accountId: string; leadId: string; campaignId: string }[]>;
 }
