@@ -15,6 +15,9 @@ create table public.conversation_states (
   constraint conversation_states_lead_unique unique (lead_id)
 );
 
+create index conversation_states_account_idx
+  on public.conversation_states (account_id, updated_at desc);
+
 alter table public.conversation_states enable row level security;
 
 -- written only by the conversation pipeline via service role — no client write policies
@@ -57,6 +60,8 @@ create table public.conversation_decisions (
 create index conversation_decisions_account_decided_idx
   on public.conversation_decisions (account_id, decided_at desc);
 create index conversation_decisions_lead_idx on public.conversation_decisions (lead_id);
+create index conversation_decisions_send_idx
+  on public.conversation_decisions (scheduled_send_id) where scheduled_send_id is not null;
 create index conversation_decisions_unscored_idx
   on public.conversation_decisions (scored_at) where scored_at is null;
 
@@ -109,7 +114,8 @@ create table public.conversation_priors_global (
 );
 
 alter table public.conversation_priors_global enable row level security;
--- intentionally NO policies and no grants: service-role only
+-- intentionally NO policies, client grants revoked: service-role only
+revoke all on public.conversation_priors_global from authenticated, anon;
 
 -- Structured readout of an inbound reply (intent, objection, signals) written by the classifier.
 alter table public.replies add column readout jsonb;

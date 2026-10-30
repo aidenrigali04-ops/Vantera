@@ -587,7 +587,23 @@ describe("conversation_priors_global is counts only (0074)", () => {
 
   it("every column is a number, a timestamp, or a CHECK-constrained text enum", () => {
     for (const line of columnLines) {
-      expect(line, line).toMatch(/^\w+ (integer|double precision|timestamptz|text\b.*check \()/);
+      expect(line, line).toMatch(
+        /^\w+ (integer|double precision|timestamptz|text (not null )?(default '[^']*' )?check \(\w+ (in \(|~ '))/
+      );
+    }
+  });
+
+  it("later ALTERs cannot add a non-counts column", () => {
+    const alters = allMigrations
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith("alter table public.conversation_priors_global") && l.includes("add column"));
+    // multi-line form: "alter table ...global" then "add column ..." on following lines
+    const multi = [...allMigrations.matchAll(/alter table public\.conversation_priors_global\s+add column[^;]*;/g)].map((m) => m[0]);
+    for (const stmt of [...alters, ...multi]) {
+      expect(stmt).not.toContain("uuid");
+      expect(stmt).not.toContain("account_id");
+      expect(stmt).toMatch(/add column (if not exists )?\w+ (integer|double precision|timestamptz|text (not null )?(default '[^']*' )?check \(\w+ (in \(|~ '))/);
     }
   });
 
@@ -599,5 +615,6 @@ describe("conversation_priors_global is counts only (0074)", () => {
   it("is service-role only: RLS on, no policies", () => {
     expect(sql).toContain("alter table public.conversation_priors_global enable row level security");
     expect(sql).not.toMatch(/create policy \w+ on public\.conversation_priors_global/);
+    expect(sql).toContain("revoke all on public.conversation_priors_global from authenticated, anon;");
   });
 });

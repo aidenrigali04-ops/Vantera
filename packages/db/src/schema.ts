@@ -623,6 +623,7 @@ export const labDecisions = pgTable(
   },
   (t) => [
     unique("lab_decisions_send_unique").on(t.scheduledSendId),
+    // SQL uses `on delete set null (scheduled_send_id)`; the migration is the source of truth
     foreignKey({
       columns: [t.scheduledSendId, t.accountId],
       foreignColumns: [scheduledSends.id, scheduledSends.accountId],
@@ -854,6 +855,7 @@ export const conversationStates = pgTable(
   },
   (t) => [
     unique("conversation_states_lead_unique").on(t.leadId),
+    index("conversation_states_account_idx").on(t.accountId, t.updatedAt.desc()),
     foreignKey({
       columns: [t.leadId, t.accountId],
       foreignColumns: [leads.id, leads.accountId],
@@ -893,12 +895,16 @@ export const conversationDecisions = pgTable(
   (t) => [
     index("conversation_decisions_account_decided_idx").on(t.accountId, t.decidedAt.desc()),
     index("conversation_decisions_lead_idx").on(t.leadId),
+    index("conversation_decisions_send_idx")
+      .on(t.scheduledSendId)
+      .where(sql`${t.scheduledSendId} is not null`),
     index("conversation_decisions_unscored_idx").on(t.scoredAt).where(sql`${t.scoredAt} is null`),
     foreignKey({
       columns: [t.leadId, t.accountId],
       foreignColumns: [leads.id, leads.accountId],
       name: "conversation_decisions_lead_same_account",
     }).onDelete("cascade"),
+    // SQL uses `on delete set null (scheduled_send_id)`; the migration is the source of truth
     foreignKey({
       columns: [t.scheduledSendId, t.accountId],
       foreignColumns: [scheduledSends.id, scheduledSends.accountId],
@@ -937,6 +943,7 @@ export const conversationPriorsGlobal = pgTable(
     })
       .notNull()
       .default(""),
+    // SQL checks archetype against ~ '^$|^(ic_mgr|dir_vp|cxo_founder):(low|high|unknown):(low|high|unknown)$'
     archetype: text("archetype").notNull().default(""),
     move: text("move", {
       enum: [
