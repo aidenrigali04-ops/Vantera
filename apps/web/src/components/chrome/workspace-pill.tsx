@@ -1,37 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ChevronDown, Pause, Play, Settings } from "lucide-react";
+import { ChevronDown, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CHROME_FOCUS, CHROME_MENU, CHROME_MENU_ITEM, CHROME_MOTION, CHROME_PILL } from "./tile";
 import { useDismiss, type DismissReason } from "./use-dismiss";
 import { WorkspaceIcon } from "./workspace-icon";
-
-/** A server action that flips the workspace engine; resolves to `{}` or a user-facing error. */
-export type EngineAction = () => Promise<{ error?: string }>;
 
 export type WorkspacePillProps = {
   name: string;
   paused: boolean;
   /** Icon URLs to try, in order (scanned icon, else the domain's conventional paths). */
   iconCandidates?: string[];
-  pauseEngine: EngineAction;
-  resumeEngine: EngineAction;
 };
 
 /**
  * The workspace switcher-shaped pill (blueprint §6.1): icon square · name · chevron. Its
- * menu holds the one workspace-level control that matters day to day — pausing and
- * resuming the engine — plus the settings link. The pause stamp lives on the account
- * (`accounts.paused_at`); the actions are passed in from the server layout.
+ * menu holds the workspace name and the settings link. Pausing / resuming the engine lives
+ * in ONE place — the status chip's popover (`engine-popover.tsx`); the pill only shows the
+ * paused dot (`accounts.paused_at`).
  */
-export function WorkspacePill({ name, paused, iconCandidates = [], pauseEngine, resumeEngine }: WorkspacePillProps) {
-  const router = useRouter();
+export function WorkspacePill({ name, paused, iconCandidates = [] }: WorkspacePillProps) {
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const focusFirstItem = useRef(false);
@@ -40,7 +31,6 @@ export function WorkspacePill({ name, paused, iconCandidates = [], pauseEngine, 
 
   const close = useCallback((restoreFocus: boolean) => {
     setOpen(false);
-    setError(null);
     if (restoreFocus) buttonRef.current?.focus();
   }, []);
 
@@ -83,22 +73,6 @@ export function WorkspacePill({ name, paused, iconCandidates = [], pauseEngine, 
             : (current - 1 + items.length) % items.length;
     items[next]?.focus();
   }
-
-  function toggleEngine() {
-    startTransition(async () => {
-      setError(null);
-      const result = await (paused ? resumeEngine() : pauseEngine());
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      close(true);
-      router.refresh();
-    });
-  }
-
-  const engineLabel = pending ? (paused ? "Resuming…" : "Pausing…") : paused ? "Resume engine" : "Pause engine";
-  const EngineIcon = paused ? Play : Pause;
 
   return (
     <div ref={rootRef} className="relative">
@@ -153,22 +127,6 @@ export function WorkspacePill({ name, paused, iconCandidates = [], pauseEngine, 
         >
           <p className="truncate px-2.5 pb-2 pt-1.5 text-[13px] text-[var(--ink-dim)]">{name}</p>
           <div role="separator" className="mx-1 mb-1 h-px bg-[var(--line)]" />
-          <button
-            type="button"
-            role="menuitem"
-            disabled={pending}
-            aria-busy={pending || undefined}
-            onClick={toggleEngine}
-            className={CHROME_MENU_ITEM}
-          >
-            <EngineIcon className="size-4 text-[var(--ink-mid)]" strokeWidth={1.75} aria-hidden="true" />
-            <span className={cn(pending && "text-[var(--ink-mid)]")}>{engineLabel}</span>
-          </button>
-          {error && (
-            <p role="alert" className="px-2.5 py-1.5 text-[13px] leading-snug text-[var(--danger)]">
-              {error}
-            </p>
-          )}
           <Link href="/settings" role="menuitem" onClick={() => close(false)} className={CHROME_MENU_ITEM}>
             <Settings className="size-4 text-[var(--ink-mid)]" strokeWidth={1.75} aria-hidden="true" />
             Workspace settings

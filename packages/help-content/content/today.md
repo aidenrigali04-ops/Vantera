@@ -77,4 +77,4 @@ Every page has a status chip in the top bar that says what your engine is doing 
 
 - **Why is a draft "held"?** Its sender is disconnected or restricted. The draft is kept, not lost; it sends once that sender is back.
 - **Why did my queue not fill up?** If the engine ran several passes and found nobody above your quality bar, Today tells you so and points at your profile — it is usually too narrow.
-- **Can I pause everything?** Yes — the workspace menu at the top left has **Pause engine**. Sourcing and sending stop; your approvals stay open, and Today shows that it is paused until you resume it.
+- **Can I pause everything?** Yes — click the status chip in the top bar and choose **Pause everything**. Sourcing and sending stop; your approvals stay open, and Today shows that it is paused until you resume it.

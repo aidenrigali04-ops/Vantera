@@ -9,7 +9,9 @@ import { cn } from "@/lib/utils";
 import { StatusChip, useChipDetail } from "./status-chip";
 import { CHROME_FOCUS, CHROME_MENU, CHROME_MENU_ITEM, CHROME_MOTION } from "./tile";
 import { useDismiss, type DismissReason } from "./use-dismiss";
-import type { EngineAction } from "./workspace-pill";
+
+/** A server action that flips the workspace engine; resolves to `{}` or a user-facing error. */
+export type EngineAction = () => Promise<{ error?: string }>;
 
 /** The popover's switch action: a whole agent group on or off; `{}` or a user-facing error. */
 export type GroupAction = (group: "sourcing" | "outreach", status: "live" | "paused") => Promise<{ error?: string }>;
