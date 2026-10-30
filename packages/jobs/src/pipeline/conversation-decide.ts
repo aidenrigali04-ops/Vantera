@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { tagLinksInText } from "@vantera/meetings-infra";
 import {
   COMPOSE_SYSTEM,
@@ -196,8 +197,11 @@ export async function runConversationDecide(
           propensity: 1,
         };
 
-  const logDecision = (scheduledSendId: string | null, composedBody: string | null) => {
+  // Minted up front so the sent message's recipe can name the decision row written after it.
+  const decisionId = randomUUID();
+  const logDecision = async (scheduledSendId: string | null, composedBody: string | null) => {
     const row: NewDecision = {
+      id: decisionId,
       accountId,
       leadId,
       scheduledSendId,
@@ -222,7 +226,7 @@ export async function runConversationDecide(
 
   // (7) shadow: record what the policy WOULD do; compose and send nothing.
   if (mode === "shadow") {
-    const decisionId = await logDecision(null, null);
+    await logDecision(null, null);
     return { action: "skipped", reason: "shadow", decisionId, move: decision.move };
   }
 
@@ -231,7 +235,7 @@ export async function runConversationDecide(
     return { action: "wait", decisionId: await logDecision(null, null), move: "wait" };
   }
   if (decision.move === "hand_to_human") {
-    const decisionId = await logDecision(null, null);
+    await logDecision(null, null);
     await store.insertLeadNotification({ accountId, leadId, kind: "needs_human", body: HANDOFF_NOTE });
     // a person owns the thread now: no proactive touches until they hand it back ("Let Vera handle it")
     await store.stopSequenceForReply(leadId);
@@ -286,7 +290,6 @@ export async function runConversationDecide(
     ...(isReply
       ? { notBefore: new Date(deps.now().getTime() + replyDelayMs(trigger.incoming.length, draft.message.length, deps.rng)) }
       : {}),
-    // TODO(Task 12): recipe v3 — add move, styleKey, policyVersion, propensity, decisionId here.
     recipe: buildSendRecipe({
       brain: BRAIN[trigger.kind],
       strategy: bundle.attribution.strategy,
@@ -294,9 +297,16 @@ export async function runConversationDecide(
       promptHash: COMPOSE_SYSTEM.hash,
       modelId: getModelId(),
       ...(n > 1 ? { bestOfN: n } : {}),
+      conversation: {
+        move: decision.move,
+        styleKey: styleKey(decision.style),
+        policyVersion: POLICY_VERSION,
+        propensity: decision.propensity,
+        decisionId,
+      },
     }),
   });
-  const decisionId = await logDecision(sendId, body);
+  await logDecision(sendId, body);
   await rememberMove(accountId, leadId, state, decision.move, deps);
 
   if (decision.move === "graceful_exit") {

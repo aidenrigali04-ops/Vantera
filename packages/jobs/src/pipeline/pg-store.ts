@@ -2168,6 +2168,41 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       await db.update(leads).set({ linkedinProviderRef: providerRef }).where(eq(leads.id, leadId));
     },
 
+    async setReplyOutreachSend(replyId: string, scheduledSendId: string | null) {
+      // replies.outreach_send_id references the outreach_sends audit row; resolve the delivered
+      // scheduled send to its newest audit row (null when unattributed or no audit row exists).
+      let outreachSendId: string | null = null;
+      if (scheduledSendId) {
+        const [row] = await db
+          .select({ id: outreachSends.id })
+          .from(outreachSends)
+          .where(eq(outreachSends.scheduledSendId, scheduledSendId))
+          .orderBy(desc(outreachSends.sentAt))
+          .limit(1);
+        outreachSendId = row?.id ?? null;
+      }
+      await db.update(replies).set({ outreachSendId }).where(eq(replies.id, replyId));
+    },
+
+    async lastDeliveredSendId(accountId: string, leadId: string, before: Date) {
+      const deliveredAt = sql<Date>`coalesce((select max(o.sent_at) from ${outreachSends} o where o.scheduled_send_id = ${scheduledSends.id}), ${scheduledSends.updatedAt})`;
+      const [row] = await db
+        .select({ id: scheduledSends.id })
+        .from(scheduledSends)
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            eq(scheduledSends.leadId, leadId),
+            eq(scheduledSends.status, "sent"),
+            inArray(scheduledSends.linkedinStage, ["invite", "message"]),
+            sql`${deliveredAt} <= ${before.toISOString()}::timestamptz`
+          )
+        )
+        .orderBy(desc(deliveredAt))
+        .limit(1);
+      return row?.id ?? null;
+    },
+
     async insertReply(r: {
       accountId: string;
       leadId: string;
@@ -4559,6 +4594,7 @@ export function createConversationStore(db: Db): ConversationStore {
       const [row] = await db
         .insert(conversationDecisions)
         .values({
+          ...(d.id ? { id: d.id } : {}),
           accountId: d.accountId,
           leadId: d.leadId,
           scheduledSendId: d.scheduledSendId,

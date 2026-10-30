@@ -138,7 +138,7 @@ function makeStore(opts: {
     insertDecision: async (d) => {
       calls.push("insertDecision");
       decisions.push(d);
-      return `dec${decisions.length}`;
+      return d.id ?? `dec${decisions.length}`;
     },
     insertScheduledSendReturningId: async (s) => {
       calls.push("insertScheduledSendReturningId");
@@ -363,7 +363,7 @@ describe("runConversationDecide", () => {
 
     const out = await runConversationDecide(args(replyTrigger(readout({ intent: "asks_question" })), "shadow"), deps);
 
-    expect(out).toEqual({ action: "skipped", reason: "shadow", decisionId: "dec1", move: "answer" });
+    expect(out).toEqual({ action: "skipped", reason: "shadow", decisionId: fake.decisions[0]!.id, move: "answer" });
     expect(composeFn).not.toHaveBeenCalled();
     expect(fake.sends).toHaveLength(0);
     expect(fake.canceled).toHaveLength(0);
@@ -385,7 +385,7 @@ describe("runConversationDecide", () => {
 
     const out = await runConversationDecide(args(replyTrigger(readout({ intent: "asks_question" }), "How does it work?")), deps);
 
-    expect(out).toEqual({ action: "drafted", decisionId: "dec1", move: "answer" });
+    expect(out).toEqual({ action: "drafted", decisionId: fake.decisions[0]!.id, move: "answer" });
     expect(composeFn).toHaveBeenCalledTimes(1);
     const input = composeFn.mock.calls[0]![0 as never] as unknown as { incoming?: string; sellerName: string | null; decision: { move: Move }; avoidSkeletons: string[] };
     expect(input.incoming).toBe("How does it work?");
@@ -408,9 +408,10 @@ describe("runConversationDecide", () => {
     });
     expect(send.body).toBe(`Fair — grab a slot if useful: ${BOOKING}?utm_content=vt-lead1&metadata%5Bvt%5D=vt-lead1`);
     expect(send.notBefore!.getTime() - NOW.getTime()).toBeGreaterThanOrEqual(REPLY_DELAY_MIN_MS);
-    // TODO(Task 12): recipe v3 carries move + decisionId; for now the v2 stamp names the brain
     expect(send.recipe).toMatchObject({
-      v: 2,
+      v: 3,
+      move: "answer",
+      decisionId: fake.decisions[0]!.id,
       brain: "conversation_reply",
       playbookVersion: 3,
       promptHash: COMPOSE_SYSTEM.hash,
@@ -422,6 +423,7 @@ describe("runConversationDecide", () => {
       composedBody: send.body,
       move: "answer",
     });
+    expect(fake.decisions[0]!.id).toEqual(expect.any(String));
     expect(fake.calls.indexOf("insertScheduledSendReturningId")).toBeLessThan(fake.calls.indexOf("insertDecision"));
     // the acted move is remembered for the repeat guards; the read cursor is untouched
     expect(fake.stored!.state.lastMove).toEqual({ move: "answer", at: NOW.toISOString() });
@@ -461,7 +463,7 @@ describe("runConversationDecide", () => {
     const fake = makeStore();
     const { deps, composeFn } = makeDeps(fake, { pick: "wait" });
     const out = await runConversationDecide(args(replyTrigger(readout({ intent: "small_talk" }))), deps);
-    expect(out).toEqual({ action: "wait", decisionId: "dec1", move: "wait" });
+    expect(out).toEqual({ action: "wait", decisionId: fake.decisions[0]!.id, move: "wait" });
     expect(composeFn).not.toHaveBeenCalled();
     expect(fake.sends).toHaveLength(0);
     expect(fake.canceled).toHaveLength(0);
@@ -487,7 +489,7 @@ describe("runConversationDecide", () => {
     const { deps, composeFn, shortlistFn } = makeDeps(fake, { pick: "answer" });
     const out = await runConversationDecide(args(replyTrigger(readout({ identitySuspicion: true, intent: "asks_question" }), "is this a bot?")), deps);
     expect((shortlistFn.mock.calls[0]![0] as PolicyInput).legal).toEqual(["hand_to_human"]);
-    expect(out).toEqual({ action: "hand_to_human", decisionId: "dec1", move: "hand_to_human" });
+    expect(out).toEqual({ action: "hand_to_human", decisionId: fake.decisions[0]!.id, move: "hand_to_human" });
     expect(composeFn).not.toHaveBeenCalled();
     expect(fake.sends).toHaveLength(0);
     expect(fake.notifications).toEqual([
@@ -516,7 +518,7 @@ describe("runConversationDecide", () => {
       args(replyTrigger(readout({ stance: "negative", confidence: 0.9, intent: "declines" }), "not for us")),
       deps
     );
-    expect(out).toEqual({ action: "exit", decisionId: "dec1", move: "graceful_exit" });
+    expect(out).toEqual({ action: "exit", decisionId: fake.decisions[0]!.id, move: "graceful_exit" });
     expect(fake.sends).toHaveLength(1);
     expect(fake.stopped).toEqual([LEAD]);
   });
@@ -528,7 +530,7 @@ describe("runConversationDecide", () => {
     const input = shortlistFn.mock.calls[0]![0] as PolicyInput;
     expect(input.legal.every((m) => m === "breakup" || m === "wait")).toBe(true);
     expect(input.readout).toBeUndefined();
-    expect(out).toEqual({ action: "drafted", decisionId: "dec1", move: "breakup" });
+    expect(out).toEqual({ action: "drafted", decisionId: fake.decisions[0]!.id, move: "breakup" });
     const send = fake.sends[0]!;
     expect(send.origin).toBe("sequence");
     expect(send.notBefore ?? null).toBeNull();
@@ -573,7 +575,7 @@ describe("runConversationDecide", () => {
     const fake = makeStore({ turns: [BASE_TURNS[0]!] });
     const { deps, composeFn } = makeDeps(fake, { pick: "breakup" });
     const out = await runConversationDecide(args({ kind: "followup", runId: "run1", touchNo: 3, isLast: true }, "live_replies"), deps);
-    expect(out).toEqual({ action: "skipped", reason: "shadow", decisionId: "dec1", move: "breakup" });
+    expect(out).toEqual({ action: "skipped", reason: "shadow", decisionId: fake.decisions[0]!.id, move: "breakup" });
     expect(composeFn).not.toHaveBeenCalled();
     expect(fake.sends).toHaveLength(0);
     expect(fake.decisions[0]).toMatchObject({ mode: "shadow", scheduledSendId: null, composedBody: null });

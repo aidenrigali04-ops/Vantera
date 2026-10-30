@@ -791,6 +791,12 @@ export interface InboundStore {
      *  so an existing-but-unclassified row is a crashed run to finish, not a duplicate */
     classified: boolean;
   }>;
+  /** Attribute a reply to the agent send it answered. `scheduledSendId` is the delivered
+   *  scheduled_sends row (null = none); the store resolves it to its outreach_sends audit row. */
+  setReplyOutreachSend(replyId: string, scheduledSendId: string | null): Promise<void>;
+  /** Newest delivered (status 'sent', invite|message) scheduled send for the lead at or before
+   *  `before`; delivery time = coalesce(max(outreach_sends.sent_at), updated_at). */
+  lastDeliveredSendId(accountId: string, leadId: string, before: Date): Promise<string | null>;
   /** Written LAST in reply processing: classification doubles as the "fully processed" marker. */
   setReplyClassification(replyId: string, verdict: ReplyVerdict): Promise<void>;
   /** The lead's STORED LinkedIn URL — the value every send-path suppression check compares
@@ -1301,6 +1307,8 @@ export type ConversationTrigger =
   | { kind: "followup"; runId: string; touchNo: number; isLast: boolean };
 
 export type NewDecision = {
+  /** pre-generated id so the sent message's recipe can carry it before the row is written */
+  id?: string;
   accountId: string;
   leadId: string;
   scheduledSendId: string | null;

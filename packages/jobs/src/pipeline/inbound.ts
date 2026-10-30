@@ -410,6 +410,12 @@ export async function handleLinkedInEvent(event: LinkedInEvent, deps: InboundDep
     body: event.body,
     receivedAt,
   });
+  if (inserted.created) {
+    await deps.store.setReplyOutreachSend(
+      inserted.id,
+      await deps.store.lastDeliveredSendId(accountId, lead.id, receivedAt)
+    );
+  }
   // The classification is the processed marker, written LAST. An existing row WITHOUT one is a
   // run that crashed mid-way (its Trigger retry lands here) — finish it rather than drop the
   // reply unclassified, unsuppressed and un-notified. Every effect below is idempotent or

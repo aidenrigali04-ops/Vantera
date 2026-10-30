@@ -35,6 +35,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   bundleRequests: { leadId: string; opts?: { excludeReplyId?: string } }[];
   /** ordered log of effect calls — proves the classification marker is written LAST */
   effects: string[];
+  replyAttributions: { replyId: string; scheduledSendId: string | null }[];
 } {
   let replyCounter = 0;
   const replies: Parameters<InboundStore["insertReply"]>[0][] = [];
@@ -55,7 +56,12 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
   const nativeMessages: Parameters<InboundStore["insertNativeMessage"]>[0][] = [];
   const bundleRequests: { leadId: string; opts?: { excludeReplyId?: string } }[] = [];
   const effects: string[] = [];
+  const replyAttributions: { replyId: string; scheduledSendId: string | null }[] = [];
   const base: InboundStore = {
+    setReplyOutreachSend: async (replyId, scheduledSendId) => {
+      replyAttributions.push({ replyId, scheduledSendId });
+    },
+    lastDeliveredSendId: async () => null,
     findLinkedInAccountByProviderRef: async () => null,
     upsertLinkedInAccountStatus: async (e) => {
       upsertedLinkedInStatuses.push(e);
@@ -127,6 +133,7 @@ function makeStore(overrides: Partial<InboundStore> = {}): InboundStore & {
     nativeMessages,
     bundleRequests,
     effects,
+    replyAttributions,
   });
 }
 
@@ -216,6 +223,42 @@ describe("runInbound — LinkedIn reply: interested", () => {
     expect(store.repliedLeads.map((r) => r.leadId)).toContain("lead1");
     expect(store.notifications).toHaveLength(1);
     expect(store.suppressions).toHaveLength(0);
+  });
+});
+
+describe("runInbound — reply → send attribution", () => {
+  const linked = (extra: Partial<InboundStore> = {}) =>
+    makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li_id_1", accountId: "acc1" }),
+      findLeadByLinkedInUrl: async (_a, url) => (url === NORMALIZED_URL ? { id: "lead1", campaignId: "camp1" } : null),
+      ...extra,
+    });
+
+  it("attributes the reply to the last delivered send before receivedAt", async () => {
+    const asked: { accountId: string; leadId: string; before: Date }[] = [];
+    const store = linked({
+      lastDeliveredSendId: async (accountId, leadId, before) => {
+        asked.push({ accountId, leadId, before });
+        return "send_9";
+      },
+    });
+    await runInbound({ source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE }, deps(store, { classifyFn: classify("interested") }));
+    expect(asked).toEqual([{ accountId: "acc1", leadId: "lead1", before: new Date("2026-06-12T10:05:00.000Z") }]);
+    expect(store.replyAttributions).toEqual([{ replyId: "reply_1", scheduledSendId: "send_9" }]);
+  });
+
+  it("records null when no send was delivered before the reply", async () => {
+    const store = linked();
+    await runInbound({ source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE }, deps(store, { classifyFn: classify("interested") }));
+    expect(store.replyAttributions).toEqual([{ replyId: "reply_1", scheduledSendId: null }]);
+  });
+
+  it("does not attribute a duplicate reply", async () => {
+    const store = linked({
+      insertReply: async (r) => ({ id: "reply_x", created: false, createdAt: r.receivedAt, classified: true }),
+    });
+    await runInbound({ source: "linkedin", payload: LINKEDIN_REPLY_FIXTURE }, deps(store, { classifyFn: classify("interested") }));
+    expect(store.replyAttributions).toHaveLength(0);
   });
 });
 

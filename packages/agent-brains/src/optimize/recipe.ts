@@ -1,4 +1,5 @@
 import type { CopyStrategy } from "../copy/shared";
+import type { Move } from "../conversation/moves";
 
 /**
  * Message-level recipe attribution (Vera Stage 1, spec 2026-07-14; v2 promptHash/modelId,
@@ -24,7 +25,7 @@ export type RecipeBrain = "first_touch" | "conversation_reply" | "sequence_follo
 
 export type SendRecipe = {
   /** stamp schema version — bump when the shape changes so old stamps stay parseable */
-  v: 2;
+  v: 2 | 3;
   brain: RecipeBrain;
   /** the copy knobs that shaped THIS draft ({} = no strategy directives were applied) */
   strategy: CopyStrategy;
@@ -48,6 +49,15 @@ export type SendRecipe = {
    * its own absence proves nothing ran, rather than needing a sentinel value to say so.
    */
   bestOfN?: number;
+  /**
+   * v3 (conversation intelligence): present ONLY on stamps written by the conversation core.
+   * `decisionId` joins the message to its `conversation_decisions` row.
+   */
+  move?: Move;
+  styleKey?: string;
+  policyVersion?: number;
+  propensity?: number;
+  decisionId?: string;
 };
 
 /** Normalizing constructor: absent facts become honest nulls — never invented. */
@@ -61,6 +71,7 @@ export function buildSendRecipe(input: {
   promptHash?: string | null;
   modelId?: string | null;
   bestOfN?: number;
+  conversation?: { move: Move; styleKey: string; policyVersion: number; propensity: number; decisionId: string };
 }): SendRecipe {
   const recipe: SendRecipe = {
     v: 2,
@@ -77,5 +88,9 @@ export function buildSendRecipe(input: {
   // entirely otherwise, so every non-best-of-N caller's stamp shape is untouched (see the
   // `bestOfN` doc comment on SendRecipe above).
   if (input.bestOfN !== undefined) recipe.bestOfN = input.bestOfN;
+  if (input.conversation) {
+    const { move, styleKey, policyVersion, propensity, decisionId } = input.conversation;
+    return { ...recipe, v: 3, move, styleKey, policyVersion, propensity, decisionId };
+  }
   return recipe;
 }
