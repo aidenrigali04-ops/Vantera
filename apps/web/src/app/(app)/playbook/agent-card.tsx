@@ -92,9 +92,12 @@ export function AgentCard({
   const nextRun = useUntil(agent.next_run_at, nextRunLabel);
 
   return (
-    <Panel index={index} interactive className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-3">
+    <Panel index={index} interactive className="flex min-w-0 flex-col gap-4">
+      {/* Identity row, then the actions on their own wrapping row. The two used to share one
+          non-wrapping line: in the three-column grid a card is ~320px at laptop width, so the
+          name + badge + four buttons overflowed sideways under the neighbouring card. */}
+      <div className="flex min-w-0 flex-col gap-3">
+        <div className="flex min-w-0 items-start gap-3">
         {(() => {
           const tile = KIND_TILE[agent.kind];
           return (
@@ -103,12 +106,12 @@ export function AgentCard({
             </span>
           );
         })()}
-        <div className="flex flex-col gap-1.5">
+        <div className="flex min-w-0 flex-col gap-1.5">
           <Eyebrow>{roleLabel}</Eyebrow>
-          <h3 className="font-heading flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <h3 className="font-heading flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-lg font-semibold tracking-tight">
             <Link
               href={`/playbook/${agent.kind}`}
-              className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="min-w-0 break-words rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {agent.name}
             </Link>
@@ -132,7 +135,7 @@ export function AgentCard({
           </h3>
         </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="-mx-2 flex flex-wrap items-center gap-x-1 gap-y-1">
           <Button asChild variant="ghost" size="sm">
             <Link href={`/playbook/${agent.kind}/edit`}>
               <Settings2 className="size-4" /> Edit settings
@@ -179,8 +182,8 @@ export function AgentCard({
         </div>
       )}
 
-      <div className="flex flex-col gap-3">
-        <div className="flex gap-6">
+      <div className="flex min-w-0 flex-col gap-3">
+        <div className="flex flex-wrap gap-x-6 gap-y-3">
           {stats.map((s) => (
             <div key={s.label}>
               <p className="font-data text-2xl font-semibold tabular-nums">{s.value}</p>
