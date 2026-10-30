@@ -1,4 +1,5 @@
 import { dailyAllowance, paceWithJitter } from "./safety-limits";
+import { isQuietHour } from "@vantera/agent-brains";
 import { isWithinSendWindow } from "./send-window";
 import { assignSender, inviteBudget } from "./sender-assignment";
 import {
@@ -178,6 +179,19 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
         continue;
       }
 
+      // Reply delay (spec 6.5): an approved row carries its earliest dispatch time. Only the
+      // conversation core writes one, so rows without it are byte-identical to before.
+      if (row.origin !== "manual" && row.status === "approved" && row.notBefore !== null && row.notBefore > now) {
+        skipped += 1; // not due yet - re-evaluated next tick
+        continue;
+      }
+      // Quiet window (spec 6.5): replies don't land in the lead's local night. A deliberate
+      // always-on improvement (not knob-gated). Sequence rows keep their business-hours window.
+      if (row.origin === "reply_response" && row.leadTimezone && inQuietHours(now, row.leadTimezone)) {
+        skipped += 1;
+        continue;
+      }
+
       // Proactive sends wait for the prospect's business hours (0044): 62% of sends had gone
       // out on weekends, and reply data + account-safety both favor weekday working hours.
       // Reply-responses and human-typed sends are exempt — answering promptly is human.
@@ -300,4 +314,13 @@ function pickInviteSender(
   }
   const chosenId = assignSender([...state.values()].map((s) => s.sender));
   return chosenId ? state.get(chosenId) : undefined;
+}
+
+/** isQuietHour throws on an invalid zone; a bad value must never halt dispatch. */
+function inQuietHours(now: Date, tz: string): boolean {
+  try {
+    return isQuietHour(now, tz);
+  } catch {
+    return false;
+  }
 }

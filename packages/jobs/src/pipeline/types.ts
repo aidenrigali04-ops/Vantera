@@ -649,6 +649,11 @@ export interface DispatchableSend {
   origin: "sequence" | "reply_response" | "manual";
   /** free-text lead location — drives the proactive business-hours send window */
   leadLocation: string | null;
+  /** `scheduled_for` of an `approved` row = the earliest dispatch time (reply delay, §6.5);
+   *  null for `scheduled` rows and rows nothing delayed. */
+  notBefore: Date | null;
+  /** IANA zone for the lead (from location, else the copy agent's zone); null = unknown. */
+  leadTimezone: string | null;
   /** Multi-sender: the LinkedIn account already assigned to this lead (rule 04/13).
    *  Null until first invite — invites without one are assigned here; a connected
    *  lead's messages are LOCKED to this account (can't message from another). */

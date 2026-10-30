@@ -26,6 +26,8 @@ function makeSend(overrides: Partial<DispatchableSend> = {}): DispatchableSend {
     leadHasInFlightMessage: false,
     origin: "sequence",
     leadLocation: null,
+    notBefore: null,
+    leadTimezone: null,
     ...overrides,
   };
 }
@@ -853,5 +855,64 @@ describe("runSendDispatch — never invites an existing connection", () => {
     const result = await runSendDispatch(makeDeps(store));
     expect(result.scheduled).toBe(0);
     expect(store.canceled).toEqual([{ sendId: "inv1", error: "already connected" }]);
+  });
+});
+
+describe("runSendDispatch - notBefore and quiet window", () => {
+  const NOW = new Date("2026-06-03T15:00:00Z"); // Wed 15:00 UTC = 08:00 Los Angeles, 17:00 Berlin
+  const run = async (sends: DispatchableSend[]) => {
+    const store = new FakeDispatchStore();
+    store.sends = sends;
+    const enq: string[] = [];
+    const summary = await runSendDispatch({ store, enqueue: async (id) => void enq.push(id), now: () => NOW });
+    return { store, summary };
+  };
+
+  it("skips an approved row whose notBefore is in the future", async () => {
+    const { store, summary } = await run([
+      makeSend({ origin: "reply_response", notBefore: new Date(NOW.getTime() + 60_000) }),
+    ]);
+    expect(store.scheduled).toHaveLength(0);
+    expect(summary.skipped).toBe(1);
+  });
+
+  it("dispatches an approved row whose notBefore has passed", async () => {
+    const { store } = await run([
+      makeSend({ origin: "reply_response", notBefore: new Date(NOW.getTime() - 60_000) }),
+    ]);
+    expect(store.scheduled).toHaveLength(1);
+  });
+
+  it("exempts manual rows from notBefore and quiet hours", async () => {
+    const { store } = await run([
+      makeSend({
+        origin: "manual",
+        notBefore: new Date(NOW.getTime() + 60_000),
+        leadTimezone: "Asia/Tokyo",
+      }),
+    ]);
+    expect(store.scheduled).toHaveLength(1);
+  });
+
+  it("skips a reply_response during the lead's local quiet hours", async () => {
+    // 15:00Z = 00:00 Tokyo (quiet)
+    const { store, summary } = await run([makeSend({ origin: "reply_response", leadTimezone: "Asia/Tokyo" })]);
+    expect(store.scheduled).toHaveLength(0);
+    expect(summary.skipped).toBe(1);
+  });
+
+  it("dispatches a reply_response outside quiet hours", async () => {
+    const { store } = await run([makeSend({ origin: "reply_response", leadTimezone: "Europe/Berlin" })]);
+    expect(store.scheduled).toHaveLength(1);
+  });
+
+  it("applies no quiet gate when the timezone is unknown", async () => {
+    const { store } = await run([makeSend({ origin: "reply_response", leadTimezone: null })]);
+    expect(store.scheduled).toHaveLength(1);
+  });
+
+  it("does not throw on an invalid timezone string", async () => {
+    const { store } = await run([makeSend({ origin: "reply_response", leadTimezone: "Not/AZone" })]);
+    expect(store.scheduled).toHaveLength(1);
   });
 });

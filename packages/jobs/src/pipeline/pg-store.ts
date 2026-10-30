@@ -1,3 +1,4 @@
+import { timezoneForLocation } from "./send-window";
 import { createHash } from "node:crypto";
 import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, max, ne, or, sql } from "drizzle-orm";
 import { LIFECYCLE_ADMIN_EMAIL } from "./lifecycle-outreach";
@@ -1654,6 +1655,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           leadAssignedSenderId: leads.linkedinAccountId,
           leadLocation: leads.location,
           origin: scheduledSends.origin,
+          scheduledFor: scheduledSends.scheduledFor,
           createdAt: scheduledSends.createdAt,
         })
         .from(scheduledSends)
@@ -1730,6 +1732,21 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         if (await accountExemptFromTrialCaps(accountId)) exemptAccounts.add(accountId);
       }
 
+      // Lead timezone = timezoneForLocation(lead.location); when that resolves to nothing, fall
+      // back to the account's copy agent timezone (one batched query; the "UTC" column default
+      // counts as unset, so an agent nobody configured yields null = no quiet gate).
+      const agentTz = new Map<string, string>();
+      const needFallback = [
+        ...new Set(rows.filter((r) => !timezoneForLocation(r.leadLocation)).map((r) => r.accountId)),
+      ];
+      if (needFallback.length > 0) {
+        const tzRows = await db
+          .select({ accountId: agents.accountId, timezone: agents.timezone })
+          .from(agents)
+          .where(and(inArray(agents.accountId, needFallback), eq(agents.kind, "copy")));
+        for (const t of tzRows) if (t.timezone && t.timezone !== "UTC") agentTz.set(t.accountId, t.timezone);
+      }
+
       return rows.map((r) => ({
         id: r.id,
         accountId: r.accountId,
@@ -1751,6 +1768,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         leadHasInFlightMessage: inFlightLeads.has(r.leadId),
         origin: r.origin as "sequence" | "reply_response" | "manual",
         leadLocation: r.leadLocation,
+        notBefore: r.status === "approved" ? r.scheduledFor : null,
+        leadTimezone: timezoneForLocation(r.leadLocation) ?? agentTz.get(r.accountId) ?? null,
       }));
     },
 
