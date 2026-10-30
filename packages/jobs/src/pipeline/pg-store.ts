@@ -4747,6 +4747,21 @@ export function createConversationStore(db: Db): ConversationStore {
         .where(eq(conversationDecisions.id, id));
     },
 
+    async leadsDecidedSince(leadIds, trigger, since) {
+      if (leadIds.length === 0) return new Set<string>();
+      const rows = await db
+        .selectDistinct({ leadId: conversationDecisions.leadId })
+        .from(conversationDecisions)
+        .where(
+          and(
+            inArray(conversationDecisions.leadId, leadIds),
+            eq(conversationDecisions.trigger, trigger),
+            gte(conversationDecisions.decidedAt, since)
+          )
+        );
+      return new Set(rows.map((r) => r.leadId));
+    },
+
     async listConnectedWithoutFirstMessage(limit) {
       const rows = (await db.execute(sql`
         -- One row per lead is guaranteed by the lateral join: sequence_runs is only unique on

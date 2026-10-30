@@ -5,6 +5,13 @@ import type { ConversationMode, ConversationStore, InboundStore, SequenceTouchSt
 /** Leads per scan; the scan re-runs every scheduler tick, so a backlog drains over a few ticks. */
 export const FIRST_MESSAGE_SCAN_LIMIT = 50;
 
+/**
+ * A lead with a first_message decision this recent is not re-decided — in every mode: shadow and a
+ * live `wait` both leave no message row, so without this the scan would re-decide (a policy model
+ * call + a decision row) every scheduler tick.
+ */
+export const FIRST_MESSAGE_DECISION_COOLDOWN_MS = 24 * 3_600_000;
+
 export interface FirstMessageDeps {
   store: ConversationStore &
     SequenceTouchStore &
@@ -39,7 +46,7 @@ export interface FirstMessageSummary {
  * note there is no hook.
  *
  * Idempotent: the scan excludes leads with a message row, the core skips when an unsent message
- * exists, and a lead is decided at most once per run.
+ * exists, a lead is decided at most once per run, and not again within the decision cooldown.
  */
 export async function runFirstMessage(deps: FirstMessageDeps): Promise<FirstMessageSummary> {
   const summary: FirstMessageSummary = { scanned: 0, drafted: 0, waited: 0, skipped: 0, handedOff: 0 };
@@ -47,6 +54,14 @@ export async function runFirstMessage(deps: FirstMessageDeps): Promise<FirstMess
   if (mode === "off") return summary;
 
   const rows = await store.listConnectedWithoutFirstMessage(FIRST_MESSAGE_SCAN_LIMIT);
+  const recent =
+    rows.length > 0
+      ? await store.leadsDecidedSince(
+          [...new Set(rows.map((r) => r.leadId))],
+          "first_message",
+          new Date(deps.now().getTime() - FIRST_MESSAGE_DECISION_COOLDOWN_MS)
+        )
+      : new Set<string>();
   const seen = new Set<string>();
   for (const { accountId, leadId, campaignId } of rows) {
     summary.scanned += 1;
@@ -55,6 +70,10 @@ export async function runFirstMessage(deps: FirstMessageDeps): Promise<FirstMess
       continue;
     }
     seen.add(leadId);
+    if (recent.has(leadId)) {
+      summary.skipped += 1;
+      continue;
+    }
 
     // rule 11: the core checks again before any model call; this check keeps a suppressed lead
     // from even having its grounding bundle built.

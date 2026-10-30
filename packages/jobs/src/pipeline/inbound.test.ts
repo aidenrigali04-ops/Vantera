@@ -1810,6 +1810,7 @@ describe("handleLinkedInEvent — readout-driven actions and routing (spec §6.4
         upsertPriors: async () => {},
         listUnscoredDecisions: async () => [],
         scoreDecision: async () => {},
+        leadsDecidedSince: async () => new Set<string>(),
         listConnectedWithoutFirstMessage: async () => [],
       },
       readFn: readFn as unknown as ConversationDecideDeps["readFn"],

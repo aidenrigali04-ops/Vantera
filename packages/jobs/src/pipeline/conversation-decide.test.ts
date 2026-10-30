@@ -152,6 +152,7 @@ function makeStore(opts: {
     upsertPriors: async () => {},
     listUnscoredDecisions: async () => [],
     scoreDecision: async () => {},
+    leadsDecidedSince: async () => new Set<string>(),
     listConnectedWithoutFirstMessage: async () => [],
     insertLeadNotification: async (n) => {
       calls.push("insertLeadNotification");

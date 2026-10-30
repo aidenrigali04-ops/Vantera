@@ -1395,6 +1395,9 @@ export interface ConversationStore {
   upsertPriors(accountId: string | null, cells: PriorTable): Promise<void>;
   listUnscoredDecisions(olderThan: Date, limit: number): Promise<ScorableDecision[]>;
   scoreDecision(id: string, outcome: DecisionOutcome, reward: number | null): Promise<void>;
+  /** which of these leads have a decision for `trigger` at or after `since` (the first-message
+   *  scan's cooldown: a lead is not re-decided every tick) */
+  leadsDecidedSince(leadIds: string[], trigger: Trigger, since: Date): Promise<Set<string>>;
   listConnectedWithoutFirstMessage(
     limit: number
   ): Promise<{ accountId: string; leadId: string; campaignId: string }[]>;

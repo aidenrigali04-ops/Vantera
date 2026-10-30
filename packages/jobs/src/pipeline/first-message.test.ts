@@ -9,7 +9,7 @@ import type {
   StoredTurn,
 } from "@vantera/agent-brains";
 import type { ConversationDecideDeps } from "./conversation-decide";
-import { runFirstMessage, type FirstMessageDeps } from "./first-message";
+import { FIRST_MESSAGE_DECISION_COOLDOWN_MS, runFirstMessage, type FirstMessageDeps } from "./first-message";
 import type { ConversationMode, NewDecision, NewScheduledSend, ResponderBundle } from "./types";
 
 const NOW = new Date("2026-10-28T15:00:00Z");
@@ -81,12 +81,15 @@ function makeFake(opts: {
   bundles?: Record<string, ResponderBundle | null>;
   turns?: Record<string, StoredTurn[]>;
   suppressed?: Set<string>;
+  /** leadId → when its last first_message decision was made */
+  decidedAt?: Record<string, Date>;
 } = {}) {
   const rows = opts.rows ?? [{ accountId: "acc1", leadId: "lead1", campaignId: "camp1" }];
   const states = new Map<string, { state: ConversationState; lastMessageRef: string | null }>();
   const decisions: NewDecision[] = [];
   const sends: NewScheduledSend[] = [];
   const bundleCalls: string[] = [];
+  const cooldownQueries: { leadIds: string[]; trigger: string; since: Date }[] = [];
   let scans = 0;
   const store: FirstMessageDeps["store"] = {
     getConversationPolicyMode: async () => "live",
@@ -110,6 +113,11 @@ function makeFake(opts: {
     upsertPriors: async () => {},
     listUnscoredDecisions: async () => [],
     scoreDecision: async () => {},
+    leadsDecidedSince: async (leadIds, trigger, since) => {
+      cooldownQueries.push({ leadIds, trigger, since });
+      const decided = opts.decidedAt ?? {};
+      return new Set(leadIds.filter((id) => trigger === "first_message" && decided[id] && decided[id]! >= since));
+    },
     listConnectedWithoutFirstMessage: async () => {
       scans += 1;
       return rows;
@@ -134,6 +142,7 @@ function makeFake(opts: {
     decisions,
     sends,
     bundleCalls,
+    cooldownQueries,
     get scans() {
       return scans;
     },
@@ -298,5 +307,40 @@ describe("runFirstMessage", () => {
     const handFake = makeFake();
     expect(await run(handFake, makeDecide(handFake, "hand_to_human").decide)).toMatchObject({ handedOff: 1, drafted: 0 });
     expect(handFake.sends).toHaveLength(0);
+  });
+
+  it("first-message: a lead decided 1 h ago is skipped with no model call; one decided 25 h ago is re-decided", async () => {
+    const hour = 3_600_000;
+    const fake = makeFake({
+      rows: [
+        { accountId: "acc1", leadId: "recent", campaignId: "camp1" },
+        { accountId: "acc1", leadId: "stale", campaignId: "camp1" },
+      ],
+      decidedAt: { recent: new Date(NOW.getTime() - hour), stale: new Date(NOW.getTime() - 25 * hour) },
+    });
+    const { decide, readFn, shortlistFn } = makeDecide(fake);
+
+    const out = await run(fake, decide);
+
+    expect(FIRST_MESSAGE_DECISION_COOLDOWN_MS).toBe(24 * hour);
+    expect(fake.cooldownQueries).toEqual([
+      { leadIds: ["recent", "stale"], trigger: "first_message", since: new Date(NOW.getTime() - 24 * hour) },
+    ]);
+    expect(out).toEqual({ scanned: 2, drafted: 1, waited: 0, skipped: 1, handedOff: 0 });
+    expect(fake.bundleCalls).toEqual(["stale"]);
+    expect(shortlistFn).toHaveBeenCalledTimes(1);
+    expect(readFn.mock.calls.length).toBeGreaterThan(0);
+    expect(fake.decisions.map((d) => d.leadId)).toEqual(["stale"]);
+  });
+
+  it("first-message: the cooldown applies in shadow too (no re-deciding every tick)", async () => {
+    const fake = makeFake({ decidedAt: { lead1: new Date(NOW.getTime() - 60_000) } });
+    const { decide, shortlistFn } = makeDecide(fake);
+
+    const out = await run(fake, decide, "shadow");
+
+    expect(out).toEqual({ scanned: 1, drafted: 0, waited: 0, skipped: 1, handedOff: 0 });
+    expect(shortlistFn).not.toHaveBeenCalled();
+    expect(fake.decisions).toHaveLength(0);
   });
 });
