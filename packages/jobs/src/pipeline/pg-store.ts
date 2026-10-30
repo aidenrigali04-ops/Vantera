@@ -4672,7 +4672,7 @@ export function createConversationStore(db: Db): ConversationStore {
           propensity: conversationDecisions.propensity,
           composedBody: conversationDecisions.composedBody,
           sentBody: scheduledSends.body,
-          sentAt: sql<Date | null>`(select max(o.sent_at) from ${outreachSends} o where o.scheduled_send_id = ${conversationDecisions.scheduledSendId})`,
+          sentAt: sql<Date | null>`(select max(o.sent_at) from ${outreachSends} o where o.scheduled_send_id = ${conversationDecisions.scheduledSendId})`.mapWith(outreachSends.sentAt),
         })
         .from(conversationDecisions)
         .leftJoin(scheduledSends, eq(scheduledSends.id, conversationDecisions.scheduledSendId))
@@ -4690,7 +4690,7 @@ export function createConversationStore(db: Db): ConversationStore {
         move: r.move as ScorableDecision["move"],
         phase: r.phase as ScorableDecision["phase"],
         archetype: r.archetype as ScorableDecision["archetype"],
-        sentAt: r.sentAt ? new Date(r.sentAt) : null,
+        sentAt: r.sentAt ?? null,
       }));
     },
 
@@ -4703,13 +4703,20 @@ export function createConversationStore(db: Db): ConversationStore {
 
     async listConnectedWithoutFirstMessage(limit) {
       const rows = (await db.execute(sql`
+        -- One row per lead is guaranteed by the lateral join: sequence_runs is only unique on
+        -- (campaign_id, lead_id), so a lead can have several active runs; the NEWEST one wins.
         select l.account_id, l.id as lead_id, sr.campaign_id
         from ${leads} l
-        join ${sequenceRuns} sr on sr.lead_id = l.id and sr.account_id = l.account_id and sr.status = 'active'
+        join lateral (
+          select r.campaign_id from ${sequenceRuns} r
+          where r.lead_id = l.id and r.account_id = l.account_id and r.status = 'active'
+          order by r.created_at desc
+          limit 1
+        ) sr on true
         where l.linkedin_connected_at is not null
           and not exists (
             select 1 from ${scheduledSends} s
-            where s.lead_id = l.id and s.linkedin_stage = 'message' and s.status <> 'canceled'
+            where s.account_id = l.account_id and s.lead_id = l.id and s.linkedin_stage = 'message' and s.status <> 'canceled'
           )
           and exists (
             select 1 from ${agents} a
