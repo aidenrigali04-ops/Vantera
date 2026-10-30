@@ -2334,6 +2334,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       }
     },
 
+    async setReplyReadout(replyId: string, readout: import("@vantera/agent-brains").Readout) {
+      await db.update(replies).set({ readout }).where(eq(replies.id, replyId));
+    },
+
     async setReplyClassification(replyId: string, verdict: import("@vantera/agent-brains").ReplyVerdict) {
       await db
         .update(replies)

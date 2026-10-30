@@ -47,6 +47,7 @@ import type {
 } from "@vantera/agent-brains";
 import type { OutreachCapacity } from "./capacity";
 import type { SenderCandidate } from "./sender-assignment";
+import type { ConversationDecideDeps } from "./conversation-decide";
 import type { LinkedInInfra } from "@vantera/linkedin-infra";
 
 export interface ScoutConfig {
@@ -799,6 +800,8 @@ export interface InboundStore {
   lastDeliveredSendId(accountId: string, leadId: string, before: Date): Promise<string | null>;
   /** Written LAST in reply processing: classification doubles as the "fully processed" marker. */
   setReplyClassification(replyId: string, verdict: ReplyVerdict): Promise<void>;
+  /** Persist the conversation reader's structured readout of an inbound reply (0074 replies.readout). */
+  setReplyReadout(replyId: string, readout: Readout): Promise<void>;
   /** The lead's STORED LinkedIn URL — the value every send-path suppression check compares
    *  against (rule 11). Inbound payloads carry a provider-id URL form that rarely matches it. */
   getLeadLinkedInUrl(accountId: string, leadId: string): Promise<string | null>;
@@ -959,6 +962,17 @@ export interface InboundDeps {
    * MAX_BEST_OF_N regardless of what's configured, and forces it to 1 when `judgeFn` is absent.
    */
   bestOfN?: number;
+  /**
+   * Conversation intelligence (spec §6.4/§9). Absent or mode "off" ⇒ today's classifier-driven path,
+   * byte-identical. Otherwise the reader's readout of the incoming reply drives suppression/stop,
+   * and the conversation core runs (shadow: logs only, legacy responder still writes; live_replies /
+   * live: replaces the legacy responder). `sellerName` overrides the bundle's account name.
+   */
+  conversation?: {
+    mode: ConversationMode;
+    deps: ConversationDecideDeps;
+    sellerName?: string | null;
+  };
 }
 
 export interface InboundSummary {

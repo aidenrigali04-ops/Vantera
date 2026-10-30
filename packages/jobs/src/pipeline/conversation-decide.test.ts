@@ -279,6 +279,29 @@ describe("syncState", () => {
     expect(fake.stored!.lastMessageRef).toBe("m4");
   });
 
+  it("stopBeforeRef folds only the turns before that ref and never moves the cursor onto it", async () => {
+    const turns = [
+      ...BASE_TURNS,
+      turn("m3", "agent", "Got it — what breaks first when volume spikes?", "2026-10-28T14:30:00Z"),
+      turn("r9", "lead", "Response time.", "2026-10-28T14:40:00Z"),
+    ];
+    const fake = makeStore({ turns, stored: { state: emptyState(), lastMessageRef: "m2" } });
+    const { deps, readFn } = makeDeps(fake);
+    const b = bundle();
+
+    await syncState(ACC, LEAD, b.lead, b.insights, "G", deps, undefined, { stopBeforeRef: "r9" });
+
+    expect(readFn.mock.calls.map((c) => (c[1] as StoredTurn).ref)).toEqual(["m3"]);
+    expect(fake.stored!.lastMessageRef).toBe("m3");
+
+    // the cursor already sits on the stop ref (a retried run): nothing is read, nothing regresses
+    const at = makeStore({ turns, stored: { state: emptyState(), lastMessageRef: "r9" } });
+    const second = makeDeps(at);
+    await syncState(ACC, LEAD, b.lead, b.insights, "G", second.deps, undefined, { stopBeforeRef: "r9" });
+    expect(second.readFn).not.toHaveBeenCalled();
+    expect(at.stored!.lastMessageRef).toBe("r9");
+  });
+
   it("seeds from the lead when no state exists and reads every turn", async () => {
     const fake = makeStore();
     const { deps, readFn } = makeDeps(fake);

@@ -79,6 +79,7 @@ export const HANDOFF_NOTE = "This thread needs you — the agent stepped aside."
  * ref read. A ref that's no longer in the thread means a backfill: every turn is read. Idempotent —
  * a repeat call with nothing new reads nothing and returns the stored state. `knownReadouts` (ref →
  * readout) supplies readouts already produced upstream so those turns skip the model call.
+ * `stopBeforeRef` caps the fold just before that turn (a missing ref caps nothing).
  */
 export async function syncState(
   accountId: string,
@@ -87,13 +88,17 @@ export async function syncState(
   insights: StoredInsights | null,
   grounding: string,
   deps: ConversationDecideDeps,
-  knownReadouts?: Map<string, Readout>
+  knownReadouts?: Map<string, Readout>,
+  opts: { stopBeforeRef?: string } = {}
 ): Promise<ConversationState> {
   const stored = await deps.store.getConversationState(accountId, leadId);
   const turns = await deps.store.listThreadTurns(accountId, leadId);
   const lastRef = stored?.lastMessageRef ?? null;
   const seen = lastRef === null ? -1 : turns.findIndex((t) => t.ref === lastRef);
-  const unread = turns.slice(seen + 1);
+  // stopBeforeRef: fold only the turns BEFORE that ref (inbound reads the incoming reply itself,
+  // against the state as it stood) — the cursor never advances onto or past it here.
+  const stopAt = opts.stopBeforeRef ? turns.findIndex((t) => t.ref === opts.stopBeforeRef) : -1;
+  const unread = turns.slice(seen + 1, stopAt >= 0 ? Math.max(seen + 1, stopAt) : turns.length);
   if (stored && unread.length === 0) return stored.state;
   let state: ConversationState;
   if (stored && seen >= 0) {

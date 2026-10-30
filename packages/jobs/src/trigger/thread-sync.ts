@@ -8,6 +8,7 @@ import {
 } from "@vantera/agent-brains";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { handleLinkedInEvent } from "../pipeline/inbound";
+import { buildConversationDeps } from "../pipeline/conversation-deps";
 import { createPgStore, createThreadSyncStore } from "../pipeline/pg-store";
 import { runThreadSync } from "../pipeline/thread-sync";
 
@@ -37,6 +38,7 @@ export const threadSync = task({
       fixReplyFn: fixConversationMessage,
       judgeFn: judgeCopy,
       bestOfN,
+      conversation: await buildConversationDeps(db, store, bestOfN),
     };
     const result = await runThreadSync({
       store: createThreadSyncStore(db),

@@ -9,6 +9,7 @@ import {
 } from "@vantera/agent-brains";
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { runInbound } from "../pipeline/inbound";
+import { buildConversationDeps } from "../pipeline/conversation-deps";
 import { createPgStore } from "../pipeline/pg-store";
 
 /**
@@ -38,6 +39,7 @@ export const replayInbound = task({
       fixReplyFn: fixConversationMessage,
       judgeFn: judgeCopy,
       bestOfN,
+      conversation: await buildConversationDeps(db, store, bestOfN),
     };
 
     const rows = await db
