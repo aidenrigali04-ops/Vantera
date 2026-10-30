@@ -25,7 +25,8 @@ import type { Readout } from "../src/conversation/read";
 const here = dirname(fileURLToPath(import.meta.url));
 const pkg = resolve(here, "..");
 const fixturesDir = resolve(pkg, "../evals/fixtures/conversation");
-const SEEDS = [1, 2, 3, 4, 5, 6];
+const SEED_COUNT = Math.max(1, Number(process.env.SIM_SEEDS ?? 6) || 6);
+const SEEDS = Array.from({ length: SEED_COUNT }, (_, i) => i + 1);
 const FIXTURE_LIMIT = 40;
 
 function suppressionOf(last: Readout | undefined): "none" | "written" {

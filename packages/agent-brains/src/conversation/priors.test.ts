@@ -107,3 +107,12 @@ describe("priors", () => {
     expect(mean({ alpha: 30, beta: 10 })).toBeGreaterThan(0.5);
   });
 });
+
+describe("beta sampler bounds", () => {
+  it("a degenerate rng does not hang and yields a finite value in [0, 1]", () => {
+    const v = beta(2, 3, () => 0);
+    expect(Number.isFinite(v)).toBe(true);
+    expect(v).toBeGreaterThanOrEqual(0);
+    expect(v).toBeLessThanOrEqual(1);
+  }, 2000);
+});

@@ -83,22 +83,28 @@ function normal(rng: () => number): number {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rng());
 }
 
+const GAMMA_MAX_ITER = 1000;
+
 /** Marsaglia–Tsang gamma(shape, 1) sampler on an injected uniform rng. */
 function gamma(shape: number, rng: () => number): number {
   if (shape < 1) return gamma(shape + 1, rng) * Math.pow(Math.max(rng(), Number.MIN_VALUE), 1 / shape);
   const d = shape - 1 / 3;
   const c = 1 / Math.sqrt(9 * d);
-  for (;;) {
+  // bounded rejection loop: a degenerate rng (e.g. constant 0) must not hang; fall back to the mean
+  for (let i = 0; i < GAMMA_MAX_ITER; i++) {
     let x: number;
     let v: number;
+    let j = 0;
     do {
       x = normal(rng);
       v = 1 + c * x;
-    } while (v <= 0);
+    } while (v <= 0 && ++j < GAMMA_MAX_ITER);
+    if (v <= 0) break;
     v = v * v * v;
     const u = rng();
     if (u < 1 - 0.0331 * x ** 4 || Math.log(Math.max(u, Number.MIN_VALUE)) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
   }
+  return shape;
 }
 
 const shapeOk = (x: number) => (Number.isFinite(x) && x > 0 ? x : 1);
