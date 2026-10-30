@@ -3,6 +3,7 @@ import {
   COMPOSE_SYSTEM,
   RESPOND_SYSTEM,
   leadBlock,
+  seedState,
   type ComposeInput,
   type ConversationDraft,
   type ConversationMessageInput,
@@ -617,13 +618,14 @@ const TURN: StoredTurn = { ref: "m1", role: "agent", text: "Thanks for connectin
 type Pick_ = "nudge" | "wait" | "hand_to_human" | "throw";
 
 /** A full conversation-core wiring over in-memory fakes; `pick` steers what the policy shortlists. */
-function convo(mode: ConversationMode, pick: Pick_ = "nudge") {
+function convo(mode: ConversationMode, pick: Pick_ = "nudge", seeded?: ConversationState) {
   const decisions: NewDecision[] = [];
   const convSends: NewScheduledSend[] = [];
   const notifications: unknown[] = [];
   const stoppedForReply: string[] = [];
   const policyInputs: PolicyInput[] = [];
   const states = new Map<string, { state: ConversationState; lastMessageRef: string | null }>();
+  if (seeded) states.set("l1", { state: structuredClone(seeded), lastMessageRef: TURN.ref });
   const store: ConversationDecideDeps["store"] = {
     getConversationPolicyMode: async () => mode,
     getConversationState: async (_a, leadId) => {
@@ -768,6 +770,27 @@ describe("runSequenceTouch — conversation policy (Task 15)", () => {
     expect(deferred).toHaveLength(0);
     expect(c.notifications).toHaveLength(1);
     expect(c.stoppedForReply).toEqual(["l1"]);
+  });
+
+  it("live graceful_exit on a follow-up: the goodbye still sends, then the run stops — outcome 'drafted'", async () => {
+    const declined = seedState(bundle().lead, bundle().insights);
+    declined.memory.declined = true;
+    const c = convo("live", "nudge", declined);
+    const { d, deferred, draftFn } = convoDeps(c);
+    const out = await runSequenceTouch(dispatch, d);
+    expect(out).toBe("drafted");
+    expect(c.convSends).toHaveLength(1);
+    expect((c.convSends[0]!.recipe as Record<string, unknown>).move).toBe("graceful_exit");
+    expect(d.stoppedRunIds).toEqual(["r1"]);
+    expect(deferred).toHaveLength(0);
+    expect(draftFn).not.toHaveBeenCalled();
+  });
+
+  it("live drafted (not an exit) leaves the run going", async () => {
+    const c = convo("live");
+    const { d } = convoDeps(c);
+    await runSequenceTouch(dispatch, d);
+    expect(d.stoppedRunIds).toEqual([]);
   });
 
   for (const mode of ["shadow", "live_replies"] as const) {

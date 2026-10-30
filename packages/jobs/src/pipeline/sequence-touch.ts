@@ -131,8 +131,11 @@ export async function runSequenceTouch(
           return "deferred";
         case "hand_to_human":
           return "handed_off"; // the core already notified the human and stopped the run
-        case "drafted":
         case "exit":
+          // a graceful exit is a goodbye: the message still sends, but no touch follows it
+          await deps.store.stopSequenceRun(d.runId);
+          return "drafted";
+        case "drafted":
           return "drafted";
         default:
           return "skipped";
