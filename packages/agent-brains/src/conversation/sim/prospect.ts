@@ -12,7 +12,7 @@ export type SimReply = { text: string | null; disposition: Disposition };
 /** The thread as the simulated prospect sees it, plus the phase of the agent's stage (drives the reply roll). */
 export type ProspectView = { turns: ConversationTurn[]; phase: Phase };
 
-const HARD_CTA = /\b(calendar|meeting|demo)\b|calendly|cal\.com|\b(book|schedule) (a|an|some|the)\b|\b\d+[- ]?min(ute)?s?\b/i;
+const HARD_CTA = /\b(calendar|meeting|demo|call)\b|hop on|quick chat|calendly|cal\.com|\b(book|schedule) (a|an|some|the)\b|\b\d+[- ]?min(ute)?s?\b/i;
 export const hasHardCta = (text: string): boolean => HARD_CTA.test(text);
 
 export const PROSPECT_SYSTEM = registerPrompt("conversation/sim-prospect", `You role-play a LinkedIn prospect receiving a message from a salesperson. Stay in persona at all times.

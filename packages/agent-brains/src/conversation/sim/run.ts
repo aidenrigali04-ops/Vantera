@@ -276,9 +276,28 @@ export function judgePenalty(j: SimJudgement | null): number {
   return (j.pressure >= 4 ? -3 : 0) + (j.manipulation >= 4 ? -5 : 0) + (j.identityDetection ? -4 : 0);
 }
 
+/** Run a thread, reporting a thrown model/pipeline error instead of propagating it. */
+export async function safeRunSimThread(
+  persona: Persona,
+  deps: SimDeps,
+  maxTurns = 6,
+): Promise<{ ok: true; thread: SimThread } | { ok: false; persona: Persona["id"]; seed: number; error: string }> {
+  try {
+    return { ok: true, thread: await runSimThread(persona, deps, maxTurns) };
+  } catch (err) {
+    return { ok: false, persona: persona.id, seed: deps.seed ?? 0, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** The suppression ledger entry the thread would write: an opt-out or a decline in the final state. */
+export function suppressionOf(state: ConversationState): "none" | "written" {
+  return state.memory.explicitOptOut || state.memory.declined ? "written" : "none";
+}
+
 export function simToPriors(threads: SimThread[]): PriorTable {
   const rows = threads.flatMap((t) => {
-    const pen = judgePenalty(t.judge);
+    // the thread-level judge penalty is spread evenly so the per-thread total equals the penalty exactly
+    const pen = judgePenalty(t.judge) / Math.max(1, t.decisions.length);
     return t.decisions.map((d) => ({
       move: d.move,
       phase: d.phase,

@@ -3,7 +3,7 @@ import { MockLanguageModelV3 } from "ai/test";
 import { mulberry32 } from "../../optimize/sim/harness";
 import { PERSONAS, personaById } from "./personas";
 import { hasHardCta, simulateProspectReply } from "./prospect";
-import { judgePenalty, runSimThread, simToPriors, type SimDeps, type SimThread } from "./run";
+import { judgePenalty, runSimThread, safeRunSimThread, simToPriors, suppressionOf, type SimDeps, type SimThread } from "./run";
 import type { Readout } from "../read";
 import type { Move } from "../moves";
 
@@ -145,5 +145,40 @@ describe("simToPriors", () => {
     expect(judgePenalty({ pressure: 3, manipulation: 3, repetition: 5, identityDetection: false })).toBe(0);
     const cell = table.find((c) => c.level === "move" && c.move === "observe")!;
     expect(cell.rewardSum).toBeLessThan(0);
+  });
+});
+
+describe("review round 1", () => {
+  it("a thread whose compose throws is reported, not propagated", async () => {
+    const { d } = deps({ compose: async () => { throw new Error("boom"); } });
+    d.seed = 3;
+    const r = await safeRunSimThread(personaById("ghost"), d);
+    expect(r).toEqual({ ok: false, persona: "ghost", seed: 3, error: "boom" });
+  });
+
+  it("spreads the judge penalty so the thread total is exact", async () => {
+    const { d } = deps({ moves: ["observe"] });
+    const t = await runSimThread(personaById("ghost"), d, 1);
+    const dec = { ...t.decisions[0]!, move: "observe" as const, propensity: 1 };
+    const thread: SimThread = {
+      ...t,
+      decisions: [dec, dec, dec],
+      judge: { pressure: 4, manipulation: 1, repetition: 1, identityDetection: false },
+    };
+    const cell = simToPriors([thread]).find((c) => c.level === "move" && c.move === "observe")!;
+    expect(cell.rewardSum).toBeCloseTo(-3, 10);
+  });
+
+  it("a rude thread that opted out records suppression written", async () => {
+    const { d } = deps({ moves: ["observe", "ask_discovery", "graceful_exit"], model: prospectModel("Not interested.") });
+    d.rng = () => 1e-7;
+    const t = await runSimThread(personaById("rude"), d);
+    expect(suppressionOf(t.finalState)).toBe("written");
+    const ghost = await runSimThread(personaById("ghost"), deps().d);
+    expect(suppressionOf(ghost.finalState)).toBe("none");
+  });
+
+  it("call / hop on / quick chat are hard CTAs", () => {
+    for (const m of ["Can we have a call?", "Want to hop on Tuesday?", "Up for a quick chat?"]) expect(hasHardCta(m)).toBe(true);
   });
 });

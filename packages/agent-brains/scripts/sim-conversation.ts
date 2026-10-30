@@ -19,8 +19,7 @@ import { readTurn } from "../src/conversation/read";
 import { legalMoves } from "../src/conversation/rules";
 import { judgeSimThread } from "../src/conversation/sim/judge";
 import { PERSONAS } from "../src/conversation/sim/personas";
-import { runSimThread, simToPriors, type SimThread } from "../src/conversation/sim/run";
-import type { Readout } from "../src/conversation/read";
+import { safeRunSimThread, simToPriors, suppressionOf, type SimThread } from "../src/conversation/sim/run";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkg = resolve(here, "..");
@@ -28,10 +27,21 @@ const fixturesDir = resolve(pkg, "../evals/fixtures/conversation");
 const SEED_COUNT = Math.max(1, Number(process.env.SIM_SEEDS ?? 6) || 6);
 const SEEDS = Array.from({ length: SEED_COUNT }, (_, i) => i + 1);
 const FIXTURE_LIMIT = 40;
+const MIN_COMPLETED = 30;
 
-function suppressionOf(last: Readout | undefined): "none" | "written" {
-  if (!last) return "none";
-  return last.explicitOptOut || last.stance === "opt_out" || last.intent === "opts_out" ? "written" : "none";
+/** FNV-1a so same-length persona ids get different rng streams. */
+function fnv1a(str: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 0x01000193) >>> 0;
+  return h;
+}
+
+function writeOutputs(threads: SimThread[]) {
+  writeFileSync(resolve(pkg, "src/conversation/priors-sim.json"), `${JSON.stringify(simToPriors(threads), null, 2)}\n`);
+  mkdirSync(fixturesDir, { recursive: true });
+  for (const t of threads.slice(0, FIXTURE_LIMIT)) {
+    writeFileSync(resolve(fixturesDir, `sim-${t.persona}-${t.seed}.json`), `${JSON.stringify(fixtureOf(t), null, 2)}\n`);
+  }
 }
 
 function fixtureOf(t: SimThread) {
@@ -57,6 +67,7 @@ function fixtureOf(t: SimThread) {
         turn: r.turn,
         stance: r.stance,
         intent: r.intent,
+        confidence: r.confidence,
         explicitOptOut: r.explicitOptOut,
         ...(r.answeredQuestionRef ? { answeredQuestionRef: r.answeredQuestionRef } : {}),
       })),
@@ -64,7 +75,7 @@ function fixtureOf(t: SimThread) {
       finalTrigger,
       finalLegal: legal,
       finalVetoed: [...new Set(vetoes.map((v) => v.move))],
-      suppression: suppressionOf(lastLeadIsLast ? lastReadout : undefined),
+      suppression: suppressionOf(t.finalState),
     },
     notes: "sim",
   };
@@ -75,27 +86,34 @@ async function main() {
   const model = getModel();
   const judgeModel = getModel(JUDGE_MODEL_ID);
   const threads: SimThread[] = [];
+  let failed = 0;
 
   for (const persona of PERSONAS) {
     for (const seed of SEEDS) {
-      const thread = await runSimThread(persona, {
+      const res = await safeRunSimThread(persona, {
         shortlist: shortlistMoves,
         compose: composeMessage,
         read: readTurn,
-        rng: mulberry32(seed * 7919 + persona.id.length),
+        rng: mulberry32((seed * 7919 + fnv1a(persona.id)) >>> 0),
         model,
         judge: (convo) => judgeSimThread(convo, judgeModel),
         seed,
       });
+      if (!res.ok) {
+        console.error(JSON.stringify({ persona: res.persona, seed: res.seed, error: res.error }));
+        failed += 1;
+        continue;
+      }
+      const thread = res.thread;
       threads.push(thread);
+      writeOutputs(threads); // incremental: a later failure never loses finished threads
       console.log(`${persona.id} seed ${seed}: ${thread.decisions.length} decisions, ${thread.readouts.length} replies, end ${thread.end}`);
     }
   }
-
-  writeFileSync(resolve(pkg, "src/conversation/priors-sim.json"), `${JSON.stringify(simToPriors(threads), null, 2)}\n`);
-  mkdirSync(fixturesDir, { recursive: true });
-  for (const t of threads.slice(0, FIXTURE_LIMIT)) {
-    writeFileSync(resolve(fixturesDir, `sim-${t.persona}-${t.seed}.json`), `${JSON.stringify(fixtureOf(t), null, 2)}\n`);
+  console.log(`completed ${threads.length}, failed ${failed}`);
+  if (threads.length < MIN_COMPLETED) {
+    console.error(`only ${threads.length} threads completed (need ${MIN_COMPLETED})`);
+    process.exit(1);
   }
 
   const mean = (xs: number[]) => (xs.length ? (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(2) : "-");

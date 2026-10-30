@@ -12,6 +12,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: sim-conversation-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   sim:
     runs-on: ubuntu-latest
@@ -46,4 +50,5 @@ jobs:
             exit 0
           fi
           git commit -m "chore(sim): regenerate sim priors + fixtures"
+          git pull --rebase
           git push
