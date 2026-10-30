@@ -64,6 +64,7 @@ import type {
   StrategySource,
   ConversationState,
   PriorCell,
+  DecisionOutcome,
 } from "@vantera/agent-brains";
 import {
   buildTargetingProfile,
@@ -147,9 +148,11 @@ import {
   type SequenceTouchStore,
   type StrategyStampStore,
   type ConversationStore,
+  type ConversationLearnStore,
   type ConversationMode,
   type ScorableDecision,
 } from "./types";
+import type { Move, Phase, Archetype } from "@vantera/agent-brains";
 import { mergePriorTables, turnsFromRows } from "./conversation-store-pure";
 import type { ThreadSyncStore } from "./thread-sync";
 import { normalizeLinkedInUrl } from "./copy-draft";
@@ -4549,7 +4552,7 @@ export function createThreadSyncStore(db: Db): ThreadSyncStore {
  * Conversation intelligence store (0074). Service role, cross-tenant by design like the other
  * pipeline stores: every call carries its own accountId and every write re-states it.
  */
-export function createConversationStore(db: Db): ConversationStore {
+export function createConversationStore(db: Db): ConversationStore & ConversationLearnStore {
   const MODES: readonly ConversationMode[] = ["off", "shadow", "live_replies", "live"];
   type PriorRow = {
     level: PriorCell["level"];
@@ -4786,6 +4789,108 @@ export function createConversationStore(db: Db): ConversationStore {
         .update(conversationDecisions)
         .set({ outcome, reward, scoredAt: new Date() })
         .where(eq(conversationDecisions.id, id));
+    },
+
+    async listScoredDecisions(accountId, limit) {
+      const since = new Date(Date.now() - 90 * 86_400_000);
+      const rows = await db
+        .select({
+          accountId: conversationDecisions.accountId,
+          move: conversationDecisions.move,
+          phase: conversationDecisions.phase,
+          archetype: conversationDecisions.archetype,
+          propensity: conversationDecisions.propensity,
+          reward: conversationDecisions.reward,
+        })
+        .from(conversationDecisions)
+        .where(
+          and(
+            isNotNull(conversationDecisions.reward),
+            gte(conversationDecisions.decidedAt, since),
+            ...(accountId ? [eq(conversationDecisions.accountId, accountId)] : [])
+          )
+        )
+        .limit(limit);
+      return rows.map((r) => ({
+        accountId: r.accountId,
+        move: r.move as Move,
+        phase: r.phase as Phase,
+        archetype: r.archetype as Archetype,
+        propensity: r.propensity,
+        reward: r.reward as number,
+      }));
+    },
+
+    async hasGlobalPriors(source) {
+      const [row] = await db
+        .select({ n: count() })
+        .from(conversationPriorsGlobal)
+        .where(eq(conversationPriorsGlobal.source, source));
+      return (row?.n ?? 0) > 0;
+    },
+
+    async outcomeFor(d) {
+      const at = d.decidedAt.toISOString();
+      const rows = (await db.execute(sql`
+        with send as (
+          select o.id from ${outreachSends} o
+          where o.account_id = ${d.accountId} and o.scheduled_send_id = ${d.scheduledSendId}
+        ),
+        direct as (
+          select r.id, r.received_at, r.readout from ${replies} r
+          where r.account_id = ${d.accountId} and r.lead_id = ${d.leadId}
+            and ${d.move === "wait"
+              ? sql`r.received_at > ${at}::timestamptz`
+              : sql`r.outreach_send_id in (select id from send)`}
+          order by r.received_at asc
+          limit 1
+        )
+        select
+          (select count(*) from direct)::int as replied,
+          (select readout->>'stance' from direct) as stance,
+          (select count(*) from ${replies} r2
+            where r2.account_id = ${d.accountId} and r2.lead_id = ${d.leadId}
+              and r2.received_at > (select received_at from direct)
+              and (r2.classification is null or r2.classification <> 'out_of_office'))::int as further,
+          exists (select 1 from ${leads} l
+            where l.id = ${d.leadId} and l.account_id = ${d.accountId}
+              and l.meeting_booked_at > ${at}::timestamptz) as booked,
+          exists (select 1 from ${suppressionEntries} s
+            where s.account_id = ${d.accountId} and s.lead_id = ${d.leadId}
+              and s.created_at > ${at}::timestamptz) as opt_out,
+          exists (select 1 from ${replies} r3
+            where r3.account_id = ${d.accountId} and r3.lead_id = ${d.leadId}
+              and r3.received_at > ${at}::timestamptz
+              and r3.readout->>'identitySuspicion' = 'true') as suspicion,
+          exists (select 1 from ${nativeMessages} n
+            where n.account_id = ${d.accountId} and n.lead_id = ${d.leadId}
+              and n.sent_at > ${at}::timestamptz) as takeover,
+          exists (select 1 from ${replies} r4
+            where r4.account_id = ${d.accountId} and r4.lead_id = ${d.leadId}
+              and r4.received_at > ${at}::timestamptz) as any_reply
+      `)) as unknown as {
+        replied: number;
+        stance: string | null;
+        further: number;
+        booked: boolean;
+        opt_out: boolean;
+        suspicion: boolean;
+        takeover: boolean;
+        any_reply: boolean;
+      }[];
+      const r = rows[0];
+      const replied = (r?.replied ?? 0) > 0;
+      const stance = r?.stance;
+      return {
+        replied,
+        stance: stance === "positive" || stance === "neutral" || stance === "skeptical" || stance === "negative" || stance === "opt_out" ? stance : null,
+        furtherLeadTurns: replied ? (r?.further ?? 0) : 0,
+        booked: r?.booked ?? false,
+        optOut: r?.opt_out ?? false,
+        identitySuspicion: r?.suspicion ?? false,
+        humanTakeover: r?.takeover ?? false,
+        waitThenReply: d.move === "wait" && (r?.any_reply ?? false),
+      };
     },
 
     async listConnectedWithoutFirstMessage(limit, { includeParked, decidedSince }) {

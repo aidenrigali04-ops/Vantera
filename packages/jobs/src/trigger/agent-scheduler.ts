@@ -44,6 +44,11 @@ export const agentScheduler = schedules.task({
       scope: "global",
     });
     await tasks.trigger("thread-sync", {}, { idempotencyKey: threadSyncKey });
+    // daily: same global-key pattern; the learner is idempotent but only needs one run a day
+    const learnKey = await idempotencyKeys.create(`conversation-learn:${now.toISOString().slice(0, 10)}`, {
+      scope: "global",
+    });
+    await tasks.trigger("conversation-learn", {}, { idempotencyKey: learnKey });
     // every tick, no key: the connected-without-first-message scan is cheap and idempotent
     await tasks.trigger("first-message", {});
     logger.info("agent scheduler tick", { due: due.length });

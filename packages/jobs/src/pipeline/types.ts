@@ -1435,3 +1435,17 @@ export interface ConversationStore {
     opts: { includeParked: boolean; decidedSince: Date }
   ): Promise<{ accountId: string; leadId: string; campaignId: string }[]>;
 }
+
+/** Learner-only reads/outcomes (Task 17); kept off ConversationStore so decide/send fakes stay small. */
+export interface ConversationLearnStore {
+  /** Scored, on-policy decisions (reward not null) from the last 90 days; accountId null = every account. */
+  listScoredDecisions(
+    accountId: string | null,
+    limit: number
+  ): Promise<
+    { accountId: string; move: Move; phase: Phase; archetype: Archetype; propensity: number; reward: number }[]
+  >;
+  /** True when the global priors table already holds rows of this source. */
+  hasGlobalPriors(source: "sim"): Promise<boolean>;
+  outcomeFor(d: ScorableDecision): Promise<DecisionOutcome>;
+}
