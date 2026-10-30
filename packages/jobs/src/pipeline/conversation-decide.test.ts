@@ -302,11 +302,23 @@ describe("syncState", () => {
   });
 
   it("an unknown lastMessageRef is a backfill: every turn is read", async () => {
-    const fake = makeStore({ stored: { state: emptyState(), lastMessageRef: "gone" } });
-    const { deps, readFn } = makeDeps(fake);
+    // a stored state that already folded both turns, whose cursor no longer exists in the thread
+    const fake0 = makeStore();
+    const { deps: d0 } = makeDeps(fake0);
     const b = bundle();
-    await syncState(ACC, LEAD, b.lead, b.insights, "G", deps);
+    const folded = await syncState(ACC, LEAD, b.lead, b.insights, "G", d0);
+    expect(folded.counters).toMatchObject({ agentTurns: 1, leadTurns: 1 });
+    folded.lastMove = { move: "observe", at: "2026-10-27T10:00:00.000Z" };
+
+    const fake = makeStore({ stored: { state: folded, lastMessageRef: "gone" } });
+    const { deps, readFn } = makeDeps(fake);
+    const state = await syncState(ACC, LEAD, b.lead, b.insights, "G", deps);
     expect(readFn).toHaveBeenCalledTimes(2);
+    // re-folded from the seed: real counts, never doubled; lastMove carried over
+    expect(state.counters).toMatchObject({ agentTurns: 1, leadTurns: 1 });
+    expect(state.person.seniority).toBe("vp");
+    expect(state.lastMove).toEqual({ move: "observe", at: "2026-10-27T10:00:00.000Z" });
+    expect(fake.saves.at(-1)!.lastMessageRef).toBe("m2");
   });
 });
 
@@ -533,6 +545,44 @@ describe("runConversationDecide", () => {
     const input = composeFn.mock.calls[0]![0 as never] as unknown as { incoming?: string };
     expect(input.incoming).toBeUndefined();
     expect(fake.sends[0]).toMatchObject({ origin: "sequence", recipe: { brain: "first_touch" } });
+  });
+
+  it("a proactive trigger with an unsent message queued is skipped before any model call (retry guard)", async () => {
+    for (const trigger of [{ kind: "first_message" } as const, { kind: "followup", runId: "run1", touchNo: 2, isLast: false } as const]) {
+      const fake = makeStore();
+      const { deps, readFn, shortlistFn, composeFn } = makeDeps(fake, { pick: "observe" });
+      const out = await runConversationDecide(args(trigger, "live", bundle({ newestUnsentMessageCreatedAt: new Date("2026-10-28T14:59:00Z") })), deps);
+      expect(out).toEqual({ action: "skipped", reason: "unsent_message_exists", decisionId: null, move: null });
+      expect(readFn).not.toHaveBeenCalled();
+      expect(shortlistFn).not.toHaveBeenCalled();
+      expect(composeFn).not.toHaveBeenCalled();
+      expect(fake.decisions).toHaveLength(0);
+      expect(fake.sends).toHaveLength(0);
+    }
+    // a reply is never blocked by a queued message (cancelPendingSends supersedes it)
+    const fake = makeStore();
+    const { deps } = makeDeps(fake, { pick: "answer" });
+    const out = await runConversationDecide(
+      args(replyTrigger(readout({ intent: "asks_question" })), "live", bundle({ newestUnsentMessageCreatedAt: new Date("2026-10-28T14:59:00Z") })),
+      deps
+    );
+    expect(out.action).toBe("drafted");
+  });
+
+  it("live_replies: a proactive trigger is only logged (shadow); a reply acts live", async () => {
+    const fake = makeStore({ turns: [BASE_TURNS[0]!] });
+    const { deps, composeFn } = makeDeps(fake, { pick: "breakup" });
+    const out = await runConversationDecide(args({ kind: "followup", runId: "run1", touchNo: 3, isLast: true }, "live_replies"), deps);
+    expect(out).toEqual({ action: "skipped", reason: "shadow", decisionId: "dec1", move: "breakup" });
+    expect(composeFn).not.toHaveBeenCalled();
+    expect(fake.sends).toHaveLength(0);
+    expect(fake.decisions[0]).toMatchObject({ mode: "shadow", scheduledSendId: null, composedBody: null });
+
+    const fake2 = makeStore();
+    const { deps: d2 } = makeDeps(fake2, { pick: "answer" });
+    const out2 = await runConversationDecide(args(replyTrigger(readout({ intent: "asks_question" })), "live_replies"), d2);
+    expect(out2.action).toBe("drafted");
+    expect(fake2.decisions[0]).toMatchObject({ mode: "live", scheduledSendId: "send1" });
   });
 
   it("suppressed lead ⇒ skipped before any model call (rule 11)", async () => {

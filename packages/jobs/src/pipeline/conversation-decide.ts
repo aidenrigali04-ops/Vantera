@@ -89,12 +89,20 @@ export async function syncState(
   knownReadouts?: Map<string, Readout>
 ): Promise<ConversationState> {
   const stored = await deps.store.getConversationState(accountId, leadId);
-  let state = stored?.state ?? seedState(lead, insights);
   const turns = await deps.store.listThreadTurns(accountId, leadId);
   const lastRef = stored?.lastMessageRef ?? null;
   const seen = lastRef === null ? -1 : turns.findIndex((t) => t.ref === lastRef);
   const unread = turns.slice(seen + 1);
-  if (stored && unread.length === 0) return state;
+  if (stored && unread.length === 0) return stored.state;
+  let state: ConversationState;
+  if (stored && seen >= 0) {
+    state = stored.state;
+  } else {
+    // Fresh lead, or a backfill (cursor missing from the thread): re-fold every turn from the seed so
+    // nothing is applied twice. Only lastMove survives — the core is its only writer, no turn re-derives it.
+    state = seedState(lead, insights);
+    if (stored) state.lastMove = stored.state.lastMove;
+  }
   for (const turn of unread) {
     // a turn already read upstream (the incoming reply's readout) is applied, never read twice
     const readout = knownReadouts?.get(turn.ref) ?? (await deps.readFn(state, turn, grounding));
@@ -120,11 +128,18 @@ export async function runConversationDecide(
 ): Promise<DecideOutcome> {
   const { accountId, leadId, trigger, bundle } = args;
   const { store } = deps;
+  // live_replies acts on replies only; a proactive trigger under it is logged, never sent.
+  const mode: Exclude<ConversationMode, "off"> = args.mode === "live_replies" && trigger.kind !== "reply" ? "shadow" : args.mode;
 
   // (1) rule 11: suppression before anything that could reach a prospect — and before any model spend.
   const url = await store.getLeadLinkedInUrl(accountId, leadId);
   if (url && (await store.isSuppressed(accountId, "linkedin", normalizeLinkedInUrl(url)))) {
     return { action: "skipped", reason: "suppressed", decisionId: null, move: null };
+  }
+  // Retry guard for proactive sends: the caller reloads the bundle every run, so an unsent queued
+  // message means this touch was already drafted (or another is pending) — never stack a second one.
+  if (mode !== "shadow" && trigger.kind !== "reply" && bundle.newestUnsentMessageCreatedAt !== null) {
+    return { action: "skipped", reason: "unsent_message_exists", decisionId: null, move: null };
   }
 
   // (2) reader: catch the state up on every unread turn (a double-message is two turns, one answer).
@@ -186,7 +201,7 @@ export async function runConversationDecide(
       accountId,
       leadId,
       scheduledSendId,
-      mode: args.mode === "shadow" ? "shadow" : "live",
+      mode: mode === "shadow" ? "shadow" : "live",
       trigger: trigger.kind,
       phase,
       archetype,
@@ -206,7 +221,7 @@ export async function runConversationDecide(
   };
 
   // (7) shadow: record what the policy WOULD do; compose and send nothing.
-  if (args.mode === "shadow") {
+  if (mode === "shadow") {
     const decisionId = await logDecision(null, null);
     return { action: "skipped", reason: "shadow", decisionId, move: decision.move };
   }
