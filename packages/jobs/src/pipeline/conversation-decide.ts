@@ -25,6 +25,7 @@ import {
   type JudgeFn,
   type Move,
   type MoveDecision,
+  type Readout,
   type Shortlist,
   type StoredInsights,
   type composeMessage,
@@ -75,7 +76,8 @@ export const HANDOFF_NOTE = "This thread needs you — the agent stepped aside."
 /**
  * Fold every stored turn after `lastMessageRef` into the lead's state, in order, and persist the last
  * ref read. A ref that's no longer in the thread means a backfill: every turn is read. Idempotent —
- * a repeat call with nothing new reads nothing and returns the stored state.
+ * a repeat call with nothing new reads nothing and returns the stored state. `knownReadouts` (ref →
+ * readout) supplies readouts already produced upstream so those turns skip the model call.
  */
 export async function syncState(
   accountId: string,
@@ -83,7 +85,8 @@ export async function syncState(
   lead: CopyLead,
   insights: StoredInsights | null,
   grounding: string,
-  deps: ConversationDecideDeps
+  deps: ConversationDecideDeps,
+  knownReadouts?: Map<string, Readout>
 ): Promise<ConversationState> {
   const stored = await deps.store.getConversationState(accountId, leadId);
   let state = stored?.state ?? seedState(lead, insights);
@@ -93,7 +96,8 @@ export async function syncState(
   const unread = turns.slice(seen + 1);
   if (stored && unread.length === 0) return state;
   for (const turn of unread) {
-    const readout = await deps.readFn(state, turn, grounding);
+    // a turn already read upstream (the incoming reply's readout) is applied, never read twice
+    const readout = knownReadouts?.get(turn.ref) ?? (await deps.readFn(state, turn, grounding));
     state = applyReadout(state, turn, readout);
   }
   await deps.store.saveConversationState(accountId, leadId, state, unread.at(-1)?.ref ?? lastRef);
@@ -125,7 +129,8 @@ export async function runConversationDecide(
 
   // (2) reader: catch the state up on every unread turn (a double-message is two turns, one answer).
   const grounding = leadBlock({ lead: bundle.lead, insights: bundle.insights, context: bundle.context });
-  const state = await syncState(accountId, leadId, bundle.lead, bundle.insights, grounding, deps);
+  const known = trigger.kind === "reply" ? new Map([[trigger.replyId, trigger.readout]]) : undefined;
+  const state = await syncState(accountId, leadId, bundle.lead, bundle.insights, grounding, deps, known);
 
   // (3) rules: the deterministic legal menu.
   const readout = trigger.kind === "reply" ? trigger.readout : undefined;
@@ -213,6 +218,8 @@ export async function runConversationDecide(
   if (decision.move === "hand_to_human") {
     const decisionId = await logDecision(null, null);
     await store.insertLeadNotification({ accountId, leadId, kind: "needs_human", body: HANDOFF_NOTE });
+    // a person owns the thread now: no proactive touches until they hand it back ("Let Vera handle it")
+    await store.stopSequenceForReply(leadId);
     await rememberMove(accountId, leadId, state, decision.move, deps);
     return { action: "hand_to_human", decisionId, move: "hand_to_human" };
   }
@@ -286,7 +293,8 @@ export async function runConversationDecide(
 
 /**
  * Stamp the move the agent acted on so the repeat guards (same-move-twice, graceful-exit-once,
- * soft-ask-twice) see it next turn. The reader never sets `lastMove` — it reads text, not intent.
+ * soft-ask-twice) see it next turn. The reader cannot know the move from text, so this core is the
+ * only writer of `lastMove`. Never on `wait`, never in shadow; the read pointer is left untouched.
  * The message's own content is folded in by the next `syncState` from the text actually sent.
  */
 async function rememberMove(

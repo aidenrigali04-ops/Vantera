@@ -289,6 +289,18 @@ describe("syncState", () => {
     expect(fake.saves.at(-1)!.lastMessageRef).toBe("m2");
   });
 
+  it("a known readout is applied instead of re-reading that turn", async () => {
+    const fake = makeStore({ stored: { state: emptyState(), lastMessageRef: "m1" } });
+    const { deps, readFn } = makeDeps(fake);
+    const b = bundle();
+    const known = new Map([["m2", readout({ newProblems: ["qualifying by hand"] })]]);
+    const state = await syncState(ACC, LEAD, b.lead, b.insights, "G", deps, known);
+    expect(readFn).not.toHaveBeenCalled();
+    expect(state.counters.leadTurns).toBe(1);
+    expect(state.memory.problemsStated.join(" ")).toContain("qualifying by hand");
+    expect(fake.saves.at(-1)!.lastMessageRef).toBe("m2");
+  });
+
   it("an unknown lastMessageRef is a backfill: every turn is read", async () => {
     const fake = makeStore({ stored: { state: emptyState(), lastMessageRef: "gone" } });
     const { deps, readFn } = makeDeps(fake);
@@ -319,6 +331,18 @@ describe("runConversationDecide", () => {
     expect(fake.sends).toHaveLength(1);
     expect(fake.decisions).toHaveLength(1);
     expect(out.action).toBe("drafted");
+  });
+
+  it("the incoming reply's readout is reused, never read twice", async () => {
+    const turns = [...BASE_TURNS, turn("r1", "lead", "How does it work?", "2026-10-28T14:50:00Z")];
+    const fake = makeStore({ turns, stored: { state: emptyState(), lastMessageRef: "m2" } });
+    const { deps, readFn } = makeDeps(fake, { pick: "answer" });
+    const incoming = readout({ intent: "asks_question", newProblems: ["slow follow-up"] });
+    await runConversationDecide(args(replyTrigger(incoming, "How does it work?")), deps);
+    expect(readFn).not.toHaveBeenCalled();
+    expect(fake.stored!.state.counters.leadTurns).toBe(1);
+    expect(fake.stored!.state.memory.problemsStated.join(" ")).toContain("slow follow-up");
+    expect(fake.stored!.lastMessageRef).toBe("r1");
   });
 
   it("shadow mode logs the decision with no send and composes nothing", async () => {
@@ -457,6 +481,10 @@ describe("runConversationDecide", () => {
     expect(fake.notifications).toEqual([
       { kind: "needs_human", body: "This thread needs you — the agent stepped aside.", leadId: LEAD },
     ]);
+    // a person owns the thread now: proactive touches stop, after the notification
+    expect(fake.stopped).toEqual([LEAD]);
+    expect(fake.calls.indexOf("insertLeadNotification")).toBeLessThan(fake.calls.indexOf("stopSequenceForReply"));
+    expect(fake.stored!.state.lastMove).toEqual({ move: "hand_to_human", at: NOW.toISOString() });
   });
 
   it("an empty shortlist hands to a human instead of throwing", async () => {
@@ -465,6 +493,7 @@ describe("runConversationDecide", () => {
     const out = await runConversationDecide(args(replyTrigger()), deps);
     expect(out.action).toBe("hand_to_human");
     expect(fake.notifications).toHaveLength(1);
+    expect(fake.stopped).toEqual([LEAD]);
     expect(fake.decisions[0]).toMatchObject({ move: "hand_to_human", degraded: "no_legal_candidates" });
   });
 
