@@ -1023,7 +1023,24 @@ describe("runCopyDraft — first touch by conversation mode (spec §7.2)", () =>
     expect(store.sends[0]!.recipe?.promptHash).toBe(LINKEDIN_SYSTEM.hash);
   });
 
-  for (const mode of ["shadow", "live_replies", "live"] as const) {
+  for (const mode of ["shadow", "live_replies"] as const) {
+    it(`copy-draft mode ${mode}: keeps the pair path (the legacy follow-up is what gets sent)`, async () => {
+      const store = new FakeCopyStore();
+      store.leads = [lead("l1")];
+      const draftLinkedInFn = vi.fn(async () => ({ connectionNote: "note", followupMessage: "follow", violations: [] }));
+      const draftLinkedInNoteFn = vi.fn(async () => ({ connectionNote: "n", violations: [] }));
+
+      await runCopyDraft(PAYLOAD, { store, conversationMode: mode, draftLinkedInFn, draftLinkedInNoteFn });
+
+      expect(draftLinkedInFn).toHaveBeenCalledTimes(1);
+      expect(draftLinkedInNoteFn).not.toHaveBeenCalled();
+      expect(store.linkedInCallKinds).toEqual(["pair"]);
+      expect(store.sends.map((s) => s.linkedinStage)).toEqual(["invite", "message"]);
+      expect(store.sends[0]!.recipe?.promptHash).toBe(LINKEDIN_SYSTEM.hash);
+    });
+  }
+
+  for (const mode of ["live"] as const) {
     it(`copy-draft mode ${mode}: inserts only the invite from the note brain; no message row`, async () => {
       const store = new FakeCopyStore();
       store.leads = [lead("l1")];
@@ -1107,7 +1124,7 @@ describe("runCopyDraft — first touch by conversation mode (spec §7.2)", () =>
       return { overall: draft.text === "note 2" ? 9 : 1 };
     });
 
-    await runCopyDraft(PAYLOAD, { store, conversationMode: "shadow", draftLinkedInFn: vi.fn(), draftLinkedInNoteFn, judgeFn, bestOfN: 3 });
+    await runCopyDraft(PAYLOAD, { store, conversationMode: "live", draftLinkedInFn: vi.fn(), draftLinkedInNoteFn, judgeFn, bestOfN: 3 });
 
     expect(draftLinkedInNoteFn).toHaveBeenCalledTimes(3);
     expect(judged.sort()).toEqual(["note 1", "note 2", "note 3"]);

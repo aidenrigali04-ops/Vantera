@@ -285,9 +285,11 @@ export async function runCopyDraft(
         await deps.store.isSuppressed(accountId, "linkedin", normalizeLinkedInUrl(lead.linkedinUrl))
       ) {
         leadSuppressed += 1;
-      } else if (deps.conversationMode !== "off") {
-        // Spec §7.2: the conversation core writes the first message at acceptance (first-message
-        // scan), from the live thread — so the first touch here is the connection note ONLY.
+      } else if (deps.conversationMode === "live") {
+        // Spec §7.2: under "live" the conversation core writes the first message at acceptance
+        // (first-message scan), from the live thread — so the first touch here is the note ONLY.
+        // shadow / live_replies keep the pair: the legacy follow-up is what actually gets sent there
+        // (the scan only logs a shadow decision against it), so a connected lead is never left silent.
         await draftNoteOnly(input, strategy, lead.id);
         leadDrafted += 1;
       } else {

@@ -23,8 +23,8 @@ export const copyDraft = task({
     // core re-caps it and forces it to 1 whenever a judge isn't wired.
     // Message-shape selector: the global `message_shape_auto` rollout knob (default OFF =
     // byte-identical champion), read once per run alongside it.
-    // conversation_policy (spec §7.2): anything but "off" drafts the invite note only; the first
-    // message is written at acceptance. A failed read degrades to "off" (today's pair path).
+    // conversation_policy (spec §7.2): "live" drafts the invite note only (the first message is
+    // written at acceptance); any other mode keeps the pair. A failed read degrades to "off".
     const [bestOfN, messageShapeAuto, conversationMode] = await Promise.all([
       store.getBestOfN(),
       store.getMessageShapeAuto(),

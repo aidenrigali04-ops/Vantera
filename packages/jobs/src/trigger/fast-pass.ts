@@ -19,7 +19,7 @@ export const fastPass = task({
   run: async (payload: { accountId: string; revealRunId: string }) => {
     const db = createDb();
     const store = createPgStore(db);
-    // same first-touch shape as copy-draft (spec §7.2): note only unless conversation_policy is off
+    // same first-touch shape as copy-draft (spec §7.2): note only when conversation_policy is "live"
     const conversationMode = await createConversationStore(db).getConversationPolicyMode().catch(() => "off" as const);
     try {
       const summary = await runFastPass(payload, {

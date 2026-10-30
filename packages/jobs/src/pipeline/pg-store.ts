@@ -4747,25 +4747,23 @@ export function createConversationStore(db: Db): ConversationStore {
         .where(eq(conversationDecisions.id, id));
     },
 
-    async leadsDecidedSince(leadIds, trigger, since) {
-      if (leadIds.length === 0) return new Set<string>();
-      const rows = await db
-        .selectDistinct({ leadId: conversationDecisions.leadId })
-        .from(conversationDecisions)
-        .where(
-          and(
-            inArray(conversationDecisions.leadId, leadIds),
-            eq(conversationDecisions.trigger, trigger),
-            gte(conversationDecisions.decidedAt, since)
-          )
-        );
-      return new Set(rows.map((r) => r.leadId));
-    },
-
-    async listConnectedWithoutFirstMessage(limit) {
+    async listConnectedWithoutFirstMessage(limit, { includeParked, decidedSince }) {
+      // Every cheap exclusion lives in SQL, BEFORE the limit, so a stuck tail can never starve the
+      // batch (the core's in-memory skips — no bundle, human-handled, suppressed — are defence only).
+      // Guarantees, per returned lead:
+      //  - connected (linkedin_connected_at set), newest acceptance first, under a live Outreach agent;
+      //  - its NEWEST active sequence run supplies the campaign (one row per lead via the lateral join:
+      //    sequence_runs is only unique on (campaign_id, lead_id));
+      //  - no first_message decision at or after decidedSince (the cooldown: shadow and a live `wait`
+      //    leave no message row, so without it the lead would be re-decided every tick);
+      //  - the prospect has not spoken since our last delivered invite/message (non-OOO replies; the
+      //    reply path answers those);
+      //  - no message-stage row (excluding canceled) — or, with includeParked, none sent/sending, so
+      //    a parked legacy draft still gets its shadow decision.
+      const messageBlock = includeParked
+        ? sql`s.status in ('sent', 'sending')`
+        : sql`s.status <> 'canceled'`;
       const rows = (await db.execute(sql`
-        -- One row per lead is guaranteed by the lateral join: sequence_runs is only unique on
-        -- (campaign_id, lead_id), so a lead can have several active runs; the NEWEST one wins.
         select l.account_id, l.id as lead_id, sr.campaign_id
         from ${leads} l
         join lateral (
@@ -4777,13 +4775,33 @@ export function createConversationStore(db: Db): ConversationStore {
         where l.linkedin_connected_at is not null
           and not exists (
             select 1 from ${scheduledSends} s
-            where s.account_id = l.account_id and s.lead_id = l.id and s.linkedin_stage = 'message' and s.status <> 'canceled'
+            where s.account_id = l.account_id and s.lead_id = l.id and s.linkedin_stage = 'message'
+              and ${messageBlock}
+          )
+          and not exists (
+            select 1 from ${conversationDecisions} d
+            where d.account_id = l.account_id and d.lead_id = l.id and d.trigger = 'first_message'
+              and d.decided_at >= ${decidedSince.toISOString()}::timestamptz
+          )
+          and not exists (
+            select 1 from ${replies} rp
+            where rp.account_id = l.account_id and rp.lead_id = l.id
+              and (rp.classification is null or rp.classification <> 'out_of_office')
+              and rp.received_at > coalesce((
+                select max(coalesce(
+                  (select max(o.sent_at) from ${outreachSends} o where o.scheduled_send_id = ss.id),
+                  ss.updated_at
+                ))
+                from ${scheduledSends} ss
+                where ss.account_id = l.account_id and ss.lead_id = l.id and ss.status = 'sent'
+                  and ss.linkedin_stage in ('invite', 'message')
+              ), '-infinity'::timestamptz)
           )
           and exists (
             select 1 from ${agents} a
             where a.account_id = l.account_id and a.kind = 'copy' and a.status = 'live'
           )
-        order by l.linkedin_connected_at asc
+        order by l.linkedin_connected_at desc
         limit ${limit}
       `)) as unknown as { account_id: string; lead_id: string; campaign_id: string }[];
       return rows.map((r) => ({ accountId: r.account_id, leadId: r.lead_id, campaignId: r.campaign_id }));

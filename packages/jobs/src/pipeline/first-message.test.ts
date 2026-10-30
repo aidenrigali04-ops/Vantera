@@ -74,22 +74,31 @@ const bundle = (over: Partial<ResponderBundle> = {}): ResponderBundle => ({
 
 const NOTE_TURN: StoredTurn = { ref: "inv1", role: "agent", text: "Saw the Series A, Ryan.", at: "2026-10-27T10:00:00Z" };
 
-type Row = { accountId: string; leadId: string; campaignId: string };
+/** A candidate lead plus the facts the scan's SQL predicates read (modelled by the fake). */
+type Row = {
+  accountId: string;
+  leadId: string;
+  campaignId: string;
+  /** when its last first_message decision was made */
+  decidedAt?: Date;
+  /** the prospect replied after our last delivered touch */
+  leadSpokeLast?: boolean;
+  /** has a message-stage row that is still unsent (a parked legacy draft) */
+  parked?: boolean;
+};
 
 function makeFake(opts: {
   rows?: Row[];
   bundles?: Record<string, ResponderBundle | null>;
   turns?: Record<string, StoredTurn[]>;
   suppressed?: Set<string>;
-  /** leadId → when its last first_message decision was made */
-  decidedAt?: Record<string, Date>;
 } = {}) {
   const rows = opts.rows ?? [{ accountId: "acc1", leadId: "lead1", campaignId: "camp1" }];
   const states = new Map<string, { state: ConversationState; lastMessageRef: string | null }>();
   const decisions: NewDecision[] = [];
   const sends: NewScheduledSend[] = [];
   const bundleCalls: string[] = [];
-  const cooldownQueries: { leadIds: string[]; trigger: string; since: Date }[] = [];
+  const scanQueries: { limit: number; includeParked: boolean; decidedSince: Date }[] = [];
   let scans = 0;
   const store: FirstMessageDeps["store"] = {
     getConversationPolicyMode: async () => "live",
@@ -113,14 +122,14 @@ function makeFake(opts: {
     upsertPriors: async () => {},
     listUnscoredDecisions: async () => [],
     scoreDecision: async () => {},
-    leadsDecidedSince: async (leadIds, trigger, since) => {
-      cooldownQueries.push({ leadIds, trigger, since });
-      const decided = opts.decidedAt ?? {};
-      return new Set(leadIds.filter((id) => trigger === "first_message" && decided[id] && decided[id]! >= since));
-    },
-    listConnectedWithoutFirstMessage: async () => {
+    listConnectedWithoutFirstMessage: async (limit, { includeParked, decidedSince }) => {
       scans += 1;
-      return rows;
+      scanQueries.push({ limit, includeParked, decidedSince });
+      return rows
+        .filter((r) => !(r.decidedAt && r.decidedAt >= decidedSince))
+        .filter((r) => !r.leadSpokeLast)
+        .filter((r) => includeParked || !r.parked)
+        .map(({ accountId, leadId, campaignId }) => ({ accountId, leadId, campaignId }));
     },
     getDraftableLead: async () => null,
     getResponderBundle: async (_a, leadId) => {
@@ -142,7 +151,7 @@ function makeFake(opts: {
     decisions,
     sends,
     bundleCalls,
-    cooldownQueries,
+    scanQueries,
     get scans() {
       return scans;
     },
@@ -185,7 +194,7 @@ describe("runFirstMessage", () => {
 
     const out = await run(fake, decide);
 
-    expect(out).toEqual({ scanned: 1, drafted: 1, waited: 0, skipped: 0, handedOff: 0 });
+    expect(out).toEqual({ scanned: 1, drafted: 1, exited: 0, waited: 0, skipped: 0, handedOff: 0, failed: 0 });
     expect(shortlistFn.mock.calls[0]![0].trigger).toBe("first_message");
     expect(fake.decisions).toHaveLength(1);
     expect(fake.decisions[0]).toMatchObject({ trigger: "first_message", mode: "live", leadId: "lead1" });
@@ -214,7 +223,7 @@ describe("runFirstMessage", () => {
 
     const out = await run(fake, decide, "shadow");
 
-    expect(out).toEqual({ scanned: 1, drafted: 0, waited: 0, skipped: 1, handedOff: 0 });
+    expect(out).toEqual({ scanned: 1, drafted: 0, exited: 0, waited: 0, skipped: 1, handedOff: 0, failed: 0 });
     expect(fake.decisions).toHaveLength(1);
     expect(fake.decisions[0]).toMatchObject({ mode: "shadow", trigger: "first_message", scheduledSendId: null });
     expect(composeFn).not.toHaveBeenCalled();
@@ -237,7 +246,7 @@ describe("runFirstMessage", () => {
 
     const out = await run(fake, decide, "off");
 
-    expect(out).toEqual({ scanned: 0, drafted: 0, waited: 0, skipped: 0, handedOff: 0 });
+    expect(out).toEqual({ scanned: 0, drafted: 0, exited: 0, waited: 0, skipped: 0, handedOff: 0, failed: 0 });
     expect(fake.scans).toBe(0);
     expect(shortlistFn).not.toHaveBeenCalled();
   });
@@ -259,7 +268,7 @@ describe("runFirstMessage", () => {
 
     const out = await run(fake, decide);
 
-    expect(out).toEqual({ scanned: 3, drafted: 0, waited: 0, skipped: 3, handedOff: 0 });
+    expect(out).toEqual({ scanned: 3, drafted: 0, exited: 0, waited: 0, skipped: 3, handedOff: 0, failed: 0 });
     expect(shortlistFn).not.toHaveBeenCalled();
     expect(fake.decisions).toHaveLength(0);
     expect(fake.sends).toHaveLength(0);
@@ -297,7 +306,7 @@ describe("runFirstMessage", () => {
 
     const out = await run(fake, decide);
 
-    expect(out).toEqual({ scanned: 1, drafted: 0, waited: 0, skipped: 1, handedOff: 0 });
+    expect(out).toEqual({ scanned: 1, drafted: 0, exited: 0, waited: 0, skipped: 1, handedOff: 0, failed: 0 });
     expect(fake.sends).toHaveLength(0);
   });
 
@@ -313,34 +322,108 @@ describe("runFirstMessage", () => {
     const hour = 3_600_000;
     const fake = makeFake({
       rows: [
-        { accountId: "acc1", leadId: "recent", campaignId: "camp1" },
-        { accountId: "acc1", leadId: "stale", campaignId: "camp1" },
+        { accountId: "acc1", leadId: "recent", campaignId: "camp1", decidedAt: new Date(NOW.getTime() - hour) },
+        { accountId: "acc1", leadId: "stale", campaignId: "camp1", decidedAt: new Date(NOW.getTime() - 25 * hour) },
       ],
-      decidedAt: { recent: new Date(NOW.getTime() - hour), stale: new Date(NOW.getTime() - 25 * hour) },
     });
-    const { decide, readFn, shortlistFn } = makeDecide(fake);
+    const { decide, shortlistFn } = makeDecide(fake);
 
     const out = await run(fake, decide);
 
     expect(FIRST_MESSAGE_DECISION_COOLDOWN_MS).toBe(24 * hour);
-    expect(fake.cooldownQueries).toEqual([
-      { leadIds: ["recent", "stale"], trigger: "first_message", since: new Date(NOW.getTime() - 24 * hour) },
-    ]);
-    expect(out).toEqual({ scanned: 2, drafted: 1, waited: 0, skipped: 1, handedOff: 0 });
+    expect(fake.scanQueries).toEqual([{ limit: 50, includeParked: false, decidedSince: new Date(NOW.getTime() - 24 * hour) }]);
+    expect(out).toEqual({ scanned: 1, drafted: 1, exited: 0, waited: 0, skipped: 0, handedOff: 0, failed: 0 });
     expect(fake.bundleCalls).toEqual(["stale"]);
     expect(shortlistFn).toHaveBeenCalledTimes(1);
-    expect(readFn.mock.calls.length).toBeGreaterThan(0);
     expect(fake.decisions.map((d) => d.leadId)).toEqual(["stale"]);
   });
 
   it("first-message: the cooldown applies in shadow too (no re-deciding every tick)", async () => {
-    const fake = makeFake({ decidedAt: { lead1: new Date(NOW.getTime() - 60_000) } });
+    const fake = makeFake({
+      rows: [{ accountId: "acc1", leadId: "lead1", campaignId: "camp1", decidedAt: new Date(NOW.getTime() - 60_000) }],
+    });
     const { decide, shortlistFn } = makeDecide(fake);
 
     const out = await run(fake, decide, "shadow");
 
-    expect(out).toEqual({ scanned: 1, drafted: 0, waited: 0, skipped: 1, handedOff: 0 });
+    expect(out.scanned).toBe(0);
     expect(shortlistFn).not.toHaveBeenCalled();
     expect(fake.decisions).toHaveLength(0);
+  });
+
+  it("first-message: shadow scans parked legacy drafts and logs a shadow decision against them", async () => {
+    const fake = makeFake({
+      rows: [{ accountId: "acc1", leadId: "lead1", campaignId: "camp1", parked: true }],
+      bundles: { lead1: bundle({ newestUnsentMessageCreatedAt: new Date("2026-10-28T14:00:00Z") }) },
+    });
+    const { decide, composeFn } = makeDecide(fake);
+
+    const out = await run(fake, decide, "shadow");
+
+    expect(fake.scanQueries[0]?.includeParked).toBe(true);
+    expect(out.scanned).toBe(1);
+    expect(fake.decisions).toHaveLength(1);
+    expect(fake.decisions[0]).toMatchObject({ mode: "shadow", trigger: "first_message", leadId: "lead1" });
+    expect(composeFn).not.toHaveBeenCalled();
+    expect(fake.sends).toHaveLength(0);
+  });
+
+  it("first-message: live_replies also includes parked drafts (shadow-logged)", async () => {
+    const fake = makeFake({ rows: [{ accountId: "acc1", leadId: "lead1", campaignId: "camp1", parked: true }] });
+    const { decide } = makeDecide(fake);
+
+    await run(fake, decide, "live_replies");
+
+    expect(fake.scanQueries[0]?.includeParked).toBe(true);
+    expect(fake.decisions[0]?.mode).toBe("shadow");
+  });
+
+  it("first-message: live ignores parked rows (the no-message-row predicate)", async () => {
+    const fake = makeFake({ rows: [{ accountId: "acc1", leadId: "lead1", campaignId: "camp1", parked: true }] });
+    const { decide, shortlistFn } = makeDecide(fake);
+
+    const out = await run(fake, decide, "live");
+
+    expect(fake.scanQueries[0]?.includeParked).toBe(false);
+    expect(out.scanned).toBe(0);
+    expect(shortlistFn).not.toHaveBeenCalled();
+  });
+
+  it("first-message: a lead who spoke last is excluded by the scan, so a fresh accept behind it is still decided", async () => {
+    const fake = makeFake({
+      rows: [
+        { accountId: "acc1", leadId: "replied", campaignId: "camp1", leadSpokeLast: true },
+        { accountId: "acc1", leadId: "fresh", campaignId: "camp1" },
+      ],
+    });
+    const { decide } = makeDecide(fake);
+
+    const out = await run(fake, decide);
+
+    expect(out).toMatchObject({ scanned: 1, drafted: 1 });
+    expect(fake.bundleCalls).toEqual(["fresh"]);
+  });
+
+  it("first-message: one failing lead is logged and tallied; the rest of the batch is still decided", async () => {
+    const fake = makeFake({
+      rows: [
+        { accountId: "acc1", leadId: "boom", campaignId: "camp1" },
+        { accountId: "acc1", leadId: "ok", campaignId: "camp1" },
+      ],
+    });
+    const getBundle = fake.store.getResponderBundle;
+    fake.store.getResponderBundle = async (a, leadId, c) => {
+      if (leadId === "boom") throw new Error("db hiccup");
+      return getBundle(a, leadId, c);
+    };
+    const { decide } = makeDecide(fake);
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const out = await run(fake, decide);
+
+    expect(out).toEqual({ scanned: 2, drafted: 1, exited: 0, waited: 0, skipped: 0, handedOff: 0, failed: 1 });
+    expect(fake.decisions.map((d) => d.leadId)).toEqual(["ok"]);
+    expect(err).toHaveBeenCalledWith("first-message: decide failed", expect.objectContaining({ accountId: "acc1", leadId: "boom" }));
+    err.mockRestore();
   });
 });

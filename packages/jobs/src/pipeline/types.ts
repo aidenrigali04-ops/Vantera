@@ -493,13 +493,14 @@ export interface CopyDraftDeps {
   store: CopyDraftStore;
   draftLinkedInFn: (input: DraftInput) => Promise<LinkedInDraft>;
   /**
-   * The `conversation_policy` rollout knob, read once per run by the thin trigger (spec §7.2).
-   * "off" ⇒ today's invite+message pair from `draftLinkedInFn`, byte-identical. Any other mode ⇒
-   * the invite note ONLY, from `draftLinkedInNoteFn`; the first message is written at acceptance
-   * by the first-message scan through the conversation core.
+   * The `conversation_policy` rollout knob, read once per run by the thin trigger (spec §7.2/§9).
+   * "live" ⇒ the invite note ONLY, from `draftLinkedInNoteFn`; the first message is written at
+   * acceptance by the first-message scan through the conversation core. "off" / "shadow" /
+   * "live_replies" ⇒ today's invite+message pair from `draftLinkedInFn`, byte-identical (in shadow
+   * and live_replies the scan logs a shadow decision against the parked pair message).
    */
   conversationMode: ConversationMode;
-  /** Note-only first-touch brain (lints itself); used whenever `conversationMode !== "off"`. */
+  /** Note-only first-touch brain (lints itself); used only when `conversationMode === "live"`. */
   draftLinkedInNoteFn: (input: DraftInput) => Promise<LinkedInNoteDraft>;
   /**
    * One targeted EDIT of a style-flagged pair, run only on the AUTOMATIC send path before the
@@ -1395,10 +1396,15 @@ export interface ConversationStore {
   upsertPriors(accountId: string | null, cells: PriorTable): Promise<void>;
   listUnscoredDecisions(olderThan: Date, limit: number): Promise<ScorableDecision[]>;
   scoreDecision(id: string, outcome: DecisionOutcome, reward: number | null): Promise<void>;
-  /** which of these leads have a decision for `trigger` at or after `since` (the first-message
-   *  scan's cooldown: a lead is not re-decided every tick) */
-  leadsDecidedSince(leadIds: string[], trigger: Trigger, since: Date): Promise<Set<string>>;
+  /**
+   * Candidates for the first-message scan (spec §7.2), newest acceptance first: connected leads with
+   * an active sequence run under a live Outreach agent, with no `first_message` decision at or after
+   * `decidedSince`, whose prospect has not spoken since our last delivered touch (the reply path owns
+   * those), and with no message-stage row — or, when `includeParked` (shadow / live_replies), no
+   * message-stage row that is sent or sending (a parked legacy draft still qualifies).
+   */
   listConnectedWithoutFirstMessage(
-    limit: number
+    limit: number,
+    opts: { includeParked: boolean; decidedSince: Date }
   ): Promise<{ accountId: string; leadId: string; campaignId: string }[]>;
 }
