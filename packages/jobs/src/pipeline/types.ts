@@ -1057,7 +1057,8 @@ export interface SequenceRunPatch {
 
 export type SequenceDecision =
   | { kind: "hold" }
-  | { kind: "dispatch"; stage: SequenceStage; touchNo: number; patch: SequenceRunPatch }
+  /** isLast = this is the stage's final allowed touch (touchNo === target) — the policy's breakup-only touch */
+  | { kind: "dispatch"; stage: SequenceStage; touchNo: number; isLast: boolean; patch: SequenceRunPatch }
   | { kind: "advance"; patch: SequenceRunPatch }
   /** write the patch and stop this tick — the soft-no revival parks the run ~30 days out */
   | { kind: "park"; patch: SequenceRunPatch }
@@ -1072,6 +1073,10 @@ export interface SequenceTouchDispatch {
   leadId: string;
   stage: SequenceStage;
   touchNo: number;
+  /** the stage's final allowed touch — the user's touch count is a ceiling, the policy runs below it */
+  isLast: boolean;
+  /** the stage's configured touch gap — how far a policy `wait` re-arms the run */
+  touchGapDays: number;
 }
 
 export interface DueSequenceRun {
@@ -1114,6 +1119,8 @@ export interface SequenceTouchStore {
   stopSequenceRun(runId: string): Promise<void>;
   /** turn-cap handoff: tell the human the agent is stepping aside on this thread */
   insertLeadNotification(n: { accountId: string; leadId: string; kind: "needs_human"; body: string }): Promise<void>;
+  /** policy `wait` returns the touch (spec §6.5): touches_done - 1, lastTouchAt restored, run re-armed */
+  deferTouch(runId: string, patch: { nextActionAt: Date; lastTouchAt: Date | null }): Promise<void>;
 }
 
 export interface SequenceTouchDeps {
@@ -1149,9 +1156,20 @@ export interface SequenceTouchDeps {
    * MAX_BEST_OF_N regardless of what's configured, and forces it to 1 when `judgeFn` is absent.
    */
   bestOfN?: number;
+  /**
+   * Conversation intelligence (spec §6.5). Absent or mode "off" ⇒ the legacy follow-up draft,
+   * byte-identical. "live" ⇒ the conversation core decides the touch (a `wait` returns it);
+   * "shadow"/"live_replies" ⇒ the core logs a shadow decision, then the legacy draft runs.
+   * `sellerName` overrides the bundle's account name.
+   */
+  conversation?: {
+    mode: ConversationMode;
+    deps: ConversationDecideDeps;
+    sellerName?: string | null;
+  };
 }
 
-export type SequenceTouchOutcome = "drafted" | "suppressed" | "skipped" | "dropped" | "handed_off";
+export type SequenceTouchOutcome = "drafted" | "suppressed" | "skipped" | "dropped" | "handed_off" | "deferred";
 
 // ── Conversion gate (tracked-CTA redirect) ────────────────────────────────────
 

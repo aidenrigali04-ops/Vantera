@@ -33,14 +33,14 @@ function ctx(run: Partial<SequenceRun>, over: Partial<SequenceTickContext> = {})
 describe("advanceSequence", () => {
   it("dispatches the first LinkedIn touch and schedules the next by touch gap", () => {
     const d = advanceSequence(ctx({ currentStage: "linkedin", touchesDone: 0 }));
-    expect(d).toMatchObject({ kind: "dispatch", stage: "linkedin", touchNo: 1 });
+    expect(d).toMatchObject({ kind: "dispatch", stage: "linkedin", touchNo: 1, isLast: false });
     expect(d.kind === "dispatch" && d.patch.touchesDone).toBe(1);
     expect(d.kind === "dispatch" && d.patch.nextActionAt?.getTime()).toBe(NOW.getTime() + 2 * DAY);
   });
 
   it("on the last touch of the stage, schedules the conversion wait window", () => {
     const d = advanceSequence(ctx({ currentStage: "linkedin", touchesDone: 1 })); // target 2
-    expect(d).toMatchObject({ kind: "dispatch", stage: "linkedin", touchNo: 2 });
+    expect(d).toMatchObject({ kind: "dispatch", stage: "linkedin", touchNo: 2, isLast: true });
     expect(d.kind === "dispatch" && d.patch.nextActionAt?.getTime()).toBe(NOW.getTime() + 3 * DAY);
   });
 

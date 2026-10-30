@@ -1414,6 +1414,21 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(eq(sequenceRuns.id, runId));
     },
 
+    async deferTouch(runId: string, patch: { nextActionAt: Date; lastTouchAt: Date | null }) {
+      // Policy `wait` returns the touch (spec §6.5): advanceSequence stamped it before the touch
+      // ran, so step the count back (floored at 0), restore the last real delivery and re-arm.
+      // Active runs only — a run a reply/booking/human moved meanwhile is left as it is.
+      await db
+        .update(sequenceRuns)
+        .set({
+          touchesDone: sql`greatest(${sequenceRuns.touchesDone} - 1, 0)`,
+          lastTouchAt: patch.lastTouchAt,
+          nextActionAt: patch.nextActionAt,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(sequenceRuns.id, runId), eq(sequenceRuns.status, "active")));
+    },
+
     async reviveSequenceRun(leadId: string, nextActionAt: Date) {
       // Conversation cadence (0044): the engaged lead's run goes back on the clock with one
       // touch of headroom — touches_done drops to (target-1)-equivalent by simply stepping

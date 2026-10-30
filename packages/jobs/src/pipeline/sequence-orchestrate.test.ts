@@ -88,7 +88,17 @@ describe("driveSequenceRun", () => {
       leadId: "l1",
       stage: "linkedin",
       touchNo: 1,
+      isLast: false,
+      touchGapDays: SEQUENCE_DEFAULTS.stages.linkedin.touchGapDays,
     });
+  });
+
+  it("marks the stage's final touch isLast and carries the configured touch gap", async () => {
+    const e = env();
+    await driveSequenceRun(dueItem({ run: run({ touchesDone: 1 }) }), e); // target 2
+    expect(e.dispatch.dispatchTouch).toHaveBeenCalledWith(
+      expect.objectContaining({ touchNo: 2, isLast: true, touchGapDays: SEQUENCE_DEFAULTS.stages.linkedin.touchGapDays })
+    );
   });
 
   it("claims (applyRunPatch) BEFORE firing the trigger", async () => {

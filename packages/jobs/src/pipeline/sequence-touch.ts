@@ -3,6 +3,7 @@ import { getModelId } from "@vantera/ai";
 import { normalizeLinkedInUrl, MAX_BEST_OF_N } from "./copy-draft";
 import { MAX_AGENT_TURNS } from "./inbound";
 import { needsRefresh, FRESHNESS_WINDOW_DAYS } from "./freshness";
+import { runConversationDecide } from "./conversation-decide";
 import type {
   NewScheduledSend,
   SequenceTouchDeps,
@@ -97,6 +98,51 @@ export async function runSequenceTouch(
     deps.now().getTime() - bundle.lastAgentMessageAt.getTime() < MIN_TOUCH_GAP_HOURS * 3_600_000
   ) {
     return "skipped";
+  }
+
+  // Conversation intelligence (spec §6.5) — only after every guard above. Absent/"off" ⇒ the legacy
+  // draft below, byte-identical. "live" ⇒ the core owns the touch; shadow/live_replies ⇒ the core
+  // logs what it WOULD do (never fails the touch), then the legacy draft runs unchanged.
+  const conv = deps.conversation;
+  if (conv && conv.mode !== "off") {
+    const decide = (mode: "live" | "shadow") =>
+      runConversationDecide(
+        {
+          accountId: d.accountId,
+          leadId: d.leadId,
+          campaignId: d.campaignId,
+          trigger: { kind: "followup", runId: d.runId, touchNo: d.touchNo, isLast: d.isLast },
+          mode,
+          bundle,
+          sellerName: conv.sellerName !== undefined ? conv.sellerName : (bundle.context.accountName ?? null),
+        },
+        conv.deps
+      );
+    if (conv.mode === "live") {
+      const outcome = await decide("live");
+      switch (outcome.action) {
+        case "wait":
+          // `wait` returns the touch: advanceSequence stamped it before this task ran, so roll the
+          // count/clock back and re-arm one gap out — the user's touch count stays a ceiling.
+          await deps.store.deferTouch(d.runId, {
+            nextActionAt: new Date(deps.now().getTime() + d.touchGapDays * 86_400_000),
+            lastTouchAt: bundle.lastAgentMessageAt,
+          });
+          return "deferred";
+        case "hand_to_human":
+          return "handed_off"; // the core already notified the human and stopped the run
+        case "drafted":
+        case "exit":
+          return "drafted";
+        default:
+          return "skipped";
+      }
+    }
+    try {
+      await decide("shadow");
+    } catch (err) {
+      console.error("sequence-touch: shadow conversation decision failed", { runId: d.runId, error: String(err) });
+    }
   }
 
   // Proactive follow-up: no incoming reply → the brain writes a fresh nudge that builds on the thread.

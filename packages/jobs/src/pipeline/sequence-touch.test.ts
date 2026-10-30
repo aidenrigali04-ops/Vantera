@@ -1,9 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
-import { RESPOND_SYSTEM, leadBlock, type ConversationMessageInput, type JudgeFn } from "@vantera/agent-brains";
+import {
+  COMPOSE_SYSTEM,
+  RESPOND_SYSTEM,
+  leadBlock,
+  type ComposeInput,
+  type ConversationDraft,
+  type ConversationMessageInput,
+  type ConversationState,
+  type JudgeFn,
+  type PolicyInput,
+  type Readout,
+  type Shortlist,
+  type StoredTurn,
+} from "@vantera/agent-brains";
+import type { ConversationDecideDeps } from "./conversation-decide";
 import { getModelId } from "@vantera/ai";
 import { MIN_TOUCH_GAP_HOURS, runSequenceTouch } from "./sequence-touch";
 import { MAX_BEST_OF_N } from "./copy-draft";
-import type { NewScheduledSend, ResponderBundle, SequenceTouchDeps, SequenceTouchDispatch } from "./types";
+import type { ConversationMode, NewDecision, NewScheduledSend, ResponderBundle, SequenceTouchDeps, SequenceTouchDispatch } from "./types";
 
 const NOW = new Date("2026-06-15T00:00:00Z");
 
@@ -64,6 +78,7 @@ function deps(
       insertScheduledSend: vi.fn(async () => {}),
       stopSequenceRun: vi.fn(async (runId: string) => { stoppedRunIds.push(runId); }),
       insertLeadNotification: vi.fn(async () => {}),
+      deferTouch: vi.fn(async () => {}),
       ...over,
     },
     draftFollowupFn,
@@ -82,6 +97,8 @@ const dispatch: SequenceTouchDispatch = {
   leadId: "l1",
   stage: "linkedin",
   touchNo: 1,
+  isLast: false,
+  touchGapDays: 2,
 };
 
 describe("runSequenceTouch", () => {
@@ -552,5 +569,236 @@ describe("runSequenceTouch — converse-to-close turn cap (0044)", () => {
     expect(notify).toHaveBeenCalledWith(expect.objectContaining({ kind: "needs_human", leadId: "l1" }));
     expect(draftFn).not.toHaveBeenCalled();
     expect(insert).not.toHaveBeenCalled();
+  });
+});
+
+// ── Task 15: proactive follow-ups through the conversation policy ─────────────────────────────
+
+const DAY = 86_400_000;
+const LAST_DELIVERED = new Date(NOW.getTime() - 3 * DAY);
+
+function readout(over: Partial<Readout> = {}): Readout {
+  return {
+    stance: "neutral",
+    confidence: 0.7,
+    intent: "other",
+    explicitOptOut: false,
+    identitySuspicion: false,
+    booked: false,
+    answeredQuestionRef: null,
+    newProblems: [],
+    newPriorities: [],
+    newObjection: null,
+    personDelta: {
+      directness: null,
+      formality: null,
+      warmth: null,
+      skepticism: null,
+      verbosity: null,
+      seniority: null,
+      role: null,
+      roleConfidence: null,
+      language: null,
+      emoji: null,
+      notes: [],
+    },
+    hookUsed: null,
+    questionAsked: null,
+    claims: [],
+    linksShared: [],
+    ask: "none",
+    labeled: false,
+    ...over,
+  };
+}
+
+const TURN: StoredTurn = { ref: "m1", role: "agent", text: "Thanks for connecting, Sam.", at: "2026-06-10T10:00:00Z" };
+
+type Pick_ = "nudge" | "wait" | "hand_to_human" | "throw";
+
+/** A full conversation-core wiring over in-memory fakes; `pick` steers what the policy shortlists. */
+function convo(mode: ConversationMode, pick: Pick_ = "nudge") {
+  const decisions: NewDecision[] = [];
+  const convSends: NewScheduledSend[] = [];
+  const notifications: unknown[] = [];
+  const stoppedForReply: string[] = [];
+  const policyInputs: PolicyInput[] = [];
+  const states = new Map<string, { state: ConversationState; lastMessageRef: string | null }>();
+  const store: ConversationDecideDeps["store"] = {
+    getConversationPolicyMode: async () => mode,
+    getConversationState: async (_a, leadId) => {
+      const s = states.get(leadId);
+      return s ? { state: structuredClone(s.state), lastMessageRef: s.lastMessageRef } : null;
+    },
+    saveConversationState: async (_a, leadId, state, lastMessageRef) => {
+      states.set(leadId, { state: structuredClone(state), lastMessageRef });
+    },
+    listThreadTurns: async () => [TURN],
+    insertDecision: async (d) => {
+      decisions.push(d);
+      return d.id ?? `dec${decisions.length}`;
+    },
+    insertScheduledSendReturningId: async (s) => {
+      convSends.push(s);
+      return `send${convSends.length}`;
+    },
+    readPriors: async () => [],
+    upsertPriors: async () => {},
+    listUnscoredDecisions: async () => [],
+    scoreDecision: async () => {},
+    listConnectedWithoutFirstMessage: async () => [],
+    isSuppressed: async () => false,
+    getLeadLinkedInUrl: async () => "https://linkedin.com/in/sam",
+    insertLeadNotification: async (n) => {
+      notifications.push(n);
+    },
+    cancelPendingSends: async () => 0,
+    stopSequenceForReply: async (leadId) => {
+      stoppedForReply.push(leadId);
+    },
+  };
+  const shortlistFn = vi.fn(async (input: PolicyInput): Promise<Shortlist> => {
+    policyInputs.push(input);
+    if (pick === "throw") throw new Error("policy model down");
+    if (pick === "hand_to_human") return { candidates: [], degraded: "no_legal_candidates" };
+    const move =
+      pick === "wait" && input.legal.includes("wait")
+        ? "wait"
+        : input.legal.find((m) => m !== "wait" && m !== "hand_to_human") ?? input.legal[0]!;
+    return { candidates: [{ move, style: { lengthBand: "short", question: true, link: "none", mirror: false }, rationale: "fits" }] };
+  });
+  const composeFn = vi.fn(async (_i: ComposeInput): Promise<ConversationDraft> => ({
+    message: "Curious how the SDR hiring is going, Sam?",
+    violations: [],
+  }));
+  const decide: ConversationDecideDeps = {
+    store,
+    readFn: (async () => readout()) as unknown as ConversationDecideDeps["readFn"],
+    shortlistFn: shortlistFn as unknown as ConversationDecideDeps["shortlistFn"],
+    composeFn: composeFn as unknown as ConversationDecideDeps["composeFn"],
+    now: () => NOW,
+    rng: () => 0.5,
+    seed: () => 42,
+  };
+  return { conversation: { mode, deps: decide }, decisions, convSends, notifications, stoppedForReply, policyInputs, shortlistFn, composeFn };
+}
+
+function convoDeps(c: ReturnType<typeof convo>, over: Partial<SequenceTouchDeps["store"]> = {}) {
+  const deferred: { runId: string; patch: { nextActionAt: Date; lastTouchAt: Date | null } }[] = [];
+  const draftFn = vi.fn(async () => ({ message: "legacy nudge", violations: [] }));
+  const base = deps(
+    {
+      getResponderBundle: async () => bundle({ lastAgentMessageAt: LAST_DELIVERED }),
+      deferTouch: vi.fn(async (runId: string, patch: { nextActionAt: Date; lastTouchAt: Date | null }) => {
+        deferred.push({ runId, patch });
+      }),
+      ...over,
+    },
+    "ok",
+    [],
+    draftFn
+  );
+  return { d: { ...base, conversation: c.conversation }, deferred, draftFn };
+}
+
+describe("runSequenceTouch — conversation policy (Task 15)", () => {
+  it("mode off: the legacy draft path runs and the policy is never consulted", async () => {
+    const c = convo("off");
+    const { d, draftFn } = convoDeps(c);
+    const out = await runSequenceTouch(dispatch, d);
+    expect(out).toBe("drafted");
+    expect(draftFn).toHaveBeenCalledTimes(1);
+    expect(c.shortlistFn).not.toHaveBeenCalled();
+    expect(c.decisions).toHaveLength(0);
+  });
+
+  it("live wait: returns the touch — deferTouch re-arms by touchGapDays, restores lastTouchAt, outcome 'deferred'", async () => {
+    const c = convo("live", "wait");
+    const { d, deferred, draftFn } = convoDeps(c);
+    const out = await runSequenceTouch({ ...dispatch, touchGapDays: 4 }, d);
+    expect(out).toBe("deferred");
+    expect(deferred).toEqual([
+      { runId: "r1", patch: { nextActionAt: new Date(NOW.getTime() + 4 * DAY), lastTouchAt: LAST_DELIVERED } },
+    ]);
+    expect(draftFn).not.toHaveBeenCalled();
+    expect(d.store.insertScheduledSend).not.toHaveBeenCalled();
+    expect(c.decisions).toHaveLength(1);
+    expect(c.decisions[0]).toMatchObject({ trigger: "followup", mode: "live", move: "wait" });
+  });
+
+  it("live drafted: the core writes the follow-up with a v3 sequence_followup recipe carrying the move", async () => {
+    const c = convo("live");
+    const { d, draftFn, deferred } = convoDeps(c);
+    const out = await runSequenceTouch(dispatch, d);
+    expect(out).toBe("drafted");
+    expect(draftFn).not.toHaveBeenCalled();
+    expect(d.store.insertScheduledSend).not.toHaveBeenCalled();
+    expect(deferred).toHaveLength(0);
+    expect(c.convSends).toHaveLength(1);
+    const recipe = c.convSends[0]!.recipe as Record<string, unknown>;
+    expect(recipe).toMatchObject({ v: 3, brain: "sequence_followup", promptHash: COMPOSE_SYSTEM.hash });
+    expect(typeof recipe.move).toBe("string");
+    expect(recipe.move).not.toBe("wait");
+    expect(c.convSends[0]).toMatchObject({ origin: "sequence", body: "Curious how the SDR hiring is going, Sam?" });
+  });
+
+  it("isLast reaches the core's followup trigger: on the final touch only breakup/wait are legal", async () => {
+    const c = convo("live");
+    const { d } = convoDeps(c);
+    await runSequenceTouch({ ...dispatch, touchNo: 2, isLast: true }, d);
+    expect(c.policyInputs[0]!.trigger).toBe("followup");
+    expect([...c.policyInputs[0]!.legal].sort()).toEqual(["breakup", "wait"]);
+    expect((c.convSends[0]!.recipe as Record<string, unknown>).move).toBe("breakup");
+  });
+
+  it("a non-last touch is not breakup-only (isLast=false reaches the trigger)", async () => {
+    const c = convo("live");
+    const { d } = convoDeps(c);
+    await runSequenceTouch(dispatch, d);
+    expect(c.policyInputs[0]!.legal).not.toEqual(expect.arrayContaining(["breakup"]));
+  });
+
+  it("live hand_to_human: returns 'handed_off' and never drafts a legacy follow-up", async () => {
+    const c = convo("live", "hand_to_human");
+    const { d, draftFn, deferred } = convoDeps(c);
+    const out = await runSequenceTouch(dispatch, d);
+    expect(out).toBe("handed_off");
+    expect(draftFn).not.toHaveBeenCalled();
+    expect(d.store.insertScheduledSend).not.toHaveBeenCalled();
+    expect(deferred).toHaveLength(0);
+    expect(c.notifications).toHaveLength(1);
+    expect(c.stoppedForReply).toEqual(["l1"]);
+  });
+
+  for (const mode of ["shadow", "live_replies"] as const) {
+    it(`${mode}: logs a shadow followup decision, then drafts the legacy follow-up unchanged`, async () => {
+      const c = convo(mode);
+      const { d, draftFn } = convoDeps(c);
+      const out = await runSequenceTouch(dispatch, d);
+      expect(out).toBe("drafted");
+      expect(c.decisions).toHaveLength(1);
+      expect(c.decisions[0]).toMatchObject({ trigger: "followup", mode: "shadow", scheduledSendId: null });
+      expect(c.convSends).toHaveLength(0);
+      expect(draftFn).toHaveBeenCalledTimes(1);
+      expect(d.store.insertScheduledSend).toHaveBeenCalledWith(
+        expect.objectContaining({ body: "legacy nudge", recipe: expect.objectContaining({ v: 2, brain: "sequence_followup" }) })
+      );
+    });
+  }
+
+  it("shadow: a failing policy call is logged only — the legacy follow-up still drafts", async () => {
+    const c = convo("shadow", "throw");
+    const { d, draftFn } = convoDeps(c);
+    const out = await runSequenceTouch(dispatch, d);
+    expect(out).toBe("drafted");
+    expect(draftFn).toHaveBeenCalledTimes(1);
+  });
+
+  it("live: the existing guards still run first — a suppressed lead never reaches the policy", async () => {
+    const c = convo("live");
+    const { d } = convoDeps(c, { isSuppressed: async () => true });
+    const out = await runSequenceTouch(dispatch, d);
+    expect(out).toBe("suppressed");
+    expect(c.shortlistFn).not.toHaveBeenCalled();
   });
 });

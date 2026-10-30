@@ -142,6 +142,7 @@ function makeFake(opts: {
       sends.push(s);
     },
     stopSequenceRun: async () => {},
+    deferTouch: async () => {},
     insertLeadNotification: async () => {},
     cancelPendingSends: async () => 0,
     stopSequenceForReply: async () => {},
