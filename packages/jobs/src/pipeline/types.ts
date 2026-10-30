@@ -1398,6 +1398,10 @@ export type ScorableDecision = {
   composedBody: string | null;
   sentBody: string | null;
   sentAt: Date | null;
+  /** the linked scheduled send's status; null when the decision has no send */
+  sendStatus: string | null;
+  /** the lead's next live decision's decided_at; the outcome window is [decidedAt, nextDecisionAt) */
+  nextDecisionAt: Date | null;
 };
 
 export interface ConversationStore {
@@ -1419,7 +1423,10 @@ export interface ConversationStore {
   insertScheduledSendReturningId(send: NewScheduledSend & { notBefore?: Date | null }): Promise<string>;
   /** account rows (source real) first, then global rows */
   readPriors(accountId: string): Promise<PriorTable>;
-  /** null = global table. Replaces the stored rollup for each cell (the learner sends full rollups). */
+  /**
+   * Scope replace in one transaction: account scope deletes that account's rows; global scope deletes
+   * only source = 'real' rows (never sim/research); then inserts `cells`. An empty list still clears.
+   */
   upsertPriors(accountId: string | null, cells: PriorTable): Promise<void>;
   listUnscoredDecisions(olderThan: Date, limit: number): Promise<ScorableDecision[]>;
   scoreDecision(id: string, outcome: DecisionOutcome, reward: number | null): Promise<void>;
@@ -1438,10 +1445,11 @@ export interface ConversationStore {
 
 /** Learner-only reads/outcomes (Task 17); kept off ConversationStore so decide/send fakes stay small. */
 export interface ConversationLearnStore {
-  /** Scored, on-policy decisions (reward not null) from the last 90 days; accountId null = every account. */
+  /** Scored, on-policy decisions (reward not null) decided at/after `since`, newest first; accountId null = every account. */
   listScoredDecisions(
     accountId: string | null,
-    limit: number
+    limit: number,
+    since: Date
   ): Promise<
     { accountId: string; move: Move; phase: Phase; archetype: Archetype; propensity: number; reward: number }[]
   >;

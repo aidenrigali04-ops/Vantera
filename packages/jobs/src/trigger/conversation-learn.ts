@@ -14,7 +14,7 @@ export const conversationLearn = task({
   maxDuration: 900,
   run: async () => {
     const store = createConversationStore(createDb());
-    const result = await runConversationLearn({ store, now: () => new Date(), simPriors: undefined });
+    const result = await runConversationLearn({ store, now: () => new Date(), simPriors: undefined, warn: (m, c) => logger.warn(m, c) });
     logger.info("conversation learn", result);
     return result;
   },

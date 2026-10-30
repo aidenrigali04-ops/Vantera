@@ -12,6 +12,7 @@ describe("learn", () => {
   it("reward: meeting booked dominates (+10) and opt-out is −5; identity suspicion −4; wait followed by reply +1", () => {
     expect(REWARD.booked).toBe(10);
     expect(reward(out({ booked: true }), "propose_times")).toBe(10);
+    expect(reward(out({ bookedShared: true }), "poke")).toBe(5);
     expect(reward(out({ optOut: true }), "poke")).toBe(-5);
     expect(reward(out({ identitySuspicion: true }), "observe")).toBe(-4);
     expect(reward(out({ waitThenReply: true }), "wait")).toBe(1);

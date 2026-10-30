@@ -12,6 +12,8 @@ export type DecisionOutcome = {
   identitySuspicion: boolean;
   humanTakeover: boolean;
   waitThenReply: boolean;
+  /** lead booked AFTER this decision's window: half-weight thread credit (spec §7.3) */
+  bookedShared?: boolean;
 };
 
 export const REWARD = {
@@ -20,6 +22,7 @@ export const REWARD = {
   leadTurn: 1,
   leadTurnCap: 3,
   booked: 10,
+  bookedShared: 5,
   optOut: -5,
   negativeStance: -2,
   identitySuspicion: -4,
@@ -34,6 +37,7 @@ export function reward(o: DecisionOutcome, move: Move): number {
   if (o.stance === "negative") r += REWARD.negativeStance;
   r += REWARD.leadTurn * Math.min(REWARD.leadTurnCap, Math.max(0, o.furtherLeadTurns));
   if (o.booked) r += REWARD.booked;
+  if (o.bookedShared) r += REWARD.bookedShared;
   if (o.optOut) r += REWARD.optOut;
   if (o.identitySuspicion) r += REWARD.identitySuspicion;
   if (o.humanTakeover) r += REWARD.humanTakeover;

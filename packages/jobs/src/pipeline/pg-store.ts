@@ -65,6 +65,9 @@ import type {
   ConversationState,
   PriorCell,
   DecisionOutcome,
+  Move,
+  Phase,
+  Archetype,
 } from "@vantera/agent-brains";
 import {
   buildTargetingProfile,
@@ -152,7 +155,6 @@ import {
   type ConversationMode,
   type ScorableDecision,
 } from "./types";
-import type { Move, Phase, Archetype } from "@vantera/agent-brains";
 import { mergePriorTables, turnsFromRows } from "./conversation-store-pure";
 import type { ThreadSyncStore } from "./thread-sync";
 import { normalizeLinkedInUrl } from "./copy-draft";
@@ -4691,7 +4693,6 @@ export function createConversationStore(db: Db): ConversationStore & Conversatio
     },
 
     async upsertPriors(accountId, cells) {
-      if (cells.length === 0) return;
       const now = new Date();
       const vals = (c: PriorCell) => ({
         level: c.level,
@@ -4714,6 +4715,12 @@ export function createConversationStore(db: Db): ConversationStore & Conversatio
         updatedAt: now,
       });
       await db.transaction(async (tx) => {
+        // scope replace: stale cells absent from the new rollup must not survive
+        if (accountId) {
+          await tx.delete(conversationPriors).where(eq(conversationPriors.accountId, accountId));
+        } else {
+          await tx.delete(conversationPriorsGlobal).where(eq(conversationPriorsGlobal.source, "real"));
+        }
         for (const c of cells) {
           if (accountId) {
             await tx
@@ -4763,6 +4770,8 @@ export function createConversationStore(db: Db): ConversationStore & Conversatio
           composedBody: conversationDecisions.composedBody,
           sentBody: scheduledSends.body,
           sentAt: sql<Date | null>`(select max(o.sent_at) from ${outreachSends} o where o.scheduled_send_id = ${conversationDecisions.scheduledSendId})`.mapWith(outreachSends.sentAt),
+          sendStatus: scheduledSends.status,
+          nextDecisionAt: sql<Date | null>`(select min(n.decided_at) from ${conversationDecisions} n where n.lead_id = ${conversationDecisions.leadId} and n.account_id = ${conversationDecisions.accountId} and n.mode = 'live' and n.decided_at > ${conversationDecisions.decidedAt})`.mapWith(conversationDecisions.decidedAt),
         })
         .from(conversationDecisions)
         .leftJoin(scheduledSends, eq(scheduledSends.id, conversationDecisions.scheduledSendId))
@@ -4770,7 +4779,7 @@ export function createConversationStore(db: Db): ConversationStore & Conversatio
           and(
             eq(conversationDecisions.mode, "live"),
             isNull(conversationDecisions.scoredAt),
-            lte(conversationDecisions.decidedAt, olderThan)
+            sql`coalesce((select max(o.sent_at) from ${outreachSends} o where o.scheduled_send_id = ${conversationDecisions.scheduledSendId}), ${conversationDecisions.decidedAt}) <= ${olderThan.toISOString()}::timestamptz`
           )
         )
         .orderBy(asc(conversationDecisions.decidedAt))
@@ -4781,6 +4790,8 @@ export function createConversationStore(db: Db): ConversationStore & Conversatio
         phase: r.phase as ScorableDecision["phase"],
         archetype: r.archetype as ScorableDecision["archetype"],
         sentAt: r.sentAt ?? null,
+        sendStatus: r.sendStatus ?? null,
+        nextDecisionAt: r.nextDecisionAt ?? null,
       }));
     },
 
@@ -4791,8 +4802,7 @@ export function createConversationStore(db: Db): ConversationStore & Conversatio
         .where(eq(conversationDecisions.id, id));
     },
 
-    async listScoredDecisions(accountId, limit) {
-      const since = new Date(Date.now() - 90 * 86_400_000);
+    async listScoredDecisions(accountId, limit, since) {
       const rows = await db
         .select({
           accountId: conversationDecisions.accountId,
@@ -4810,6 +4820,7 @@ export function createConversationStore(db: Db): ConversationStore & Conversatio
             ...(accountId ? [eq(conversationDecisions.accountId, accountId)] : [])
           )
         )
+        .orderBy(desc(conversationDecisions.decidedAt))
         .limit(limit);
       return rows.map((r) => ({
         accountId: r.accountId,
@@ -4830,7 +4841,10 @@ export function createConversationStore(db: Db): ConversationStore & Conversatio
     },
 
     async outcomeFor(d) {
-      const at = d.decidedAt.toISOString();
+      // Outcome window [decidedAt, nextDecisionAt): events after the lead's next live decision belong
+      // to that decision. Without a next decision the window is 30 days.
+      const ws = d.decidedAt.toISOString();
+      const we = (d.nextDecisionAt ?? new Date(d.decidedAt.getTime() + 30 * 86_400_000)).toISOString();
       const rows = (await db.execute(sql`
         with send as (
           select o.id from ${outreachSends} o
@@ -4839,9 +4853,8 @@ export function createConversationStore(db: Db): ConversationStore & Conversatio
         direct as (
           select r.id, r.received_at, r.readout from ${replies} r
           where r.account_id = ${d.accountId} and r.lead_id = ${d.leadId}
-            and ${d.move === "wait"
-              ? sql`r.received_at > ${at}::timestamptz`
-              : sql`r.outreach_send_id in (select id from send)`}
+            and r.received_at >= ${ws}::timestamptz and r.received_at < ${we}::timestamptz
+            and ${d.move === "wait" ? sql`true` : sql`r.outreach_send_id in (select id from send)`}
           order by r.received_at asc
           limit 1
         )
@@ -4851,28 +4864,33 @@ export function createConversationStore(db: Db): ConversationStore & Conversatio
           (select count(*) from ${replies} r2
             where r2.account_id = ${d.accountId} and r2.lead_id = ${d.leadId}
               and r2.received_at > (select received_at from direct)
+              and r2.received_at < ${we}::timestamptz
               and (r2.classification is null or r2.classification <> 'out_of_office'))::int as further,
           exists (select 1 from ${leads} l
             where l.id = ${d.leadId} and l.account_id = ${d.accountId}
-              and l.meeting_booked_at > ${at}::timestamptz) as booked,
+              and l.meeting_booked_at >= ${ws}::timestamptz and l.meeting_booked_at < ${we}::timestamptz) as booked,
+          exists (select 1 from ${leads} l2
+            where l2.id = ${d.leadId} and l2.account_id = ${d.accountId}
+              and l2.meeting_booked_at >= ${we}::timestamptz) as booked_shared,
           exists (select 1 from ${suppressionEntries} s
             where s.account_id = ${d.accountId} and s.lead_id = ${d.leadId}
-              and s.created_at > ${at}::timestamptz) as opt_out,
+              and s.created_at >= ${ws}::timestamptz and s.created_at < ${we}::timestamptz) as opt_out,
           exists (select 1 from ${replies} r3
             where r3.account_id = ${d.accountId} and r3.lead_id = ${d.leadId}
-              and r3.received_at > ${at}::timestamptz
+              and r3.received_at >= ${ws}::timestamptz and r3.received_at < ${we}::timestamptz
               and r3.readout->>'identitySuspicion' = 'true') as suspicion,
           exists (select 1 from ${nativeMessages} n
             where n.account_id = ${d.accountId} and n.lead_id = ${d.leadId}
-              and n.sent_at > ${at}::timestamptz) as takeover,
+              and n.sent_at >= ${ws}::timestamptz and n.sent_at < ${we}::timestamptz) as takeover,
           exists (select 1 from ${replies} r4
             where r4.account_id = ${d.accountId} and r4.lead_id = ${d.leadId}
-              and r4.received_at > ${at}::timestamptz) as any_reply
+              and r4.received_at >= ${ws}::timestamptz and r4.received_at < ${we}::timestamptz) as any_reply
       `)) as unknown as {
         replied: number;
         stance: string | null;
         further: number;
         booked: boolean;
+        booked_shared: boolean;
         opt_out: boolean;
         suspicion: boolean;
         takeover: boolean;
@@ -4886,6 +4904,7 @@ export function createConversationStore(db: Db): ConversationStore & Conversatio
         stance: stance === "positive" || stance === "neutral" || stance === "skeptical" || stance === "negative" || stance === "opt_out" ? stance : null,
         furtherLeadTurns: replied ? (r?.further ?? 0) : 0,
         booked: r?.booked ?? false,
+        bookedShared: r?.booked_shared ?? false,
         optOut: r?.opt_out ?? false,
         identitySuspicion: r?.suspicion ?? false,
         humanTakeover: r?.takeover ?? false,
