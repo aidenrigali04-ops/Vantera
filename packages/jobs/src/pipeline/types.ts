@@ -674,6 +674,12 @@ export interface DispatchSender extends SenderCandidate {
   scheduledUntil: number;
 }
 
+/** Tiny key/value access to app_settings (provider-alert cooldowns). */
+export interface AppSettingsStore {
+  getSetting(key: string): Promise<unknown>;
+  setSetting(key: string, value: unknown): Promise<void>;
+}
+
 export interface SendDispatchStore {
   isKillSwitchOn(): Promise<boolean>;
   /** approved rows + scheduled rows whose scheduled_for is older than staleCutoff (lost-task recovery) */

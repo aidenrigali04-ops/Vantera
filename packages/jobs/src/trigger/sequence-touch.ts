@@ -1,6 +1,8 @@
 import { logger, task } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
 import { draftConversationMessage, fixConversationMessage, judgeCopy, rankLeads } from "@vantera/agent-brains";
+import { withProviderAlert } from "../pipeline/provider-alert";
+import { buildProviderAlertDeps } from "../pipeline/provider-alert-deps";
 import { runSequenceTouch } from "../pipeline/sequence-touch";
 import { buildConversationDeps } from "../pipeline/conversation-deps";
 import { createPgStore } from "../pipeline/pg-store";
@@ -24,7 +26,7 @@ export const sequenceTouch = task({
     const bestOfN = await store.getBestOfN();
     // Conversation policy knob (spec §6.5): "off" (or a failed read) keeps the legacy draft path.
     const conversation = await buildConversationDeps(db, store, bestOfN);
-    const outcome = await runSequenceTouch(payload, {
+    const outcome = await withProviderAlert(() => runSequenceTouch(payload, {
       store,
       draftFollowupFn: (input) => draftConversationMessage(input),
       fixFollowupFn: (original, input) => fixConversationMessage(original, input),
@@ -38,7 +40,7 @@ export const sequenceTouch = task({
           prospectData: createProspectData(),
           rankFn: (candidates, ctx) => rankLeads(candidates, ctx),
         }),
-    });
+    }), buildProviderAlertDeps(store));
     logger.info("sequence touch finished", { outcome, runId: payload.runId, stage: payload.stage });
     return { outcome };
   },

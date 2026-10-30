@@ -146,6 +146,7 @@ import {
   type MeetingEventStore,
   type SendContext,
   type SendDispatchStore,
+  type AppSettingsStore,
   type SequenceRunPatch,
   type SequenceStore,
   type SequenceTouchStore,
@@ -566,7 +567,7 @@ async function fetchChampion(
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & AgentRunStore & FastPassStore & StrategyStampStore & MeetingEventStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & AgentRunStore & FastPassStore & StrategyStampStore & MeetingEventStore & AppSettingsStore {
   async function upsertStrategy(accountId: string, genome: StrategyGenome, source: StrategySource): Promise<string> {
     const signature = genomeSignature(genome);
     const [row] = await db
@@ -1487,6 +1488,18 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
     async getChampion(accountId) {
       return fetchChampion(db, accountId);
+    },
+
+    async getSetting(key) {
+      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, key));
+      return row?.value;
+    },
+
+    async setSetting(key, value) {
+      await db
+        .insert(appSettings)
+        .values({ key, value })
+        .onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: new Date() } });
     },
 
     async getBestOfN() {

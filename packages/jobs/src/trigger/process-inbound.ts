@@ -4,6 +4,8 @@ import { classifyReply, draftConversationMessage, fixConversationMessage, judgeC
 import { createLinkedInInfraFromEnv } from "@vantera/linkedin-infra";
 import { createTransactionalEmailFromEnv, sendLeadEventEmail } from "@vantera/transactional-email";
 import { runInbound } from "../pipeline/inbound";
+import { withProviderAlert } from "../pipeline/provider-alert";
+import { buildProviderAlertDeps } from "../pipeline/provider-alert-deps";
 import { buildConversationDeps } from "../pipeline/conversation-deps";
 import { buildLifecycleReplyAlert } from "../pipeline/lifecycle-outreach";
 import { createLeadEventNotifier } from "../pipeline/lead-event-emails";
@@ -21,7 +23,6 @@ export const processInbound = task({
     const db = createDb();
     const store = createPgStore(db);
     const lifecycleStore = createLifecycleStore(db);
-    // lifecycle is an add-on: a failed config read must never block tenant inbound processing
     const lifecycleConfig = await lifecycleStore.getLifecycleConfig().catch((err) => {
       // degraded mode must be diagnosable: lifecycle interception is silently off for this event
       logger.warn("lifecycle config read failed; lifecycle interception skipped", { err: String(err) });
@@ -29,9 +30,8 @@ export const processInbound = task({
     });
     const senderRef = lifecycleConfig?.senderRef ?? null;
     const notifyEmail = lifecycleConfig?.notifyEmail ?? null;
-    // Best-of-N (Phase 2C fast-follow): the global rollout knob — mirrors trigger/copy-draft.ts.
     const bestOfN = await store.getBestOfN();
-    const summary = await runInbound(payload, {
+    const summary = await withProviderAlert(async () => runInbound(payload, {
       store,
       linkedinInfra: createLinkedInInfraFromEnv(),
       classifyFn: (body) => classifyReply(body),
@@ -66,7 +66,7 @@ export const processInbound = task({
             },
           }
         : undefined,
-    });
+    }), buildProviderAlertDeps(store));
     if (summary.action.endsWith("+responded")) {
       // Speed-to-lead: a response just queued on the priority lane — run dispatch NOW instead
       // of waiting for the next cron tick, so the prospect hears back in ~1-2 minutes.

@@ -15,6 +15,7 @@ import {
 } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 import { handleLinkedInEvent, runInbound } from "./inbound";
+import { runThreadSync } from "./thread-sync";
 import { MAX_BEST_OF_N } from "./copy-draft";
 import type { ConversationDecideDeps } from "./conversation-decide";
 import type { ConversationMode, InboundDeps, InboundStore, NewDecision, NewScheduledSend, ResponderBundle } from "./types";
@@ -2043,5 +2044,68 @@ describe("handleLinkedInEvent — readout-driven actions and routing (spec §6.4
     expect(t.store.suppressions.map((s) => s[3])).toEqual(["not_interested", "not_interested"]);
     expect(t.store.stoppedSequences).toEqual(["lead1"]);
     expect(t.store.classifications).toHaveLength(1);
+  });
+});
+
+describe("thread-sync re-answers a reply whose first run crashed", () => {
+  it("an inserted-but-unclassified reply is answered + classified when the backstop replays it", async () => {
+    const sends: NewScheduledSend[] = [];
+    const store = makeStore({
+      findLinkedInAccountByProviderRef: async () => ({ id: "li", accountId: "acc1" }),
+      findLeadByLinkedInUrl: async () => ({ id: "lead1", campaignId: "camp1" }),
+      // the row exists from the crashed first run, never classified
+      insertReply: async (r) => ({ id: "reply_crashed", created: false, createdAt: r.receivedAt, classified: false, readout: null }),
+      getResponderBundle: async () => ({
+        campaignId: "camp1",
+        sendMode: "automatic",
+        lead: { firstName: "Pat", lastName: "P", title: "VP", companyName: "Acme", industry: "SaaS" },
+        insights: { pain_points: [], triggers: [], motivations: [], value_angle: "", aha_moment: "", summary: "" },
+        context: { cta: "a quick intro" },
+        thread: [],
+        agentTurns: 0,
+        newestUnsentMessageCreatedAt: null,
+        lastAgentMessageAt: null,
+        humanHandled: false,
+        attribution: { strategy: {}, playbookVersion: null },
+      }),
+      insertScheduledSend: async (s) => void sends.push(s),
+    });
+    const infra = new InMemoryLinkedInInfra();
+    infra.threads.set("seat1:ACoAA_P", [
+      {
+        type: "reply",
+        providerEventId: "m1",
+        connectedAccountRef: "seat1",
+        fromProfileUrl: "https://www.linkedin.com/in/prospect-smith",
+        fromProviderRef: "ACoAA_P",
+        fromPublicIdentifier: null,
+        fromName: "Pat",
+        body: "Sounds interesting, tell me more",
+        receivedAt: "2026-06-12T10:05:00.000Z",
+      },
+    ]);
+    const d = deps(store, {
+      classifyFn: classify("interested"),
+      respondFn: async () => ({ message: "Happy to — here's the short version.", violations: [] as never }),
+    });
+    const result = await runThreadSync({
+      store: {
+        listThreadSyncCandidates: async () => [
+          { leadId: "lead1", accountId: "acc1", attendeeProviderRef: "ACoAA_P", connectedAccountRef: "seat1" },
+        ],
+        markThreadSynced: async () => {},
+      },
+      linkedinInfra: infra,
+      handleEvent: (e) => handleLinkedInEvent(e, d),
+      now: () => new Date("2026-06-12T12:00:00.000Z"),
+      sleep: async () => {},
+    });
+
+    expect(result.errors).toBe(0);
+    expect(store.classifications).toEqual([
+      { replyId: "reply_crashed", verdict: expect.objectContaining({ classification: "interested" }) },
+    ]);
+    expect(sends).toHaveLength(1);
+    expect(sends[0]!.origin).toBe("reply_response");
   });
 });
