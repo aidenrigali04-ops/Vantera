@@ -2050,11 +2050,16 @@ describe("handleLinkedInEvent — readout-driven actions and routing (spec §6.4
 describe("thread-sync re-answers a reply whose first run crashed", () => {
   it("an inserted-but-unclassified reply is answered + classified when the backstop replays it", async () => {
     const sends: NewScheduledSend[] = [];
+    const insertResults: { id: string; created: boolean; classified: boolean }[] = [];
     const store = makeStore({
       findLinkedInAccountByProviderRef: async () => ({ id: "li", accountId: "acc1" }),
       findLeadByLinkedInUrl: async () => ({ id: "lead1", campaignId: "camp1" }),
       // the row exists from the crashed first run, never classified
-      insertReply: async (r) => ({ id: "reply_crashed", created: false, createdAt: r.receivedAt, classified: false, readout: null }),
+      insertReply: async (r) => {
+        const res = { id: "reply_crashed", created: false, createdAt: r.receivedAt, classified: false, readout: null };
+        insertResults.push(res);
+        return res;
+      },
       getResponderBundle: async () => ({
         campaignId: "camp1",
         sendMode: "automatic",
@@ -2102,6 +2107,8 @@ describe("thread-sync re-answers a reply whose first run crashed", () => {
     });
 
     expect(result.errors).toBe(0);
+    // it really took the crashed-row path: the existing row came back unclassified, not as new
+    expect(insertResults).toEqual([expect.objectContaining({ id: "reply_crashed", created: false, classified: false })]);
     expect(store.classifications).toEqual([
       { replyId: "reply_crashed", verdict: expect.objectContaining({ classification: "interested" }) },
     ]);

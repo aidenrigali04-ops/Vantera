@@ -24,6 +24,10 @@ describe("classifyProviderError", () => {
   it("nested cause", () => {
     expect(classifyProviderError(new Error("wrapped", { cause: new Error("credit balance is too low") }))).toBe("billing");
   });
+  it("a bare 401 inside an identifier is not an auth error", () => {
+    expect(classifyProviderError(new Error("lead_4012 not found"))).toBeNull();
+    expect(classifyProviderError(new Error("HTTP 401"))).toBe("auth");
+  });
   it("other errors and non-errors are null", () => {
     expect(classifyProviderError(new Error("db blip"))).toBeNull();
     expect(classifyProviderError(undefined)).toBeNull();
@@ -67,6 +71,22 @@ describe("withProviderAlert", () => {
     const m = makeDeps();
     const err = new Error("Your credit balance is too low");
     await expect(withProviderAlert(async () => { throw err; }, m.deps)).rejects.toBe(err);
+    expect(m.sent).toHaveLength(1);
+  });
+  it("alerts on an auth error (kind auth) and re-throws", async () => {
+    const m = makeDeps();
+    const err = new Error("invalid x-api-key");
+    await expect(withProviderAlert(async () => { throw err; }, m.deps)).rejects.toBe(err);
+    expect(m.sent).toHaveLength(1);
+    expect(m.sent[0]!.subject).toContain("API key");
+    expect(m.settings.has("provider_alert:auth")).toBe(true);
+  });
+  it("a second failing run inside the cooldown sends nothing more", async () => {
+    const m = makeDeps();
+    const fail = async () => { throw new Error("Your credit balance is too low"); };
+    await expect(withProviderAlert(fail, m.deps)).rejects.toThrow();
+    m.advance(3600_000);
+    await expect(withProviderAlert(fail, m.deps)).rejects.toThrow();
     expect(m.sent).toHaveLength(1);
   });
   it("passes through a non-provider error without alerting", async () => {

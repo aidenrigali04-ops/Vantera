@@ -4,7 +4,7 @@
 export type ProviderErrorKind = "billing" | "auth";
 
 const BILLING = /credit balance|insufficient (credits|funds|quota)|billing/i;
-const AUTH = /invalid x-api-key|authentication|unauthorized|401/i;
+const AUTH = /invalid x-api-key|authentication|unauthorized|\b401\b/i;
 export const PROVIDER_ALERT_COOLDOWN_MS = 24 * 60 * 60_000;
 
 function messages(err: unknown, depth = 0): string[] {
