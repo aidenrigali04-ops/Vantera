@@ -1,7 +1,7 @@
-import { timezoneForLocation } from "./send-window";
 import { createHash } from "node:crypto";
 import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, max, ne, or, sql } from "drizzle-orm";
 import { LIFECYCLE_ADMIN_EMAIL } from "./lifecycle-outreach";
+import { resolveLeadTimezone } from "./send-window";
 import { exemptFromTrialCaps, statusForTrialCaps } from "./trial-caps";
 import {
   accountDeletionRequests,
@@ -1737,7 +1737,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       // counts as unset, so an agent nobody configured yields null = no quiet gate).
       const agentTz = new Map<string, string>();
       const needFallback = [
-        ...new Set(rows.filter((r) => !timezoneForLocation(r.leadLocation)).map((r) => r.accountId)),
+        ...new Set(rows.filter((r) => resolveLeadTimezone(r.leadLocation, null) === null).map((r) => r.accountId)),
       ];
       if (needFallback.length > 0) {
         const tzRows = await db
@@ -1769,7 +1769,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         origin: r.origin as "sequence" | "reply_response" | "manual",
         leadLocation: r.leadLocation,
         notBefore: r.status === "approved" ? r.scheduledFor : null,
-        leadTimezone: timezoneForLocation(r.leadLocation) ?? agentTz.get(r.accountId) ?? null,
+        leadTimezone: resolveLeadTimezone(r.leadLocation, agentTz.get(r.accountId)),
       }));
     },
 

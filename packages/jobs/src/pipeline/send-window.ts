@@ -57,6 +57,11 @@ export function timezoneForLocation(location: string | null | undefined): string
   return null;
 }
 
+/** Lead zone from location, else the copy agent's zone; the "UTC" column default counts as unset. */
+export function resolveLeadTimezone(location: string | null | undefined, agentTz: string | null | undefined): string | null {
+  return timezoneForLocation(location) ?? (agentTz && agentTz !== "UTC" ? agentTz : null);
+}
+
 /** Local weekday (0=Sun) + hour for `now` in `timeZone`, via the Intl database. */
 function localParts(now: Date, timeZone: string): { day: number; hour: number } {
   const fmt = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", hour: "numeric", hour12: false });

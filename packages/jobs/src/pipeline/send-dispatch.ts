@@ -169,7 +169,9 @@ export async function runSendDispatch(deps: SendDispatchDeps): Promise<SendDispa
     for (const row of lis) {
       if (row.linkedinStage !== "message") continue;
       const cur = newestMessageByLead.get(row.leadId);
-      if (!cur || row.createdAt > cur.createdAt) newestMessageByLead.set(row.leadId, row);
+      // A reply beats a cold sequence nudge regardless of age; a human-typed send beats both;
+      // within the same origin the newest wins.
+      if (!cur || supersedes(row, cur)) newestMessageByLead.set(row.leadId, row);
     }
     const messagedLeads = new Set<string>(); // one message per lead per run, belt-and-braces
 
@@ -323,4 +325,14 @@ function inQuietHours(now: Date, tz: string): boolean {
   } catch {
     return false;
   }
+}
+
+const ORIGIN_RANK: Record<DispatchableSend["origin"], number> = { sequence: 0, reply_response: 1, manual: 2 };
+
+/** Does `a` replace `b` as the lead's one live message row? */
+function supersedes(a: DispatchableSend, b: DispatchableSend): boolean {
+  const ra = ORIGIN_RANK[a.origin];
+  const rb = ORIGIN_RANK[b.origin];
+  if (ra !== rb) return ra > rb;
+  return a.createdAt > b.createdAt;
 }

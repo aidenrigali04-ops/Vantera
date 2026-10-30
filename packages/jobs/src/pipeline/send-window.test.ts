@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isWithinSendWindow, timezoneForLocation } from "./send-window";
+import { isWithinSendWindow, resolveLeadTimezone, timezoneForLocation } from "./send-window";
 
 describe("timezoneForLocation", () => {
   it("maps the markets the accounts sell into", () => {
@@ -39,5 +39,19 @@ describe("isWithinSendWindow", () => {
   it("unknown location falls back to a UTC business-hours band", () => {
     expect(isWithinSendWindow(new Date("2026-07-07T10:00:00Z"), "Remote")).toBe(true);
     expect(isWithinSendWindow(new Date("2026-07-07T22:00:00Z"), "Remote")).toBe(false);
+  });
+});
+
+describe("resolveLeadTimezone", () => {
+  it("prefers the location's zone", () => {
+    expect(resolveLeadTimezone("Doha, Qatar", "Europe/Paris")).toBe("Asia/Qatar");
+  });
+  it("falls back to the agent zone when the location resolves to nothing", () => {
+    expect(resolveLeadTimezone("Remote", "Europe/Paris")).toBe("Europe/Paris");
+  });
+  it("treats the UTC default and missing agent zone as unset", () => {
+    expect(resolveLeadTimezone("Remote", "UTC")).toBeNull();
+    expect(resolveLeadTimezone(null, null)).toBeNull();
+    expect(resolveLeadTimezone(undefined, undefined)).toBeNull();
   });
 });

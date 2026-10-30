@@ -915,4 +915,60 @@ describe("runSendDispatch - notBefore and quiet window", () => {
     const { store } = await run([makeSend({ origin: "reply_response", leadTimezone: "Not/AZone" })]);
     expect(store.scheduled).toHaveLength(1);
   });
+
+  it("does not gate a 'scheduled' row on a future notBefore", async () => {
+    const { store } = await run([
+      makeSend({ origin: "reply_response", status: "scheduled", notBefore: new Date(NOW.getTime() + 3_600_000) }),
+    ]);
+    expect(store.scheduled).toHaveLength(1);
+  });
+
+  it("does not quiet-gate a sequence row on leadTimezone", async () => {
+    // 15:00Z is Wed 08:00 in Los Angeles: inside the business window, and not a quiet hour either
+    // way; use Tokyo (00:00 local, quiet) with no location so the business window does not apply.
+    const { store } = await run([makeSend({ origin: "sequence", leadTimezone: "Asia/Tokyo", leadLocation: null })]);
+    expect(store.scheduled).toHaveLength(1);
+  });
+
+  const msg = (over: Partial<DispatchableSend>) =>
+    makeSend({ linkedinStage: "message", leadConnectedAt: new Date("2026-05-01T00:00:00Z"), ...over });
+
+  it("a sequence row created after a delayed reply cannot supersede the reply", async () => {
+    const { store } = await run([
+      msg({ id: "reply", origin: "reply_response", createdAt: new Date("2026-06-03T14:00:00Z") }),
+      msg({ id: "cold", origin: "sequence", createdAt: new Date("2026-06-03T14:30:00Z") }),
+    ]);
+    expect(store.canceled.map((c) => c.sendId)).toEqual(["cold"]);
+    expect(store.scheduled.map((s) => s.sendId)).toEqual(["reply"]);
+  });
+
+  it("a not-yet-due reply still supersedes an older cold nudge", async () => {
+    const { store } = await run([
+      msg({ id: "cold", origin: "sequence", createdAt: new Date("2026-06-03T13:00:00Z") }),
+      msg({
+        id: "reply",
+        origin: "reply_response",
+        createdAt: new Date("2026-06-03T14:00:00Z"),
+        notBefore: new Date(NOW.getTime() + 60_000),
+      }),
+    ]);
+    expect(store.canceled.map((c) => c.sendId)).toEqual(["cold"]);
+  });
+
+  it("of two reply_response rows the newer wins", async () => {
+    const { store } = await run([
+      msg({ id: "old", origin: "reply_response", createdAt: new Date("2026-06-03T13:00:00Z") }),
+      msg({ id: "new", origin: "reply_response", createdAt: new Date("2026-06-03T14:00:00Z") }),
+    ]);
+    expect(store.canceled.map((c) => c.sendId)).toEqual(["old"]);
+    expect(store.scheduled.map((s) => s.sendId)).toEqual(["new"]);
+  });
+
+  it("a manual row beats both", async () => {
+    const { store } = await run([
+      msg({ id: "man", origin: "manual", createdAt: new Date("2026-06-03T10:00:00Z") }),
+      msg({ id: "reply", origin: "reply_response", createdAt: new Date("2026-06-03T14:00:00Z") }),
+    ]);
+    expect(store.canceled.map((c) => c.sendId)).toEqual(["reply"]);
+  });
 });
