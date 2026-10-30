@@ -55,6 +55,8 @@ export type DecideOutcome = {
   decisionId: string | null;
   move: Move | null;
   reason?: string;
+  /** set only when `wait` was the sole legal move — no model was asked; the caller lets the touch stand */
+  forced?: boolean;
 };
 
 export interface ConversationDecideDeps {
@@ -168,39 +170,45 @@ export async function runConversationDecide(
     links,
   });
 
-  // (4) priors → posteriors per legal move for this (phase, archetype).
   const phase = phaseOf(deriveStage(state));
   const archetype = archetypeOf(state.person);
-  const table = await store.readPriors(accountId);
-  const posteriors = new Map<Move, { alpha: number; beta: number }>();
-  const priors: { move: Move; rate: number; n: number; level: ReturnType<typeof posteriorFor>["level"] }[] = [];
-  for (const move of legal) {
-    const p = posteriorFor(table, move, phase, archetype);
-    posteriors.set(move, { alpha: p.alpha, beta: p.beta });
-    priors.push({ move, rate: p.alpha / (p.alpha + p.beta), n: p.n, level: p.level });
-  }
+  const silence = { lengthBand: "short", question: false, link: "none", mirror: false } as const;
 
-  // (5) policy shortlist, (6) exploration pick. An empty shortlist means no move fits: a person decides.
-  const shortlist: Shortlist = await deps.shortlistFn({
-    state,
-    trigger: trigger.kind,
-    readout,
-    incoming: trigger.kind === "reply" ? trigger.incoming : undefined,
-    legal,
-    vetoes,
-    priors,
-    links,
-    cta: bundle.context.cta,
-  });
-  const decision: Pick<MoveDecision, "move" | "style" | "rationale" | "propensity"> =
-    shortlist.candidates.length > 0
-      ? decideMove(shortlist, posteriors, deps.rng)
-      : {
-          move: "hand_to_human",
-          style: { lengthBand: "short", question: false, link: "none", mirror: false },
-          rationale: "no legal move fits",
-          propensity: 1,
-        };
+  // Forced wait: when `wait` is the only real move left (after a breakup, follow-ups exhausted, a
+  // closed thread), there is nothing to choose — no priors read, no policy call, propensity 1.
+  const forced = legal.filter((m) => m !== "hand_to_human").length === 1 && legal.includes("wait");
+  let shortlist: Shortlist | null = null;
+  let decision: Pick<MoveDecision, "move" | "style" | "rationale" | "propensity">;
+  if (forced) {
+    decision = { move: "wait", style: silence, rationale: "only legal move", propensity: 1 };
+  } else {
+    // (4) priors → posteriors per legal move for this (phase, archetype).
+    const table = await store.readPriors(accountId);
+    const posteriors = new Map<Move, { alpha: number; beta: number }>();
+    const priors: { move: Move; rate: number; n: number; level: ReturnType<typeof posteriorFor>["level"] }[] = [];
+    for (const move of legal) {
+      const p = posteriorFor(table, move, phase, archetype);
+      posteriors.set(move, { alpha: p.alpha, beta: p.beta });
+      priors.push({ move, rate: p.alpha / (p.alpha + p.beta), n: p.n, level: p.level });
+    }
+
+    // (5) policy shortlist, (6) exploration pick. An empty shortlist means no move fits: a person decides.
+    shortlist = await deps.shortlistFn({
+      state,
+      trigger: trigger.kind,
+      readout,
+      incoming: trigger.kind === "reply" ? trigger.incoming : undefined,
+      legal,
+      vetoes,
+      priors,
+      links,
+      cta: bundle.context.cta,
+    });
+    decision =
+      shortlist.candidates.length > 0
+        ? decideMove(shortlist, posteriors, deps.rng)
+        : { move: "hand_to_human", style: silence, rationale: "no legal move fits", propensity: 1 };
+  }
 
   // Minted up front so the sent message's recipe can name the decision row written after it.
   const decisionId = randomUUID();
@@ -220,7 +228,7 @@ export async function runConversationDecide(
       seed: deps.seed(),
       legalMoves: legal,
       vetoes,
-      degraded: shortlist.degraded ?? null,
+      degraded: shortlist?.degraded ?? null,
       stateSnapshot: state,
       composedBody,
       policyVersion: POLICY_VERSION,
@@ -237,7 +245,7 @@ export async function runConversationDecide(
 
   // (8) live.
   if (decision.move === "wait") {
-    return { action: "wait", decisionId: await logDecision(null, null), move: "wait" };
+    return { action: "wait", decisionId: await logDecision(null, null), move: "wait", ...(forced ? { forced: true } : {}) };
   }
   if (decision.move === "hand_to_human") {
     await logDecision(null, null);

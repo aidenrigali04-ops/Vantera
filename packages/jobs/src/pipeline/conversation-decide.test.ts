@@ -562,6 +562,28 @@ describe("runConversationDecide", () => {
     expect(fake.stopped).toHaveLength(0);
   });
 
+  it("forced wait: when wait is the only legal move (after a breakup) the policy model is skipped", async () => {
+    const after = emptyState();
+    after.lastMove = { move: "breakup", at: "2026-10-27T10:00:00Z" };
+    const fake = makeStore({ turns: [BASE_TURNS[0]!], stored: { state: after, lastMessageRef: "m1" } });
+    const { deps, shortlistFn, composeFn } = makeDeps(fake, { pick: "observe" });
+    const out = await runConversationDecide(args({ kind: "followup", runId: "run1", touchNo: 2, isLast: false }), deps);
+    expect(shortlistFn).not.toHaveBeenCalled();
+    expect(composeFn).not.toHaveBeenCalled();
+    expect(out).toEqual({ action: "wait", decisionId: fake.decisions[0]!.id, move: "wait", forced: true });
+    expect(fake.decisions[0]).toMatchObject({ move: "wait", propensity: 1, trigger: "followup", mode: "live" });
+    expect(fake.sends).toHaveLength(0);
+  });
+
+  it("a chosen wait (other moves legal) is not forced", async () => {
+    const fake = makeStore({ turns: [BASE_TURNS[0]!] });
+    const { deps, shortlistFn } = makeDeps(fake, { pick: "wait" });
+    const out = await runConversationDecide(args({ kind: "followup", runId: "run1", touchNo: 1, isLast: false }), deps);
+    expect(shortlistFn).toHaveBeenCalledTimes(1);
+    expect(out.action).toBe("wait");
+    expect(out.forced).toBeUndefined();
+  });
+
   it("first_message uses the first-touch brain and origin sequence", async () => {
     const fake = makeStore({ turns: [] });
     const { deps, composeFn } = makeDeps(fake, { pick: "observe", message: "Saw the Series A news." });

@@ -1119,8 +1119,12 @@ export interface SequenceTouchStore {
   stopSequenceRun(runId: string): Promise<void>;
   /** turn-cap handoff: tell the human the agent is stepping aside on this thread */
   insertLeadNotification(n: { accountId: string; leadId: string; kind: "needs_human"; body: string }): Promise<void>;
-  /** policy `wait` returns the touch (spec §6.5): touches_done - 1, lastTouchAt restored, run re-armed */
-  deferTouch(runId: string, patch: { nextActionAt: Date; lastTouchAt: Date | null }): Promise<void>;
+  /**
+   * A chosen policy `wait` returns the touch (spec §6.5): touches_done = touchNo - 1 (absolute, guarded
+   * by status 'active' and touches_done = touchNo, so a redelivery is a no-op), the run re-armed, and
+   * last_touch_at restored — left untouched when `lastTouchAt` is null.
+   */
+  deferTouch(runId: string, patch: { touchNo: number; nextActionAt: Date; lastTouchAt: Date | null }): Promise<void>;
 }
 
 export interface SequenceTouchDeps {

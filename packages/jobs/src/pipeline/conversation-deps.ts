@@ -7,7 +7,7 @@ import {
   shortlistMoves,
 } from "@vantera/agent-brains";
 import { createConversationStore } from "./pg-store";
-import type { InboundDeps, InboundStore } from "./types";
+import type { InboundDeps, InboundStore, ResponderBundle } from "./types";
 
 /**
  * The real conversation-intelligence wiring for the inbound wrappers (process-inbound, replay-inbound,
@@ -37,4 +37,12 @@ export async function buildConversationDeps(
       seed: () => Math.floor(Math.random() * 2 ** 31),
     },
   };
+}
+
+/**
+ * The seller name the composer signs as: an explicit override (null included) wins, else the
+ * bundle's account name. Shared by every conversation-core caller (inbound, sequence-touch).
+ */
+export function sellerNameFor(bundle: ResponderBundle, override?: string | null): string | null {
+  return override !== undefined ? override : (bundle.context.accountName ?? null);
 }

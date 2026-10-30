@@ -14,6 +14,7 @@ import { getModelId } from "@vantera/ai";
 import type { LinkedInEvent } from "@vantera/linkedin-infra";
 import { normalizeLinkedInUrl, MAX_BEST_OF_N } from "./copy-draft";
 import { runConversationDecide, syncState, type DecideOutcome } from "./conversation-decide";
+import { sellerNameFor } from "./conversation-deps";
 import type { InboundDeps, InboundPayload, InboundStore, InboundSummary, ResponderBundle } from "./types";
 
 /**
@@ -657,7 +658,7 @@ async function handleReadReply(
           trigger: { kind: "reply", replyId: reply.id, incoming: reply.body, receivedAt: reply.receivedAt, readout },
           mode,
           bundle,
-          sellerName: conv.sellerName !== undefined ? conv.sellerName : (bundle.context.accountName ?? null),
+          sellerName: sellerNameFor(bundle, conv.sellerName),
         },
         conv.deps
       );

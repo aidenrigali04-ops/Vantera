@@ -686,12 +686,13 @@ function convo(mode: ConversationMode, pick: Pick_ = "nudge", seeded?: Conversat
 }
 
 function convoDeps(c: ReturnType<typeof convo>, over: Partial<SequenceTouchDeps["store"]> = {}) {
-  const deferred: { runId: string; patch: { nextActionAt: Date; lastTouchAt: Date | null } }[] = [];
+  type DeferPatch = { touchNo: number; nextActionAt: Date; lastTouchAt: Date | null };
+  const deferred: { runId: string; patch: DeferPatch }[] = [];
   const draftFn = vi.fn(async () => ({ message: "legacy nudge", violations: [] }));
   const base = deps(
     {
       getResponderBundle: async () => bundle({ lastAgentMessageAt: LAST_DELIVERED }),
-      deferTouch: vi.fn(async (runId: string, patch: { nextActionAt: Date; lastTouchAt: Date | null }) => {
+      deferTouch: vi.fn(async (runId: string, patch: DeferPatch) => {
         deferred.push({ runId, patch });
       }),
       ...over,
@@ -720,12 +721,26 @@ describe("runSequenceTouch — conversation policy (Task 15)", () => {
     const out = await runSequenceTouch({ ...dispatch, touchGapDays: 4 }, d);
     expect(out).toBe("deferred");
     expect(deferred).toEqual([
-      { runId: "r1", patch: { nextActionAt: new Date(NOW.getTime() + 4 * DAY), lastTouchAt: LAST_DELIVERED } },
+      { runId: "r1", patch: { touchNo: 1, nextActionAt: new Date(NOW.getTime() + 4 * DAY), lastTouchAt: LAST_DELIVERED } },
     ]);
     expect(draftFn).not.toHaveBeenCalled();
     expect(d.store.insertScheduledSend).not.toHaveBeenCalled();
     expect(c.decisions).toHaveLength(1);
     expect(c.decisions[0]).toMatchObject({ trigger: "followup", mode: "live", move: "wait" });
+  });
+
+  it("live forced wait (after a breakup): the stamped touch stands — no defer, no policy call, outcome 'skipped'", async () => {
+    const after = seedState(bundle().lead, bundle().insights);
+    after.lastMove = { move: "breakup", at: "2026-06-10T10:00:00Z" };
+    const c = convo("live", "nudge", after);
+    const { d, deferred, draftFn } = convoDeps(c);
+    const out = await runSequenceTouch({ ...dispatch, touchNo: 2 }, d);
+    expect(out).toBe("skipped");
+    expect(c.shortlistFn).not.toHaveBeenCalled();
+    expect(deferred).toHaveLength(0);
+    expect(draftFn).not.toHaveBeenCalled();
+    expect(c.decisions).toHaveLength(1);
+    expect(c.decisions[0]).toMatchObject({ move: "wait", trigger: "followup", mode: "live" });
   });
 
   it("live drafted: the core writes the follow-up with a v3 sequence_followup recipe carrying the move", async () => {

@@ -4,6 +4,7 @@ import { normalizeLinkedInUrl, MAX_BEST_OF_N } from "./copy-draft";
 import { MAX_AGENT_TURNS } from "./inbound";
 import { needsRefresh, FRESHNESS_WINDOW_DAYS } from "./freshness";
 import { runConversationDecide } from "./conversation-decide";
+import { sellerNameFor } from "./conversation-deps";
 import type {
   NewScheduledSend,
   SequenceTouchDeps,
@@ -114,7 +115,7 @@ export async function runSequenceTouch(
           trigger: { kind: "followup", runId: d.runId, touchNo: d.touchNo, isLast: d.isLast },
           mode,
           bundle,
-          sellerName: conv.sellerName !== undefined ? conv.sellerName : (bundle.context.accountName ?? null),
+          sellerName: sellerNameFor(bundle, conv.sellerName),
         },
         conv.deps
       );
@@ -122,9 +123,13 @@ export async function runSequenceTouch(
       const outcome = await decide("live");
       switch (outcome.action) {
         case "wait":
-          // `wait` returns the touch: advanceSequence stamped it before this task ran, so roll the
-          // count/clock back and re-arm one gap out — the user's touch count stays a ceiling.
+          // A FORCED wait (nothing else legal: after a breakup, follow-ups exhausted) lets the
+          // stamped touch stand, so the run counts down and exhausts instead of deferring forever.
+          if (outcome.forced) return "skipped";
+          // A CHOSEN wait returns the touch: advanceSequence stamped it before this task ran, so
+          // roll the count/clock back and re-arm one gap out — the user's touch count stays a ceiling.
           await deps.store.deferTouch(d.runId, {
+            touchNo: d.touchNo,
             nextActionAt: new Date(deps.now().getTime() + d.touchGapDays * 86_400_000),
             lastTouchAt: bundle.lastAgentMessageAt,
           });
