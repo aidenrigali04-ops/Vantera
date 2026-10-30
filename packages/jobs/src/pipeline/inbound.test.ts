@@ -1876,6 +1876,17 @@ describe("handleLinkedInEvent — readout-driven actions and routing (spec §6.4
     expect(t.respondFn).not.toHaveBeenCalled();
   });
 
+  it("mode shadow: an opt_out stance suppresses even when explicitOptOut is false", async () => {
+    const t = setup({ mode: "shadow", leadReadout: readout({ stance: "opt_out", intent: "other", explicitOptOut: false, confidence: 0.7 }) });
+
+    await t.run("Leave me alone.", "neutral");
+
+    expect(t.store.suppressions.map((s) => s[3])).toEqual(["unsubscribe", "unsubscribe"]);
+    expect(t.store.stoppedSequences).toEqual(["lead1"]);
+    expect(t.respondFn).not.toHaveBeenCalled();
+    expect(t.decisions).toEqual([]);
+  });
+
   it("mode shadow: a confident decline (negative ≥ 0.8, declines) suppresses as not_interested", async () => {
     const t = setup({ mode: "shadow", leadReadout: readout({ stance: "negative", intent: "declines", confidence: 0.9 }) });
 

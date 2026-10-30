@@ -551,7 +551,7 @@ async function readIncoming(
  * The readout-driven twin of the classifier path (spec §6.4). The classifier's verdict still drives
  * the inbox chip and the reply notifications; it never suppresses or stops the run on its own here.
  *
- *   explicitOptOut, or negative ∧ confidence ≥ DECLINE_CONFIDENCE ∧ declines → suppress + stop
+ *   explicitOptOut / opt_out stance / opts_out intent, or negative ∧ confidence ≥ DECLINE_CONFIDENCE ∧ declines → suppress + stop
  *   any other negative                                                      → stop + needs_human, NO suppression
  *   ooo                                                                     → no action
  *   booked (classifier)                                                     → unchanged: stamp + stand down
@@ -577,13 +577,15 @@ async function handleReadReply(
   const { store } = deps;
   const declines =
     readout.stance === "negative" && readout.confidence >= DECLINE_CONFIDENCE && readout.intent === "declines";
-  const suppress = readout.explicitOptOut || declines;
+  // an opt_out stance/intent is by definition explicit — it suppresses even without the flag
+  const optOut = readout.explicitOptOut || readout.stance === "opt_out" || readout.intent === "opts_out";
+  const suppress = optOut || declines;
   const ooo = readout.intent === "ooo";
   const softNo = !suppress && !ooo && readout.stance === "negative";
 
   // Rule 11 first: the legal effect never waits on (or is lost to) a later failure.
   if (suppress) {
-    const source = readout.explicitOptOut ? "unsubscribe" : "not_interested";
+    const source = optOut ? "unsubscribe" : "not_interested";
     for (const value of r.suppressionValues) {
       await store.addSuppression(accountId, "linkedin", value, source, lead.id);
     }
