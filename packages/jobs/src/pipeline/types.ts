@@ -12,6 +12,7 @@ import type {
   IntentVerdict,
   LeadInsights,
   LinkedInDraft,
+  LinkedInNoteDraft,
   DraftInput,
   RankCandidate,
   RankContext,
@@ -34,9 +35,20 @@ import type {
   StrategySource,
   SendRecipe,
   JudgeFn,
+  ConversationState,
+  StoredTurn,
+  PriorTable,
+  Readout,
+  Move,
+  Phase,
+  Archetype,
+  Veto,
+  Trigger,
+  DecisionOutcome,
 } from "@vantera/agent-brains";
 import type { OutreachCapacity } from "./capacity";
 import type { SenderCandidate } from "./sender-assignment";
+import type { ConversationDecideDeps } from "./conversation-decide";
 import type { LinkedInInfra } from "@vantera/linkedin-infra";
 
 export interface ScoutConfig {
@@ -481,6 +493,16 @@ export interface CopyDraftDeps {
   store: CopyDraftStore;
   draftLinkedInFn: (input: DraftInput) => Promise<LinkedInDraft>;
   /**
+   * The `conversation_policy` rollout knob, read once per run by the thin trigger (spec §7.2/§9).
+   * "live" ⇒ the invite note ONLY, from `draftLinkedInNoteFn`; the first message is written at
+   * acceptance by the first-message scan through the conversation core. "off" / "shadow" /
+   * "live_replies" ⇒ today's invite+message pair from `draftLinkedInFn`, byte-identical (in shadow
+   * and live_replies the scan logs a shadow decision against the parked pair message).
+   */
+  conversationMode: ConversationMode;
+  /** Note-only first-touch brain (lints itself); used only when `conversationMode === "live"`. */
+  draftLinkedInNoteFn: (input: DraftInput) => Promise<LinkedInNoteDraft>;
+  /**
    * One targeted EDIT of a style-flagged pair, run only on the AUTOMATIC send path before the
    * draft may auto-approve (review mode surfaces the flags + the queue's Fix button instead).
    * The fix is re-linted with the same validator; still-flagged output waits in review (rule 06/11).
@@ -627,6 +649,11 @@ export interface DispatchableSend {
   origin: "sequence" | "reply_response" | "manual";
   /** free-text lead location — drives the proactive business-hours send window */
   leadLocation: string | null;
+  /** `scheduled_for` of an `approved` row = the earliest dispatch time (reply delay, §6.5);
+   *  null for `scheduled` rows and rows nothing delayed. */
+  notBefore: Date | null;
+  /** IANA zone for the lead (from location, else the copy agent's zone); null = unknown. */
+  leadTimezone: string | null;
   /** Multi-sender: the LinkedIn account already assigned to this lead (rule 04/13).
    *  Null until first invite — invites without one are assigned here; a connected
    *  lead's messages are LOCKED to this account (can't message from another). */
@@ -645,6 +672,12 @@ export interface DispatchSender extends SenderCandidate {
   sentTodayMessages: number;
   /** Epoch ms of this account's latest already-scheduled send (0 if none) — pacing continues after it. */
   scheduledUntil: number;
+}
+
+/** Tiny key/value access to app_settings (provider-alert cooldowns). */
+export interface AppSettingsStore {
+  getSetting(key: string): Promise<unknown>;
+  setSetting(key: string, value: unknown): Promise<void>;
 }
 
 export interface SendDispatchStore {
@@ -780,9 +813,20 @@ export interface InboundStore {
     /** the row already carries a classification — the processed marker (set LAST by runInbound),
      *  so an existing-but-unclassified row is a crashed run to finish, not a duplicate */
     classified: boolean;
+    /** the reader's readout already persisted on the row (a crashed run's retry reuses it, never
+     *  re-reading the turn against a state that already includes it); null on a fresh row */
+    readout: Readout | null;
   }>;
+  /** Attribute a reply to the agent send it answered. `scheduledSendId` is the delivered
+   *  scheduled_sends row (null = none); the store resolves it to its outreach_sends audit row. */
+  setReplyOutreachSend(replyId: string, scheduledSendId: string | null): Promise<void>;
+  /** Newest delivered (status 'sent', invite|message) scheduled send for the lead at or before
+   *  `before`; delivery time = coalesce(max(outreach_sends.sent_at), updated_at). */
+  lastDeliveredSendId(accountId: string, leadId: string, before: Date): Promise<string | null>;
   /** Written LAST in reply processing: classification doubles as the "fully processed" marker. */
   setReplyClassification(replyId: string, verdict: ReplyVerdict): Promise<void>;
+  /** Persist the conversation reader's structured readout of an inbound reply (0074 replies.readout). */
+  setReplyReadout(replyId: string, readout: Readout): Promise<void>;
   /** The lead's STORED LinkedIn URL — the value every send-path suppression check compares
    *  against (rule 11). Inbound payloads carry a provider-id URL form that rarely matches it. */
   getLeadLinkedInUrl(accountId: string, leadId: string): Promise<string | null>;
@@ -943,6 +987,17 @@ export interface InboundDeps {
    * MAX_BEST_OF_N regardless of what's configured, and forces it to 1 when `judgeFn` is absent.
    */
   bestOfN?: number;
+  /**
+   * Conversation intelligence (spec §6.4/§9). Absent or mode "off" ⇒ today's classifier-driven path,
+   * byte-identical. Otherwise the reader's readout of the incoming reply drives suppression/stop,
+   * and the conversation core runs (shadow: logs only, legacy responder still writes; live_replies /
+   * live: replaces the legacy responder). `sellerName` overrides the bundle's account name.
+   */
+  conversation?: {
+    mode: ConversationMode;
+    deps: ConversationDecideDeps;
+    sellerName?: string | null;
+  };
 }
 
 export interface InboundSummary {
@@ -1013,7 +1068,8 @@ export interface SequenceRunPatch {
 
 export type SequenceDecision =
   | { kind: "hold" }
-  | { kind: "dispatch"; stage: SequenceStage; touchNo: number; patch: SequenceRunPatch }
+  /** isLast = this is the stage's final allowed touch (touchNo === target) — the policy's breakup-only touch */
+  | { kind: "dispatch"; stage: SequenceStage; touchNo: number; isLast: boolean; patch: SequenceRunPatch }
   | { kind: "advance"; patch: SequenceRunPatch }
   /** write the patch and stop this tick — the soft-no revival parks the run ~30 days out */
   | { kind: "park"; patch: SequenceRunPatch }
@@ -1028,6 +1084,10 @@ export interface SequenceTouchDispatch {
   leadId: string;
   stage: SequenceStage;
   touchNo: number;
+  /** the stage's final allowed touch — the user's touch count is a ceiling, the policy runs below it */
+  isLast: boolean;
+  /** the stage's configured touch gap — how far a policy `wait` re-arms the run */
+  touchGapDays: number;
 }
 
 export interface DueSequenceRun {
@@ -1070,6 +1130,12 @@ export interface SequenceTouchStore {
   stopSequenceRun(runId: string): Promise<void>;
   /** turn-cap handoff: tell the human the agent is stepping aside on this thread */
   insertLeadNotification(n: { accountId: string; leadId: string; kind: "needs_human"; body: string }): Promise<void>;
+  /**
+   * A chosen policy `wait` returns the touch (spec §6.5): touches_done = touchNo - 1 (absolute, guarded
+   * by status 'active' and touches_done = touchNo, so a redelivery is a no-op), the run re-armed, and
+   * last_touch_at restored — left untouched when `lastTouchAt` is null.
+   */
+  deferTouch(runId: string, patch: { touchNo: number; nextActionAt: Date; lastTouchAt: Date | null }): Promise<void>;
 }
 
 export interface SequenceTouchDeps {
@@ -1105,9 +1171,20 @@ export interface SequenceTouchDeps {
    * MAX_BEST_OF_N regardless of what's configured, and forces it to 1 when `judgeFn` is absent.
    */
   bestOfN?: number;
+  /**
+   * Conversation intelligence (spec §6.5). Absent or mode "off" ⇒ the legacy follow-up draft,
+   * byte-identical. "live" ⇒ the conversation core decides the touch (a `wait` returns it);
+   * "shadow"/"live_replies" ⇒ the core logs a shadow decision, then the legacy draft runs.
+   * `sellerName` overrides the bundle's account name.
+   */
+  conversation?: {
+    mode: ConversationMode;
+    deps: ConversationDecideDeps;
+    sellerName?: string | null;
+  };
 }
 
-export type SequenceTouchOutcome = "drafted" | "suppressed" | "skipped" | "dropped" | "handed_off";
+export type SequenceTouchOutcome = "drafted" | "suppressed" | "skipped" | "dropped" | "handed_off" | "deferred";
 
 // ── Conversion gate (tracked-CTA redirect) ────────────────────────────────────
 
@@ -1277,4 +1354,112 @@ export interface MeetingEventStore {
   /** cancel queued drafts + stop the active sequence — a lead who booked gets no more nudges */
   standDownOutreach(accountId: string, leadId: string): Promise<void>;
   notifyMeetingBooked(accountId: string, leadId: string): Promise<void>;
+}
+
+// ---- Conversation intelligence store (Task 10) ----
+
+/** app_settings.conversation_policy rollout knob; anything but these four literals reads as "off". */
+export type ConversationMode = "off" | "shadow" | "live_replies" | "live";
+
+/** What woke the conversation policy for a lead. */
+export type ConversationTrigger =
+  | { kind: "reply"; replyId: string; incoming: string; receivedAt: Date; readout: Readout }
+  | { kind: "first_message" }
+  | { kind: "followup"; runId: string; touchNo: number; isLast: boolean };
+
+export type NewDecision = {
+  /** pre-generated id so the sent message's recipe can carry it before the row is written */
+  id?: string;
+  accountId: string;
+  leadId: string;
+  scheduledSendId: string | null;
+  mode: "shadow" | "live";
+  trigger: Trigger;
+  phase: Phase;
+  archetype: Archetype;
+  move: Move;
+  styleKey: string;
+  propensity: number;
+  seed: number;
+  legalMoves: Move[];
+  vetoes: Veto[];
+  /** Shortlist.degraded from the policy; persisted inside the legal_moves jsonb object */
+  degraded: string | null;
+  stateSnapshot: ConversationState;
+  composedBody: string | null;
+  policyVersion: number;
+  promptHash: string | null;
+};
+
+export type ScorableDecision = {
+  id: string;
+  accountId: string;
+  leadId: string;
+  scheduledSendId: string | null;
+  decidedAt: Date;
+  move: Move;
+  phase: Phase;
+  archetype: Archetype;
+  propensity: number;
+  composedBody: string | null;
+  sentBody: string | null;
+  sentAt: Date | null;
+  /** the linked scheduled send's status; null when the decision has no send */
+  sendStatus: string | null;
+  /** the lead's next live decision's decided_at; the outcome window is [decidedAt, nextDecisionAt) */
+  nextDecisionAt: Date | null;
+};
+
+export interface ConversationStore {
+  getConversationPolicyMode(): Promise<ConversationMode>;
+  getConversationState(
+    accountId: string,
+    leadId: string
+  ): Promise<{ state: ConversationState; lastMessageRef: string | null } | null>;
+  saveConversationState(
+    accountId: string,
+    leadId: string,
+    state: ConversationState,
+    lastMessageRef: string | null
+  ): Promise<void>;
+  /** every stored message in the lead's thread, oldest first */
+  listThreadTurns(accountId: string, leadId: string): Promise<StoredTurn[]>;
+  insertDecision(d: NewDecision): Promise<string>;
+  /** notBefore persists a reply delay as scheduled_for; status stays as given */
+  insertScheduledSendReturningId(send: NewScheduledSend & { notBefore?: Date | null }): Promise<string>;
+  /** account rows (source real) first, then global rows */
+  readPriors(accountId: string): Promise<PriorTable>;
+  /**
+   * Scope replace in one transaction: account scope deletes that account's rows; global scope deletes
+   * only source = 'real' rows (never sim/research); then inserts `cells`. An empty list still clears.
+   */
+  upsertPriors(accountId: string | null, cells: PriorTable): Promise<void>;
+  listUnscoredDecisions(olderThan: Date, limit: number): Promise<ScorableDecision[]>;
+  scoreDecision(id: string, outcome: DecisionOutcome, reward: number | null): Promise<void>;
+  /**
+   * Candidates for the first-message scan (spec §7.2), newest acceptance first: connected leads with
+   * an active sequence run under a live Outreach agent, with no `first_message` decision at or after
+   * `decidedSince`, whose prospect has not spoken since our last delivered touch (the reply path owns
+   * those), and with no message-stage row — or, when `includeParked` (shadow / live_replies), no
+   * message-stage row that is sent or sending (a parked legacy draft still qualifies).
+   */
+  listConnectedWithoutFirstMessage(
+    limit: number,
+    opts: { includeParked: boolean; decidedSince: Date }
+  ): Promise<{ accountId: string; leadId: string; campaignId: string }[]>;
+}
+
+/** Learner-only reads/outcomes (Task 17); kept off ConversationStore so decide/send fakes stay small. */
+export interface ConversationLearnStore {
+  /** Scored, on-policy decisions (reward not null) decided at/after `since`, newest first; accountId null = every account. */
+  listScoredDecisions(
+    accountId: string | null,
+    limit: number,
+    since: Date
+  ): Promise<
+    { accountId: string; move: Move; phase: Phase; archetype: Archetype; propensity: number; reward: number }[]
+  >;
+  /** True when the global priors table already holds rows of this source. */
+  hasGlobalPriors(source: "sim"): Promise<boolean>;
+  outcomeFor(d: ScorableDecision): Promise<DecisionOutcome>;
 }

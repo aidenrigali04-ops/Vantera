@@ -34,6 +34,9 @@ const tenantExempt = new Set([
   // operator-side lifecycle ledger about OUR OWN users (0045) — platform data, not tenant
   // data; service-role only (RLS on, no policies)
   "lifecycle_touches",
+  // cross-tenant aggregate counts (0074) — no account_id, no ids, no free text; service-role only
+  // (RLS on, no policies)
+  "conversation_priors_global",
 ]);
 
 // returns the create-table DDL block for a table from the concatenated migrations
@@ -116,7 +119,7 @@ describe("suppression list (rule 11 — the master gate)", () => {
 });
 
 describe("retention windows (rule 11)", () => {
-  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "lab_decisions", "strategies", "lead_strategy_stamp", "lead_feedback", "meeting_connections", "meeting_events", "lead_embeddings", "native_messages"])(
+  it.each(["leads", "enrichment_results", "scheduled_sends", "replies", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "lab_decisions", "strategies", "lead_strategy_stamp", "lead_feedback", "meeting_connections", "meeting_events", "lead_embeddings", "native_messages", "conversation_states", "conversation_decisions", "conversation_priors"])(
     "%s states its retention window",
     (table) => {
       expect(allMigrations).toContain(`retention(${table})`);
@@ -125,7 +128,7 @@ describe("retention windows (rule 11)", () => {
 });
 
 describe("service-role-only write surfaces (rules 09/11)", () => {
-  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls", "security_events", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "strategies", "lead_strategy_stamp", "meeting_connections", "meeting_events", "lab_decisions", "native_messages"])(
+  it.each(["outreach_sends", "copilot_actions", "enrichment_results", "replies", "unsubscribe_tokens", "conversion_tokens", "copilot_conversations", "copilot_messages", "calls", "security_events", "inbound_leads", "lead_signals", "intent_observations", "reveal_runs", "strategies", "lead_strategy_stamp", "meeting_connections", "meeting_events", "lab_decisions", "native_messages", "conversation_states", "conversation_decisions", "conversation_priors"])(
     "%s has no client write policies",
     (table) => {
     const policyRe = new RegExp(`create policy \\w+ on public\\.${table}\\s+for (insert|update|delete|all)`);
@@ -565,3 +568,53 @@ describe("intent speed + follow signal (0069, ML-8)", () => {
   });
 });
 
+
+describe("conversation_priors_global is counts only (0074)", () => {
+  const sql = fileContents.get("0074_conversation_intelligence.sql") ?? "";
+  const start = sql.indexOf("create table public.conversation_priors_global (");
+  const end = sql.indexOf("\n);", start);
+  const block = start === -1 ? "" : sql.slice(start, end);
+  const columnLines = block
+    .split("\n")
+    .slice(1)
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("--") && !l.startsWith("primary key"));
+
+  it("the table exists in 0074", () => {
+    expect(start).toBeGreaterThan(-1);
+    expect(columnLines.length).toBeGreaterThan(0);
+  });
+
+  it("every column is a number, a timestamp, or a CHECK-constrained text enum", () => {
+    for (const line of columnLines) {
+      expect(line, line).toMatch(
+        /^\w+ (integer|double precision|timestamptz|text (not null )?(default '[^']*' )?check \(\w+ (in \(|~ '))/
+      );
+    }
+  });
+
+  it("later ALTERs cannot add a non-counts column", () => {
+    const alters = allMigrations
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith("alter table public.conversation_priors_global") && l.includes("add column"));
+    // multi-line form: "alter table ...global" then "add column ..." on following lines
+    const multi = [...allMigrations.matchAll(/alter table public\.conversation_priors_global\s+add column[^;]*;/g)].map((m) => m[0]);
+    for (const stmt of [...alters, ...multi]) {
+      expect(stmt).not.toContain("uuid");
+      expect(stmt).not.toContain("account_id");
+      expect(stmt).toMatch(/add column (if not exists )?\w+ (integer|double precision|timestamptz|text (not null )?(default '[^']*' )?check \(\w+ (in \(|~ '))/);
+    }
+  });
+
+  it("has no uuid column and no account_id", () => {
+    expect(block).not.toContain("uuid");
+    expect(block).not.toContain("account_id");
+  });
+
+  it("is service-role only: RLS on, no policies", () => {
+    expect(sql).toContain("alter table public.conversation_priors_global enable row level security");
+    expect(sql).not.toMatch(/create policy \w+ on public\.conversation_priors_global/);
+    expect(sql).toContain("revoke all on public.conversation_priors_global from authenticated, anon;");
+  });
+});

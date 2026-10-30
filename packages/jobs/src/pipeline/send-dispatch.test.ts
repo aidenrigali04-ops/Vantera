@@ -26,6 +26,8 @@ function makeSend(overrides: Partial<DispatchableSend> = {}): DispatchableSend {
     leadHasInFlightMessage: false,
     origin: "sequence",
     leadLocation: null,
+    notBefore: null,
+    leadTimezone: null,
     ...overrides,
   };
 }
@@ -853,5 +855,120 @@ describe("runSendDispatch — never invites an existing connection", () => {
     const result = await runSendDispatch(makeDeps(store));
     expect(result.scheduled).toBe(0);
     expect(store.canceled).toEqual([{ sendId: "inv1", error: "already connected" }]);
+  });
+});
+
+describe("runSendDispatch - notBefore and quiet window", () => {
+  const NOW = new Date("2026-06-03T15:00:00Z"); // Wed 15:00 UTC = 08:00 Los Angeles, 17:00 Berlin
+  const run = async (sends: DispatchableSend[]) => {
+    const store = new FakeDispatchStore();
+    store.sends = sends;
+    const enq: string[] = [];
+    const summary = await runSendDispatch({ store, enqueue: async (id) => void enq.push(id), now: () => NOW });
+    return { store, summary };
+  };
+
+  it("skips an approved row whose notBefore is in the future", async () => {
+    const { store, summary } = await run([
+      makeSend({ origin: "reply_response", notBefore: new Date(NOW.getTime() + 60_000) }),
+    ]);
+    expect(store.scheduled).toHaveLength(0);
+    expect(summary.skipped).toBe(1);
+  });
+
+  it("dispatches an approved row whose notBefore has passed", async () => {
+    const { store } = await run([
+      makeSend({ origin: "reply_response", notBefore: new Date(NOW.getTime() - 60_000) }),
+    ]);
+    expect(store.scheduled).toHaveLength(1);
+  });
+
+  it("exempts manual rows from notBefore and quiet hours", async () => {
+    const { store } = await run([
+      makeSend({
+        origin: "manual",
+        notBefore: new Date(NOW.getTime() + 60_000),
+        leadTimezone: "Asia/Tokyo",
+      }),
+    ]);
+    expect(store.scheduled).toHaveLength(1);
+  });
+
+  it("skips a reply_response during the lead's local quiet hours", async () => {
+    // 15:00Z = 00:00 Tokyo (quiet)
+    const { store, summary } = await run([makeSend({ origin: "reply_response", leadTimezone: "Asia/Tokyo" })]);
+    expect(store.scheduled).toHaveLength(0);
+    expect(summary.skipped).toBe(1);
+  });
+
+  it("dispatches a reply_response outside quiet hours", async () => {
+    const { store } = await run([makeSend({ origin: "reply_response", leadTimezone: "Europe/Berlin" })]);
+    expect(store.scheduled).toHaveLength(1);
+  });
+
+  it("applies no quiet gate when the timezone is unknown", async () => {
+    const { store } = await run([makeSend({ origin: "reply_response", leadTimezone: null })]);
+    expect(store.scheduled).toHaveLength(1);
+  });
+
+  it("does not throw on an invalid timezone string", async () => {
+    const { store } = await run([makeSend({ origin: "reply_response", leadTimezone: "Not/AZone" })]);
+    expect(store.scheduled).toHaveLength(1);
+  });
+
+  it("does not gate a 'scheduled' row on a future notBefore", async () => {
+    const { store } = await run([
+      makeSend({ origin: "reply_response", status: "scheduled", notBefore: new Date(NOW.getTime() + 3_600_000) }),
+    ]);
+    expect(store.scheduled).toHaveLength(1);
+  });
+
+  it("does not quiet-gate a sequence row on leadTimezone", async () => {
+    // 15:00Z is Wed 08:00 in Los Angeles: inside the business window, and not a quiet hour either
+    // way; use Tokyo (00:00 local, quiet) with no location so the business window does not apply.
+    const { store } = await run([makeSend({ origin: "sequence", leadTimezone: "Asia/Tokyo", leadLocation: null })]);
+    expect(store.scheduled).toHaveLength(1);
+  });
+
+  const msg = (over: Partial<DispatchableSend>) =>
+    makeSend({ linkedinStage: "message", leadConnectedAt: new Date("2026-05-01T00:00:00Z"), ...over });
+
+  it("a sequence row created after a delayed reply cannot supersede the reply", async () => {
+    const { store } = await run([
+      msg({ id: "reply", origin: "reply_response", createdAt: new Date("2026-06-03T14:00:00Z") }),
+      msg({ id: "cold", origin: "sequence", createdAt: new Date("2026-06-03T14:30:00Z") }),
+    ]);
+    expect(store.canceled.map((c) => c.sendId)).toEqual(["cold"]);
+    expect(store.scheduled.map((s) => s.sendId)).toEqual(["reply"]);
+  });
+
+  it("a not-yet-due reply still supersedes an older cold nudge", async () => {
+    const { store } = await run([
+      msg({ id: "cold", origin: "sequence", createdAt: new Date("2026-06-03T13:00:00Z") }),
+      msg({
+        id: "reply",
+        origin: "reply_response",
+        createdAt: new Date("2026-06-03T14:00:00Z"),
+        notBefore: new Date(NOW.getTime() + 60_000),
+      }),
+    ]);
+    expect(store.canceled.map((c) => c.sendId)).toEqual(["cold"]);
+  });
+
+  it("of two reply_response rows the newer wins", async () => {
+    const { store } = await run([
+      msg({ id: "old", origin: "reply_response", createdAt: new Date("2026-06-03T13:00:00Z") }),
+      msg({ id: "new", origin: "reply_response", createdAt: new Date("2026-06-03T14:00:00Z") }),
+    ]);
+    expect(store.canceled.map((c) => c.sendId)).toEqual(["old"]);
+    expect(store.scheduled.map((s) => s.sendId)).toEqual(["new"]);
+  });
+
+  it("a manual row beats both", async () => {
+    const { store } = await run([
+      msg({ id: "man", origin: "manual", createdAt: new Date("2026-06-03T10:00:00Z") }),
+      msg({ id: "reply", origin: "reply_response", createdAt: new Date("2026-06-03T14:00:00Z") }),
+    ]);
+    expect(store.canceled.map((c) => c.sendId)).toEqual(["reply"]);
   });
 });

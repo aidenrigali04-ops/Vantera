@@ -1,0 +1,165 @@
+{
+  "id": "prod-reverse-seller-bd-manager",
+  "lead": {
+    "firstName": "Priya",
+    "lastName": "Raman",
+    "title": "Business Development Manager | Helping founders with growth, tech and operations",
+    "companyName": "Brightpath Digital",
+    "industry": "IT services"
+  },
+  "insights": {
+    "summary": "Business Development consultant actively advising founders on growth and operations, recently flagged slow follow-up as a deal-killer. This prospect understands the problem space cold and is in a role where Vantera's approval-first automation directly solves the capacity + safety tension they face.",
+    "triggers": [
+      "Recent comment naming follow-up bottleneck",
+      "Active discussion of growth and operations challenges",
+      "Involvement in founder coaching/growth consulting"
+    ],
+    "aha_moment": "Realizing that 15 minutes to deploy agents + hard weekly ceilings could let them safely systematize the follow-up grind—turning founder retention into a competitive edge instead of a bottleneck.",
+    "motivations": [
+      "Improve founder outcomes through faster, systematic outreach",
+      "Scale personal or team capacity without sacrificing quality",
+      "Reduce manual busywork to focus on strategy"
+    ],
+    "pain_points": [
+      "Slow follow-up killing deals",
+      "Manual outreach process limiting velocity",
+      "Inability to keep pace with lead volume"
+    ],
+    "value_angle": "Vantera's review-first automation could let this BD professional move prospects faster through follow-up cycles without manual sending, freeing capacity to coach more founders or close larger deals.",
+    "prospect_offering": "Business development services helping founders in two regions improve growth, tech, and operations; implies direct advising or consulting on scaling operations and fixing bottlenecks."
+  },
+  "context": {
+    "cta": "a short walkthrough of how Vantera books qualified meetings",
+    "accountName": "Vantera",
+    "accountIndustry": "LinkedIn outreach software",
+    "valueProp": "Vantera finds in-market prospects on LinkedIn, drafts personal messages, and books qualified meetings while the founder approves every send",
+    "websiteUrl": "https://www.vanterasystem.dev",
+    "bookingUrl": null,
+    "contentLinks": [],
+    "proofPoints": []
+  },
+  "turns": [
+    {
+      "ref": "t0",
+      "role": "agent",
+      "text": "Your point about slow follow-up being the real deal-killer stuck with me. That's the exact bottleneck most founders overlook until it's too late.",
+      "at": "2026-10-22T15:24:31Z",
+      "stage": "invite"
+    },
+    {
+      "ref": "t1",
+      "role": "lead",
+      "text": "Hi Sam , \nIt’s great connecting with you. Looking forward to stay in touch",
+      "at": "2026-10-22T15:28:26Z"
+    },
+    {
+      "ref": "t2",
+      "role": "agent",
+      "text": "Great to connect, Priya! Excited to see what you're working on with founders in two regions.",
+      "at": "2026-10-22T17:31:49Z",
+      "stage": "message"
+    },
+    {
+      "ref": "t3",
+      "role": "lead",
+      "text": "Likewise, Sam!\n\nI’m currently working as a Business Development Manager, closely engaging with founders and decision-makers across two regions.\n\nMy role revolves around understanding business challenges, identifying growth opportunities, and helping businesses with digital transformation, marketing, and technology solutions.\n\nWould love to hear more about what you’re building at Vantera!",
+      "at": "2026-10-23T05:52:30Z"
+    },
+    {
+      "ref": "t4",
+      "role": "agent",
+      "text": "Vantera is a LinkedIn outreach tool built for founders and small B2B teams. AI agents find in-market prospects, draft personalized messages, and score leads, but nothing goes out without your sign-off first. Curious if that kind of setup would be useful for the BD work you're doing across two regions?",
+      "at": "2026-10-23T05:54:13Z",
+      "stage": "message"
+    },
+    {
+      "ref": "t5",
+      "role": "human",
+      "text": "This conversation is actually being run automatically by our system. No human except a sign off on automation of wanted. :)",
+      "at": "2026-10-23T06:44:06Z"
+    },
+    {
+      "ref": "t6",
+      "role": "human",
+      "text": "Anyhow any notable achievements on ur end?",
+      "at": "2026-10-23T06:44:58Z"
+    },
+    {
+      "ref": "t7",
+      "role": "lead",
+      "text": "Well I have automated my marketing tool as well. Im in a phase of learning as well. I am exploring opportunities in DM as a marketer as well as BD",
+      "at": "2026-10-23T09:48:12Z"
+    },
+    {
+      "ref": "t8",
+      "role": "human",
+      "text": "If there’s anything that vantera can help with we can book a call. For specific clientele we build a personalized outreach systems just for them. Or if you think our system itself can help.",
+      "at": "2026-10-23T18:15:38Z"
+    },
+    {
+      "ref": "t9",
+      "role": "lead",
+      "text": "Well If you can share your scope of work or any brochure it’ll be a great help.",
+      "at": "2026-10-24T07:53:15Z"
+    },
+    {
+      "ref": "t10",
+      "role": "human",
+      "text": "Of course, our website has the best form of information you can find it at https://www.vanterasystem.dev",
+      "at": "2026-10-24T21:52:34Z"
+    }
+  ],
+  "expect": {
+    "readouts": [
+      {
+        "turn": "t1",
+        "stance": "neutral",
+        "intent": "small_talk",
+        "explicitOptOut": false
+      },
+      {
+        "turn": "t3",
+        "stance": "positive",
+        "intent": "asks_question",
+        "explicitOptOut": false,
+        "personDelta": {
+          "role": "seller_to_us"
+        }
+      },
+      {
+        "turn": "t7",
+        "stance": "neutral",
+        "intent": "other",
+        "explicitOptOut": false
+      },
+      {
+        "turn": "t9",
+        "stance": "neutral",
+        "intent": "requests_info",
+        "explicitOptOut": false
+      }
+    ],
+    "flaggedTurns": [
+      {
+        "index": 4,
+        "rule": "pitch-before-exploring"
+      }
+    ],
+    "finalTrigger": "followup",
+    "finalLegal": [
+      "answer",
+      "graceful_exit",
+      "hand_to_human",
+      "wait"
+    ],
+    "finalVetoed": [
+      "ask_discovery",
+      "soft_ask",
+      "propose_times",
+      "offer_value",
+      "observe"
+    ],
+    "suppression": "none"
+  },
+  "notes": "A BD manager selling services to us; the agent pitched the product at 'engaged' (flagged) and never noticed the role. Legal set collapses once role=seller_to_us."
+}

@@ -15,7 +15,8 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "hive": "tsx src/research/cli.ts",
-    "hive:compare": "tsx src/research/compare.ts"
+    "hive:compare": "tsx src/research/compare.ts",
+    "sim:conversation": "tsx scripts/sim-conversation.ts"
   },
   "dependencies": {
     "@vantera/ai": "workspace:*",

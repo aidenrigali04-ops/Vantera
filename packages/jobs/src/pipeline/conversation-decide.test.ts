@@ -1,0 +1,647 @@
+import { describe, expect, it, vi } from "vitest";
+import {
+  COMPOSE_SYSTEM,
+  POLICY_SYSTEM,
+  POLICY_VERSION,
+  REPLY_DELAY_MIN_MS,
+  TURN_CAP,
+  emptyState,
+  type ConversationDraft,
+  type ConversationState,
+  type Move,
+  type PolicyInput,
+  type PriorTable,
+  type Readout,
+  type Shortlist,
+  type StoredTurn,
+} from "@vantera/agent-brains";
+import { getModelId } from "@vantera/ai";
+import { MAX_AGENT_TURNS } from "./inbound";
+import {
+  runConversationDecide,
+  syncState,
+  type ConversationDecideDeps,
+} from "./conversation-decide";
+import type { ConversationTrigger, NewDecision, NewScheduledSend, ResponderBundle } from "./types";
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
+
+const ACC = "acc1";
+const LEAD = "lead1";
+const CAMP = "camp1";
+const NOW = new Date("2026-10-28T15:00:00Z");
+const BOOKING = "https://calendly.com/acme/intro";
+
+function readout(over: Partial<Readout> = {}): Readout {
+  return {
+    stance: "neutral",
+    confidence: 0.7,
+    intent: "other",
+    explicitOptOut: false,
+    identitySuspicion: false,
+    booked: false,
+    answeredQuestionRef: null,
+    newProblems: [],
+    newPriorities: [],
+    newObjection: null,
+    personDelta: {
+      directness: null,
+      formality: null,
+      warmth: null,
+      skepticism: null,
+      verbosity: null,
+      seniority: null,
+      role: null,
+      roleConfidence: null,
+      language: null,
+      emoji: null,
+      notes: [],
+    },
+    hookUsed: null,
+    questionAsked: null,
+    claims: [],
+    linksShared: [],
+    ask: "none",
+    labeled: false,
+    ...over,
+  };
+}
+
+const bundle = (over: Partial<ResponderBundle> = {}): ResponderBundle => ({
+  campaignId: CAMP,
+  sendMode: "automatic",
+  lead: { firstName: "Ryan", lastName: "C", title: "VP Sales", companyName: "Northwind", industry: "SaaS" },
+  insights: {
+    pain_points: ["unqualified leads"],
+    triggers: ["Series A"],
+    motivations: ["pipeline"],
+    value_angle: "qualify first",
+    aha_moment: "first booked meeting",
+    summary: "good fit",
+  },
+  context: { cta: "a quick intro", bookingUrl: BOOKING },
+  thread: [
+    { role: "agent", text: "Saw the Series A — how are you qualifying inbound now?" },
+    { role: "lead", text: "Mostly by hand." },
+  ],
+  agentTurns: 1,
+  newestUnsentMessageCreatedAt: null,
+  lastAgentMessageAt: null,
+  humanHandled: false,
+  attribution: { strategy: {}, playbookVersion: 3 },
+  ...over,
+});
+
+const turn = (ref: string, role: StoredTurn["role"], text: string, at: string): StoredTurn => ({ ref, role, text, at });
+
+const BASE_TURNS: StoredTurn[] = [
+  turn("m1", "agent", "Saw the Series A — how are you qualifying inbound now?", "2026-10-27T10:00:00Z"),
+  turn("m2", "lead", "Mostly by hand.", "2026-10-28T14:00:00Z"),
+];
+
+// ---------------------------------------------------------------------------
+// Fake store — records every call
+// ---------------------------------------------------------------------------
+
+function makeStore(opts: {
+  turns?: StoredTurn[];
+  stored?: { state: ConversationState; lastMessageRef: string | null } | null;
+  suppressed?: boolean;
+  priors?: PriorTable;
+} = {}) {
+  const calls: string[] = [];
+  let stored = opts.stored ?? null;
+  const saves: { state: ConversationState; lastMessageRef: string | null }[] = [];
+  const decisions: NewDecision[] = [];
+  const sends: (NewScheduledSend & { notBefore?: Date | null })[] = [];
+  const notifications: { kind: string; body: string; leadId: string }[] = [];
+  const canceled: string[] = [];
+  const stopped: string[] = [];
+  const suppressionChecks: string[] = [];
+  const store: ConversationDecideDeps["store"] = {
+    getConversationPolicyMode: async () => "live",
+    getConversationState: async () => {
+      calls.push("getConversationState");
+      return stored ? { state: structuredClone(stored.state), lastMessageRef: stored.lastMessageRef } : null;
+    },
+    saveConversationState: async (_a, _l, state, lastMessageRef) => {
+      calls.push("saveConversationState");
+      stored = { state: structuredClone(state), lastMessageRef };
+      saves.push({ state: structuredClone(state), lastMessageRef });
+    },
+    listThreadTurns: async () => {
+      calls.push("listThreadTurns");
+      return opts.turns ?? BASE_TURNS;
+    },
+    insertDecision: async (d) => {
+      calls.push("insertDecision");
+      decisions.push(d);
+      return d.id ?? `dec${decisions.length}`;
+    },
+    insertScheduledSendReturningId: async (s) => {
+      calls.push("insertScheduledSendReturningId");
+      sends.push(s);
+      return `send${sends.length}`;
+    },
+    readPriors: async () => {
+      calls.push("readPriors");
+      return opts.priors ?? [];
+    },
+    upsertPriors: async () => {},
+    listUnscoredDecisions: async () => [],
+    scoreDecision: async () => {},
+    listConnectedWithoutFirstMessage: async () => [],
+    insertLeadNotification: async (n) => {
+      calls.push("insertLeadNotification");
+      notifications.push({ kind: n.kind, body: n.body, leadId: n.leadId });
+    },
+    cancelPendingSends: async (leadId) => {
+      calls.push("cancelPendingSends");
+      canceled.push(leadId);
+      return 0;
+    },
+    stopSequenceForReply: async (leadId) => {
+      calls.push("stopSequenceForReply");
+      stopped.push(leadId);
+    },
+    isSuppressed: async (_a, _k, value) => {
+      calls.push("isSuppressed");
+      suppressionChecks.push(value);
+      return !!opts.suppressed;
+    },
+    getLeadLinkedInUrl: async () => "https://www.linkedin.com/in/Ryan-C/",
+  };
+  return {
+    store,
+    calls,
+    saves,
+    decisions,
+    sends,
+    notifications,
+    canceled,
+    stopped,
+    suppressionChecks,
+    get stored() {
+      return stored;
+    },
+  };
+}
+
+/** Mock brains: readFn keys a readout off the turn ref; shortlist picks `pick` when legal. */
+function makeDeps(
+  fake: ReturnType<typeof makeStore>,
+  o: {
+    readouts?: Record<string, Readout>;
+    pick?: Move;
+    message?: string;
+    violations?: ConversationDraft["violations"];
+    fixFn?: ConversationDecideDeps["fixFn"];
+    shortlist?: (input: PolicyInput) => Shortlist;
+  } = {}
+) {
+  const readFn = vi.fn(async (_s: ConversationState, t: StoredTurn, _g: string) => o.readouts?.[t.ref] ?? readout());
+  const shortlistFn = vi.fn(async (input: PolicyInput): Promise<Shortlist> => {
+    if (o.shortlist) return o.shortlist(input);
+    const move = o.pick && input.legal.includes(o.pick) ? o.pick : input.legal[0];
+    return move
+      ? { candidates: [{ move, style: { lengthBand: "short", question: false, link: "none", mirror: false }, rationale: "fits" }] }
+      : { candidates: [], degraded: "no_legal_candidates" };
+  });
+  const composeFn = vi.fn(async (): Promise<ConversationDraft> => ({
+    message: o.message ?? `Fair — grab a slot if useful: ${BOOKING}`,
+    violations: o.violations ?? [],
+  }));
+  const deps: ConversationDecideDeps = {
+    store: fake.store,
+    readFn: readFn as unknown as ConversationDecideDeps["readFn"],
+    shortlistFn: shortlistFn as unknown as ConversationDecideDeps["shortlistFn"],
+    composeFn: composeFn as unknown as ConversationDecideDeps["composeFn"],
+    fixFn: o.fixFn,
+    now: () => NOW,
+    rng: () => 0.5,
+    seed: () => 42,
+  };
+  return { deps, readFn, shortlistFn, composeFn };
+}
+
+const replyTrigger = (r: Readout = readout({ intent: "answers_question" }), incoming = "Mostly by hand."): ConversationTrigger => ({
+  kind: "reply",
+  replyId: "r1",
+  incoming,
+  receivedAt: new Date("2026-10-28T14:00:00Z"),
+  readout: r,
+});
+
+const args = (trigger: ConversationTrigger, mode: "shadow" | "live_replies" | "live" = "live", b = bundle()) => ({
+  accountId: ACC,
+  leadId: LEAD,
+  campaignId: CAMP,
+  trigger,
+  mode,
+  bundle: b,
+  sellerName: "Acme",
+});
+
+// ---------------------------------------------------------------------------
+
+describe("guardrails", () => {
+  it("the rulebook's TURN_CAP equals the pipeline's MAX_AGENT_TURNS", () => {
+    expect(TURN_CAP).toBe(MAX_AGENT_TURNS);
+  });
+});
+
+describe("syncState", () => {
+  it("syncState reads unread turns in order and persists lastMessageRef", async () => {
+    const turns = [
+      ...BASE_TURNS,
+      turn("m3", "agent", "Got it — what breaks first when volume spikes?", "2026-10-28T14:30:00Z"),
+      turn("m4", "lead", "Response time.", "2026-10-28T14:40:00Z"),
+    ];
+    const stored = { state: emptyState(), lastMessageRef: "m2" };
+    const fake = makeStore({ turns, stored });
+    const { deps, readFn } = makeDeps(fake);
+    const b = bundle();
+
+    const state = await syncState(ACC, LEAD, b.lead, b.insights, "GROUNDING", deps);
+
+    expect(readFn.mock.calls.map((c) => (c[1] as StoredTurn).ref)).toEqual(["m3", "m4"]);
+    expect(readFn.mock.calls[0]![2]).toBe("GROUNDING");
+    expect(fake.saves.at(-1)!.lastMessageRef).toBe("m4");
+    expect(state.counters.agentTurns).toBe(1);
+    expect(state.counters.leadTurns).toBe(1);
+
+    // idempotent: a repeat sync reads nothing new and leaves the state as it was
+    const again = await syncState(ACC, LEAD, b.lead, b.insights, "GROUNDING", deps);
+    expect(readFn).toHaveBeenCalledTimes(2);
+    expect(again).toEqual(state);
+    expect(fake.stored!.lastMessageRef).toBe("m4");
+  });
+
+  it("stopBeforeRef folds only the turns before that ref and never moves the cursor onto it", async () => {
+    const turns = [
+      ...BASE_TURNS,
+      turn("m3", "agent", "Got it — what breaks first when volume spikes?", "2026-10-28T14:30:00Z"),
+      turn("r9", "lead", "Response time.", "2026-10-28T14:40:00Z"),
+    ];
+    const fake = makeStore({ turns, stored: { state: emptyState(), lastMessageRef: "m2" } });
+    const { deps, readFn } = makeDeps(fake);
+    const b = bundle();
+
+    await syncState(ACC, LEAD, b.lead, b.insights, "G", deps, undefined, { stopBeforeRef: "r9" });
+
+    expect(readFn.mock.calls.map((c) => (c[1] as StoredTurn).ref)).toEqual(["m3"]);
+    expect(fake.stored!.lastMessageRef).toBe("m3");
+
+    // the cursor already sits on the stop ref (a retried run): nothing is read, nothing regresses
+    const at = makeStore({ turns, stored: { state: emptyState(), lastMessageRef: "r9" } });
+    const second = makeDeps(at);
+    await syncState(ACC, LEAD, b.lead, b.insights, "G", second.deps, undefined, { stopBeforeRef: "r9" });
+    expect(second.readFn).not.toHaveBeenCalled();
+    expect(at.stored!.lastMessageRef).toBe("r9");
+  });
+
+  it("seeds from the lead when no state exists and reads every turn", async () => {
+    const fake = makeStore();
+    const { deps, readFn } = makeDeps(fake);
+    const b = bundle();
+    const state = await syncState(ACC, LEAD, b.lead, b.insights, "G", deps);
+    expect(readFn).toHaveBeenCalledTimes(2);
+    expect(state.person.seniority).toBe("vp"); // seedState from "VP Sales"
+    expect(fake.saves.at(-1)!.lastMessageRef).toBe("m2");
+  });
+
+  it("a known readout is applied instead of re-reading that turn", async () => {
+    const fake = makeStore({ stored: { state: emptyState(), lastMessageRef: "m1" } });
+    const { deps, readFn } = makeDeps(fake);
+    const b = bundle();
+    const known = new Map([["m2", readout({ newProblems: ["qualifying by hand"] })]]);
+    const state = await syncState(ACC, LEAD, b.lead, b.insights, "G", deps, known);
+    expect(readFn).not.toHaveBeenCalled();
+    expect(state.counters.leadTurns).toBe(1);
+    expect(state.memory.problemsStated.join(" ")).toContain("qualifying by hand");
+    expect(fake.saves.at(-1)!.lastMessageRef).toBe("m2");
+  });
+
+  it("an unknown lastMessageRef is a backfill: every turn is read", async () => {
+    // a stored state that already folded both turns, whose cursor no longer exists in the thread
+    const fake0 = makeStore();
+    const { deps: d0 } = makeDeps(fake0);
+    const b = bundle();
+    const folded = await syncState(ACC, LEAD, b.lead, b.insights, "G", d0);
+    expect(folded.counters).toMatchObject({ agentTurns: 1, leadTurns: 1 });
+    folded.lastMove = { move: "observe", at: "2026-10-27T10:00:00.000Z" };
+
+    const fake = makeStore({ stored: { state: folded, lastMessageRef: "gone" } });
+    const { deps, readFn } = makeDeps(fake);
+    const state = await syncState(ACC, LEAD, b.lead, b.insights, "G", deps);
+    expect(readFn).toHaveBeenCalledTimes(2);
+    // re-folded from the seed: real counts, never doubled; lastMove carried over
+    expect(state.counters).toMatchObject({ agentTurns: 1, leadTurns: 1 });
+    expect(state.person.seniority).toBe("vp");
+    expect(state.lastMove).toEqual({ move: "observe", at: "2026-10-27T10:00:00.000Z" });
+    expect(fake.saves.at(-1)!.lastMessageRef).toBe("m2");
+  });
+});
+
+describe("runConversationDecide", () => {
+  it("a double-message is read as two turns and answered once", async () => {
+    const turns = [
+      ...BASE_TURNS,
+      turn("m3", "lead", "Actually also,", "2026-10-28T14:01:00Z"),
+      turn("m4", "lead", "we tried a tool last year and it flopped", "2026-10-28T14:01:30Z"),
+    ];
+    const fake = makeStore({ turns, stored: { state: emptyState(), lastMessageRef: "m2" } });
+    const { deps, readFn, composeFn } = makeDeps(fake, { pick: "acknowledge", readouts: { m4: readout({ stance: "skeptical", intent: "objects" }) } });
+
+    const out = await runConversationDecide(
+      args(replyTrigger(readout({ stance: "skeptical", intent: "objects" }), "Actually also,\nwe tried a tool last year and it flopped")),
+      deps
+    );
+
+    expect(readFn.mock.calls.map((c) => (c[1] as StoredTurn).ref)).toEqual(["m3", "m4"]);
+    expect(fake.stored!.state.counters.leadTurns).toBe(2);
+    expect(composeFn).toHaveBeenCalledTimes(1);
+    expect(fake.sends).toHaveLength(1);
+    expect(fake.decisions).toHaveLength(1);
+    expect(out.action).toBe("drafted");
+  });
+
+  it("the incoming reply's readout is reused, never read twice", async () => {
+    const turns = [...BASE_TURNS, turn("r1", "lead", "How does it work?", "2026-10-28T14:50:00Z")];
+    const fake = makeStore({ turns, stored: { state: emptyState(), lastMessageRef: "m2" } });
+    const { deps, readFn } = makeDeps(fake, { pick: "answer" });
+    const incoming = readout({ intent: "asks_question", newProblems: ["slow follow-up"] });
+    await runConversationDecide(args(replyTrigger(incoming, "How does it work?")), deps);
+    expect(readFn).not.toHaveBeenCalled();
+    expect(fake.stored!.state.counters.leadTurns).toBe(1);
+    expect(fake.stored!.state.memory.problemsStated.join(" ")).toContain("slow follow-up");
+    expect(fake.stored!.lastMessageRef).toBe("r1");
+  });
+
+  it("shadow mode logs the decision with no send and composes nothing", async () => {
+    const fake = makeStore();
+    const { deps, composeFn } = makeDeps(fake, { pick: "answer" });
+
+    const out = await runConversationDecide(args(replyTrigger(readout({ intent: "asks_question" })), "shadow"), deps);
+
+    expect(out).toEqual({ action: "skipped", reason: "shadow", decisionId: fake.decisions[0]!.id, move: "answer" });
+    expect(composeFn).not.toHaveBeenCalled();
+    expect(fake.sends).toHaveLength(0);
+    expect(fake.canceled).toHaveLength(0);
+    expect(fake.decisions[0]).toMatchObject({
+      mode: "shadow",
+      scheduledSendId: null,
+      composedBody: null,
+      move: "answer",
+      trigger: "reply",
+      seed: 42,
+      policyVersion: POLICY_VERSION,
+      promptHash: POLICY_SYSTEM.hash,
+    });
+  });
+
+  it("live: a drafted reply gets origin reply_response, a notBefore ≥ 4 min, the booking link tagged via tagLinksInText, and the decision links the send", async () => {
+    const fake = makeStore();
+    const { deps, composeFn } = makeDeps(fake, { pick: "answer" });
+
+    const out = await runConversationDecide(args(replyTrigger(readout({ intent: "asks_question" }), "How does it work?")), deps);
+
+    expect(out).toEqual({ action: "drafted", decisionId: fake.decisions[0]!.id, move: "answer" });
+    expect(composeFn).toHaveBeenCalledTimes(1);
+    const input = composeFn.mock.calls[0]![0 as never] as unknown as { incoming?: string; sellerName: string | null; decision: { move: Move }; avoidSkeletons: string[] };
+    expect(input.incoming).toBe("How does it work?");
+    expect(input.sellerName).toBe("Acme");
+    expect(input.decision.move).toBe("answer");
+    expect(input.avoidSkeletons).toEqual([]);
+
+    expect(fake.canceled).toEqual([LEAD]);
+    expect(fake.calls.indexOf("cancelPendingSends")).toBeLessThan(fake.calls.indexOf("insertScheduledSendReturningId"));
+    const send = fake.sends[0]!;
+    expect(send).toMatchObject({
+      accountId: ACC,
+      campaignId: CAMP,
+      leadId: LEAD,
+      channel: "linkedin",
+      linkedinStage: "message",
+      origin: "reply_response",
+      status: "approved",
+      styleFlags: null,
+    });
+    expect(send.body).toBe(`Fair — grab a slot if useful: ${BOOKING}?utm_content=vt-lead1&metadata%5Bvt%5D=vt-lead1`);
+    expect(send.notBefore!.getTime() - NOW.getTime()).toBeGreaterThanOrEqual(REPLY_DELAY_MIN_MS);
+    expect(send.recipe).toMatchObject({
+      v: 3,
+      move: "answer",
+      decisionId: fake.decisions[0]!.id,
+      brain: "conversation_reply",
+      playbookVersion: 3,
+      promptHash: COMPOSE_SYSTEM.hash,
+      modelId: getModelId(),
+    });
+    expect(fake.decisions[0]).toMatchObject({
+      mode: "live",
+      scheduledSendId: "send1",
+      composedBody: send.body,
+      move: "answer",
+    });
+    expect(fake.decisions[0]!.id).toEqual(expect.any(String));
+    expect(fake.calls.indexOf("insertScheduledSendReturningId")).toBeLessThan(fake.calls.indexOf("insertDecision"));
+    // the acted move is remembered for the repeat guards; the read cursor is untouched
+    expect(fake.stored!.state.lastMove).toEqual({ move: "answer", at: NOW.toISOString() });
+    expect(fake.stored!.lastMessageRef).toBe("m2");
+  });
+
+  it("shadow and wait never stamp lastMove", async () => {
+    const fake = makeStore();
+    const { deps } = makeDeps(fake, { pick: "answer" });
+    await runConversationDecide(args(replyTrigger(readout({ intent: "asks_question" })), "shadow"), deps);
+    expect(fake.stored!.state.lastMove).toBeNull();
+    const fake2 = makeStore();
+    const { deps: d2 } = makeDeps(fake2, { pick: "wait" });
+    await runConversationDecide(args(replyTrigger(readout({ intent: "small_talk" }))), d2);
+    expect(fake2.stored!.state.lastMove).toBeNull();
+  });
+
+  it("review mode / flagged drafts wait in review; automatic gets one fix pass", async () => {
+    const flagged = [{ rule: "pitch-word", detail: "x" }] as unknown as ConversationDraft["violations"];
+    const fake = makeStore();
+    const fixFn = vi.fn(async (d: ConversationDraft) => ({ ...d, violations: flagged }));
+    const { deps } = makeDeps(fake, { pick: "answer", violations: flagged, fixFn });
+    await runConversationDecide(args(replyTrigger(readout({ intent: "asks_question" }))), deps);
+    expect(fixFn).toHaveBeenCalledTimes(1);
+    expect(fake.sends[0]!.status).toBe("pending_review");
+    expect(fake.sends[0]!.styleFlags).not.toBeNull();
+
+    const fake2 = makeStore();
+    const fix2 = vi.fn();
+    const { deps: d2 } = makeDeps(fake2, { pick: "answer", fixFn: fix2 as never });
+    await runConversationDecide(args(replyTrigger(readout({ intent: "asks_question" })), "live", bundle({ sendMode: "review" })), d2);
+    expect(fix2).not.toHaveBeenCalled();
+    expect(fake2.sends[0]!.status).toBe("pending_review");
+  });
+
+  it("live: wait logs a decision and inserts nothing", async () => {
+    const fake = makeStore();
+    const { deps, composeFn } = makeDeps(fake, { pick: "wait" });
+    const out = await runConversationDecide(args(replyTrigger(readout({ intent: "small_talk" }))), deps);
+    expect(out).toEqual({ action: "wait", decisionId: fake.decisions[0]!.id, move: "wait" });
+    expect(composeFn).not.toHaveBeenCalled();
+    expect(fake.sends).toHaveLength(0);
+    expect(fake.canceled).toHaveLength(0);
+    expect(fake.decisions[0]).toMatchObject({ move: "wait", scheduledSendId: null, composedBody: null, mode: "live" });
+  });
+
+  it("wait is a legal answer to small talk and is chosen when the shortlist says so", async () => {
+    const fake = makeStore();
+    const { deps, shortlistFn } = makeDeps(fake, { pick: "wait" });
+    const out = await runConversationDecide(args(replyTrigger(readout({ intent: "small_talk", stance: "positive" }), "haha nice, happy friday")), deps);
+    const input = shortlistFn.mock.calls[0]![0] as PolicyInput;
+    expect(input.legal).toContain("wait");
+    expect(input.incoming).toBe("haha nice, happy friday");
+    expect(input.trigger).toBe("reply");
+    // priors rendered for every legal move from the posteriors
+    expect(input.priors.map((p) => p.move).sort()).toEqual([...input.legal].sort());
+    for (const p of input.priors) expect(p.rate).toBeGreaterThan(0);
+    expect(out.action).toBe("wait");
+  });
+
+  it("identity suspicion hands off: needs_human notification, no draft", async () => {
+    const fake = makeStore();
+    const { deps, composeFn, shortlistFn } = makeDeps(fake, { pick: "answer" });
+    const out = await runConversationDecide(args(replyTrigger(readout({ identitySuspicion: true, intent: "asks_question" }), "is this a bot?")), deps);
+    expect((shortlistFn.mock.calls[0]![0] as PolicyInput).legal).toEqual(["hand_to_human"]);
+    expect(out).toEqual({ action: "hand_to_human", decisionId: fake.decisions[0]!.id, move: "hand_to_human" });
+    expect(composeFn).not.toHaveBeenCalled();
+    expect(fake.sends).toHaveLength(0);
+    expect(fake.notifications).toEqual([
+      { kind: "needs_human", body: "This thread needs you — the agent stepped aside.", leadId: LEAD },
+    ]);
+    // a person owns the thread now: proactive touches stop, after the notification
+    expect(fake.stopped).toEqual([LEAD]);
+    expect(fake.calls.indexOf("insertLeadNotification")).toBeLessThan(fake.calls.indexOf("stopSequenceForReply"));
+    expect(fake.stored!.state.lastMove).toEqual({ move: "hand_to_human", at: NOW.toISOString() });
+  });
+
+  it("an empty shortlist hands to a human instead of throwing", async () => {
+    const fake = makeStore();
+    const { deps } = makeDeps(fake, { shortlist: () => ({ candidates: [], degraded: "no_legal_candidates" }) });
+    const out = await runConversationDecide(args(replyTrigger()), deps);
+    expect(out.action).toBe("hand_to_human");
+    expect(fake.notifications).toHaveLength(1);
+    expect(fake.stopped).toEqual([LEAD]);
+    expect(fake.decisions[0]).toMatchObject({ move: "hand_to_human", degraded: "no_legal_candidates" });
+  });
+
+  it("graceful_exit on a reply stops the sequence", async () => {
+    const fake = makeStore();
+    const { deps } = makeDeps(fake, { pick: "graceful_exit", message: "Totally fair — I'll leave it there." });
+    const out = await runConversationDecide(
+      args(replyTrigger(readout({ stance: "negative", confidence: 0.9, intent: "declines" }), "not for us")),
+      deps
+    );
+    expect(out).toEqual({ action: "exit", decisionId: fake.decisions[0]!.id, move: "graceful_exit" });
+    expect(fake.sends).toHaveLength(1);
+    expect(fake.stopped).toEqual([LEAD]);
+  });
+
+  it("followup trigger with isLast=true can only breakup or wait", async () => {
+    const fake = makeStore({ turns: [BASE_TURNS[0]!] });
+    const { deps, shortlistFn } = makeDeps(fake, { pick: "breakup", message: "Closing the loop here — all the best." });
+    const out = await runConversationDecide(args({ kind: "followup", runId: "run1", touchNo: 3, isLast: true }), deps);
+    const input = shortlistFn.mock.calls[0]![0] as PolicyInput;
+    expect(input.legal.every((m) => m === "breakup" || m === "wait")).toBe(true);
+    expect(input.readout).toBeUndefined();
+    expect(out).toEqual({ action: "drafted", decisionId: fake.decisions[0]!.id, move: "breakup" });
+    const send = fake.sends[0]!;
+    expect(send.origin).toBe("sequence");
+    expect(send.notBefore ?? null).toBeNull();
+    expect(send.recipe).toMatchObject({ brain: "sequence_followup" });
+    expect(fake.canceled).toHaveLength(0);
+    expect(fake.stopped).toHaveLength(0);
+  });
+
+  it("forced wait: when wait is the only legal move (after a breakup) the policy model is skipped", async () => {
+    const after = emptyState();
+    after.lastMove = { move: "breakup", at: "2026-10-27T10:00:00Z" };
+    const fake = makeStore({ turns: [BASE_TURNS[0]!], stored: { state: after, lastMessageRef: "m1" } });
+    const { deps, shortlistFn, composeFn } = makeDeps(fake, { pick: "observe" });
+    const out = await runConversationDecide(args({ kind: "followup", runId: "run1", touchNo: 2, isLast: false }), deps);
+    expect(shortlistFn).not.toHaveBeenCalled();
+    expect(composeFn).not.toHaveBeenCalled();
+    expect(out).toEqual({ action: "wait", decisionId: fake.decisions[0]!.id, move: "wait", forced: true });
+    expect(fake.decisions[0]).toMatchObject({ move: "wait", propensity: 1, trigger: "followup", mode: "live" });
+    expect(fake.sends).toHaveLength(0);
+  });
+
+  it("a chosen wait (other moves legal) is not forced", async () => {
+    const fake = makeStore({ turns: [BASE_TURNS[0]!] });
+    const { deps, shortlistFn } = makeDeps(fake, { pick: "wait" });
+    const out = await runConversationDecide(args({ kind: "followup", runId: "run1", touchNo: 1, isLast: false }), deps);
+    expect(shortlistFn).toHaveBeenCalledTimes(1);
+    expect(out.action).toBe("wait");
+    expect(out.forced).toBeUndefined();
+  });
+
+  it("first_message uses the first-touch brain and origin sequence", async () => {
+    const fake = makeStore({ turns: [] });
+    const { deps, composeFn } = makeDeps(fake, { pick: "observe", message: "Saw the Series A news." });
+    const out = await runConversationDecide(args({ kind: "first_message" }), deps);
+    expect(out.action).toBe("drafted");
+    const input = composeFn.mock.calls[0]![0 as never] as unknown as { incoming?: string };
+    expect(input.incoming).toBeUndefined();
+    expect(fake.sends[0]).toMatchObject({ origin: "sequence", recipe: { brain: "first_touch" } });
+  });
+
+  it("a proactive trigger with an unsent message queued is skipped before any model call (retry guard)", async () => {
+    for (const trigger of [{ kind: "first_message" } as const, { kind: "followup", runId: "run1", touchNo: 2, isLast: false } as const]) {
+      const fake = makeStore();
+      const { deps, readFn, shortlistFn, composeFn } = makeDeps(fake, { pick: "observe" });
+      const out = await runConversationDecide(args(trigger, "live", bundle({ newestUnsentMessageCreatedAt: new Date("2026-10-28T14:59:00Z") })), deps);
+      expect(out).toEqual({ action: "skipped", reason: "unsent_message_exists", decisionId: null, move: null });
+      expect(readFn).not.toHaveBeenCalled();
+      expect(shortlistFn).not.toHaveBeenCalled();
+      expect(composeFn).not.toHaveBeenCalled();
+      expect(fake.decisions).toHaveLength(0);
+      expect(fake.sends).toHaveLength(0);
+    }
+    // a reply is never blocked by a queued message (cancelPendingSends supersedes it)
+    const fake = makeStore();
+    const { deps } = makeDeps(fake, { pick: "answer" });
+    const out = await runConversationDecide(
+      args(replyTrigger(readout({ intent: "asks_question" })), "live", bundle({ newestUnsentMessageCreatedAt: new Date("2026-10-28T14:59:00Z") })),
+      deps
+    );
+    expect(out.action).toBe("drafted");
+  });
+
+  it("live_replies: a proactive trigger is only logged (shadow); a reply acts live", async () => {
+    const fake = makeStore({ turns: [BASE_TURNS[0]!] });
+    const { deps, composeFn } = makeDeps(fake, { pick: "breakup" });
+    const out = await runConversationDecide(args({ kind: "followup", runId: "run1", touchNo: 3, isLast: true }, "live_replies"), deps);
+    expect(out).toEqual({ action: "skipped", reason: "shadow", decisionId: fake.decisions[0]!.id, move: "breakup" });
+    expect(composeFn).not.toHaveBeenCalled();
+    expect(fake.sends).toHaveLength(0);
+    expect(fake.decisions[0]).toMatchObject({ mode: "shadow", scheduledSendId: null, composedBody: null });
+
+    const fake2 = makeStore();
+    const { deps: d2 } = makeDeps(fake2, { pick: "answer" });
+    const out2 = await runConversationDecide(args(replyTrigger(readout({ intent: "asks_question" })), "live_replies"), d2);
+    expect(out2.action).toBe("drafted");
+    expect(fake2.decisions[0]).toMatchObject({ mode: "live", scheduledSendId: "send1" });
+  });
+
+  it("suppressed lead ⇒ skipped before any model call (rule 11)", async () => {
+    const fake = makeStore({ suppressed: true });
+    const { deps, readFn, shortlistFn, composeFn } = makeDeps(fake);
+    const out = await runConversationDecide(args(replyTrigger()), deps);
+    expect(out).toEqual({ action: "skipped", reason: "suppressed", decisionId: null, move: null });
+    expect(fake.suppressionChecks).toEqual(["https://www.linkedin.com/in/ryan-c"]);
+    expect(readFn).not.toHaveBeenCalled();
+    expect(shortlistFn).not.toHaveBeenCalled();
+    expect(composeFn).not.toHaveBeenCalled();
+    expect(fake.decisions).toHaveLength(0);
+    expect(fake.sends).toHaveLength(0);
+  });
+});

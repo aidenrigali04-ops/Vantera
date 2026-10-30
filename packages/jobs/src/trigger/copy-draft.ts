@@ -1,9 +1,11 @@
 import { logger, task } from "@trigger.dev/sdk";
 import { createDb } from "@vantera/db";
 import { withUsage } from "@vantera/ai";
-import { draftLinkedIn, fixLinkedInDraft, judgeCopy } from "@vantera/agent-brains";
+import { draftLinkedIn, draftLinkedInNote, fixLinkedInDraft, judgeCopy } from "@vantera/agent-brains";
+import { withProviderAlert } from "../pipeline/provider-alert";
+import { buildProviderAlertDeps } from "../pipeline/provider-alert-deps";
 import { runCopyDraft } from "../pipeline/copy-draft";
-import { createPgStore } from "../pipeline/pg-store";
+import { createConversationStore, createPgStore } from "../pipeline/pg-store";
 import type { CopyDraftPayload } from "../pipeline/types";
 
 /**
@@ -17,24 +19,30 @@ export const copyDraft = task({
   queue: { concurrencyLimit: 1 },
   maxDuration: 1800,
   run: async (payload: CopyDraftPayload) => {
-    const store = createPgStore(createDb());
+    const db = createDb();
+    const store = createPgStore(db);
     // Task 3 (best-of-N): the global `best_of_n` rollout knob, read once per run; the pipeline
     // core re-caps it and forces it to 1 whenever a judge isn't wired.
     // Message-shape selector: the global `message_shape_auto` rollout knob (default OFF =
     // byte-identical champion), read once per run alongside it.
-    const [bestOfN, messageShapeAuto] = await Promise.all([
+    // conversation_policy (spec §7.2): "live" drafts the invite note only (the first message is
+    // written at acceptance); any other mode keeps the pair. A failed read degrades to "off".
+    const [bestOfN, messageShapeAuto, conversationMode] = await Promise.all([
       store.getBestOfN(),
       store.getMessageShapeAuto(),
+      createConversationStore(db).getConversationPolicyMode().catch(() => "off" as const),
     ]);
     const { result: summary, usage } = await withUsage(() =>
-      runCopyDraft(payload, {
+      withProviderAlert(() => runCopyDraft(payload, {
         store,
         draftLinkedInFn: (input) => draftLinkedIn(input),
+        conversationMode,
+        draftLinkedInNoteFn: (input) => draftLinkedInNote(input),
         fixLinkedInFn: (draft, input) => fixLinkedInDraft(draft, input),
         judgeFn: (draft, ctx) => judgeCopy(draft, ctx),
         bestOfN,
         messageShapeAuto,
-      })
+      }), buildProviderAlertDeps(store))
     );
     logger.info("copy draft finished", { ...summary, llm: usage, copyAgentId: payload.copyAgentId });
     return summary;

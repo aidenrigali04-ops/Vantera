@@ -1,0 +1,120 @@
+{
+  "id": "prod-terse-skeptic",
+  "lead": {
+    "firstName": "Trevor",
+    "lastName": "Lane",
+    "title": "Founder | Helping B2B revenue teams forecast from buyer evidence",
+    "companyName": "Clearline Sales",
+    "industry": "Sales consulting"
+  },
+  "insights": {
+    "summary": "Founder explicitly skeptical of AI lead-gen overpromise and committed to buyer evidence over opinion. Vantera's accuracy guarantee, review-first workflow, and hard weekly send ceilings align directly with their revenue philosophy. Strong fit for a conversation on how to scale qualified pipeline without sacrificing control.",
+    "triggers": [
+      "Recent articulation of concern for AI accuracy in lead generation",
+      "Focus on deal truth and forecast confidence suggests active pipeline challenges"
+    ],
+    "aha_moment": "Running a 2-week pilot where Vantera's AI scores prospects and you approve every message, proving accuracy on your own pipeline before scaling.",
+    "motivations": [
+      "Build trusted pipeline with verifiable buyer signals",
+      "Replace guesswork with data-driven revenue decisions",
+      "Maintain control and approval over outreach at scale"
+    ],
+    "pain_points": [
+      "Pipeline quality and forecasting confidence",
+      "Skepticism of AI lead-gen promises and false positives",
+      "Need for buyer evidence over opinion-driven pipeline decisions"
+    ],
+    "value_angle": "Vantera's 98% accuracy scoring and review-first send model give your sales outreach the rigor and control your own revenue philosophy demands — no black-box sends, every message approved before it goe",
+    "prospect_offering": "Founder building solutions for B2B revenue teams to replace pipeline opinion with buyer evidence and forecast confidence."
+  },
+  "context": {
+    "cta": "a short walkthrough of how Vantera books qualified meetings",
+    "accountName": "Vantera",
+    "accountIndustry": "LinkedIn outreach software",
+    "valueProp": "Vantera finds in-market prospects on LinkedIn, drafts personal messages, and books qualified meetings while the founder approves every send",
+    "websiteUrl": "https://www.vanterasystem.dev",
+    "bookingUrl": null,
+    "contentLinks": [],
+    "proofPoints": []
+  },
+  "turns": [
+    {
+      "ref": "t0",
+      "role": "agent",
+      "text": "Your framing around replacing pipeline opinion with buyer evidence is sharp. That tension between gut-feel forecasting and actual deal truth is underrated.",
+      "at": "2026-10-22T05:18:09Z",
+      "stage": "invite"
+    },
+    {
+      "ref": "t1",
+      "role": "agent",
+      "text": "Appreciate the connect, Trevor. You've written about AI accuracy in lead-gen being a real problem, and I'm curious how you currently vet whether a prospect is actually in-market before outreach goes out.",
+      "at": "2026-10-22T13:18:13Z",
+      "stage": "message"
+    },
+    {
+      "ref": "t2",
+      "role": "lead",
+      "text": "I dont.",
+      "at": "2026-10-22T13:37:05Z"
+    },
+    {
+      "ref": "t3",
+      "role": "agent",
+      "text": "That's honest. What do you use to decide who to reach out to in the first place?",
+      "at": "2026-10-23T02:12:49Z",
+      "stage": "message"
+    },
+    {
+      "ref": "t4",
+      "role": "lead",
+      "text": "whyndo you ask?",
+      "at": "2026-10-23T21:04:12Z"
+    },
+    {
+      "ref": "t5",
+      "role": "lead",
+      "text": "*Why do you ask?",
+      "at": "2026-10-23T22:05:34Z"
+    }
+  ],
+  "expect": {
+    "readouts": [
+      {
+        "turn": "t2",
+        "stance": "skeptical",
+        "intent": "answers_question",
+        "explicitOptOut": false,
+        "answeredQuestionRef": "t1"
+      },
+      {
+        "turn": "t4",
+        "stance": "skeptical",
+        "intent": "asks_question",
+        "explicitOptOut": false
+      },
+      {
+        "turn": "t5",
+        "stance": "skeptical",
+        "intent": "asks_question",
+        "explicitOptOut": false
+      }
+    ],
+    "flaggedTurns": [],
+    "finalTrigger": "reply",
+    "finalLegal": [
+      "answer",
+      "observe",
+      "poke",
+      "graceful_exit"
+    ],
+    "finalVetoed": [
+      "wait",
+      "soft_ask",
+      "propose_times",
+      "ask_discovery"
+    ],
+    "suppression": "none"
+  },
+  "notes": "'I dont.' was classified not_interested and suppressed in production; it is a terse answer. He then asked 'Why do you ask?' twice and nobody could answer (suppressed). A question must be answered: wait is vetoed."
+}

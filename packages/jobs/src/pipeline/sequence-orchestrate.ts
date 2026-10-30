@@ -69,6 +69,8 @@ export async function driveSequenceRun(
         leadId: run.leadId,
         stage: decision.stage,
         touchNo: decision.touchNo,
+        isLast: decision.isLast,
+        touchGapDays: item.config.stages[decision.stage].touchGapDays,
       });
       return { dispatched: 1, archived: 0 };
     }

@@ -5,12 +5,17 @@ import {
   RESPOND_SYSTEM,
   bestOfN,
   leadBlock,
+  preClassify,
+  DECLINE_CONFIDENCE,
+  type Readout,
   type ReplyVerdict,
 } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 import type { LinkedInEvent } from "@vantera/linkedin-infra";
 import { normalizeLinkedInUrl, MAX_BEST_OF_N } from "./copy-draft";
-import type { InboundDeps, InboundPayload, InboundStore, InboundSummary } from "./types";
+import { runConversationDecide, syncState, type DecideOutcome } from "./conversation-decide";
+import { sellerNameFor } from "./conversation-deps";
+import type { InboundDeps, InboundPayload, InboundStore, InboundSummary, ResponderBundle } from "./types";
 
 /**
  * Hard-negative classifications terminate outbound. Both also write suppression (rule 11), so
@@ -56,10 +61,12 @@ async function applyGenuineReply(
   accountId: string,
   lead: { id: string; campaignId: string | null },
   verdict: ReplyVerdict,
-  now: Date
+  now: Date,
+  // legacy: the classifier's hard negatives stop; under conversation intelligence the readout decides
+  stop: boolean = STOPS_SEQUENCE.has(verdict.classification)
 ): Promise<void> {
   await store.setLeadReplied(lead.id, lead.campaignId);
-  if (STOPS_SEQUENCE.has(verdict.classification)) {
+  if (stop) {
     await store.cancelPendingSends(lead.id);
     await store.stopSequenceForReply(lead.id);
   } else if (verdict.booked) {
@@ -410,6 +417,12 @@ export async function handleLinkedInEvent(event: LinkedInEvent, deps: InboundDep
     body: event.body,
     receivedAt,
   });
+  if (inserted.created) {
+    await deps.store.setReplyOutreachSend(
+      inserted.id,
+      await deps.store.lastDeliveredSendId(accountId, lead.id, receivedAt)
+    );
+  }
   // The classification is the processed marker, written LAST. An existing row WITHOUT one is a
   // run that crashed mid-way (its Trigger retry lands here) — finish it rather than drop the
   // reply unclassified, unsuppressed and un-notified. Every effect below is idempotent or
@@ -427,7 +440,42 @@ export async function handleLinkedInEvent(event: LinkedInEvent, deps: InboundDep
   const suppressionValues = [
     ...new Set([storedUrl, event.fromProfileUrl].filter((u): u is string => Boolean(u)).map(normalizeLinkedInUrl)),
   ];
-  if (verdict.classification === "not_interested" || verdict.classification === "unsubscribe") {
+  // Conversation intelligence (spec §6.4): with the policy on, the reader's readout of this turn —
+  // not the classifier — drives suppression, stop and the next move. No bundle (no live Outreach
+  // agent / no insights) or an auto-responder ⇒ the classifier path below, unchanged.
+  const conv = deps.conversation && deps.conversation.mode !== "off" ? deps.conversation : null;
+  let floorSuppressed = false;
+  if (conv && verdict.classification !== "out_of_office") {
+    // Rule 11 floor FIRST: an explicit removal request is suppressed deterministically, before (and
+    // regardless of) any reader call — the legal effect never waits on a model.
+    if (preClassify(event.body)?.classification === "unsubscribe") {
+      for (const value of suppressionValues) {
+        await deps.store.addSuppression(accountId, "linkedin", value, "unsubscribe", lead.id);
+      }
+      floorSuppressed = true;
+    }
+    let read: Awaited<ReturnType<typeof readIncoming>> = null;
+    try {
+      read = await readIncoming(conv, deps.store, accountId, lead, replyId, event.body, receivedAt, inserted.readout);
+    } catch {
+      // a reader/bundle/state failure must never sink the reply: fall back to the classifier path
+      read = null;
+    }
+    if (read) {
+      return handleReadReply(deps, conv, {
+        floorSuppressed,
+        accountId,
+        lead,
+        reply: { id: replyId, body: event.body, receivedAt, ingestedAt: inserted.createdAt },
+        verdict,
+        suppressionValues,
+        now,
+        ...read,
+      });
+    }
+  }
+
+  if (!floorSuppressed && (verdict.classification === "not_interested" || verdict.classification === "unsubscribe")) {
     for (const value of suppressionValues) {
       await deps.store.addSuppression(accountId, "linkedin", value, verdict.classification, lead.id);
     }
@@ -435,22 +483,17 @@ export async function handleLinkedInEvent(event: LinkedInEvent, deps: InboundDep
 
   let responded = false;
   if (verdict.classification !== "out_of_office") {
-    await applyGenuineReply(deps.store, accountId, lead, verdict, now);
-    // Moment-of-value emails (L3): the two reply-driven events worth interrupting someone for.
-    // Best-effort — an email failure must never sink reply processing.
-    if (deps.notifyLeadEvent) {
-      try {
-        if (verdict.booked) {
-          await deps.notifyLeadEvent({ kind: "meeting_booked", accountId, leadId: lead.id, snippet: event.body });
-        } else if (verdict.classification === "interested") {
-          await deps.notifyLeadEvent({ kind: "interested_reply", accountId, leadId: lead.id, snippet: event.body });
-        }
-      } catch {
-        // swallowed by design
-      }
-    }
+    await applyGenuineReply(
+      deps.store,
+      accountId,
+      lead,
+      verdict,
+      now,
+      STOPS_SEQUENCE.has(verdict.classification) || floorSuppressed
+    );
+    await notifyReplyEvent(deps, accountId, lead.id, verdict, event.body);
   }
-  if (RESPONDABLE.has(verdict.classification) && !verdict.booked) {
+  if (RESPONDABLE.has(verdict.classification) && !verdict.booked && !floorSuppressed) {
     // Active responder: draft + queue the seller's next move, continuing the conversation toward close.
     responded = await maybeRespond(
       deps,
@@ -467,5 +510,177 @@ export async function handleLinkedInEvent(event: LinkedInEvent, deps: InboundDep
     await deps.store.reviveSequenceRun(lead.id, new Date(now.getTime() + CONVERSATION_NUDGE_GAP_DAYS * DAY_MS));
   }
   await deps.store.setReplyClassification(replyId, verdict);
+  return { handled: true, action: `reply:${verdict.classification}${responded ? "+responded" : ""}` };
+}
+
+
+/** Moment-of-value emails (L3): the two reply-driven events worth interrupting someone for.
+ *  Best-effort — an email failure must never sink reply processing. */
+async function notifyReplyEvent(
+  deps: InboundDeps,
+  accountId: string,
+  leadId: string,
+  verdict: ReplyVerdict,
+  snippet: string
+): Promise<void> {
+  if (!deps.notifyLeadEvent) return;
+  try {
+    if (verdict.booked) {
+      await deps.notifyLeadEvent({ kind: "meeting_booked", accountId, leadId, snippet });
+    } else if (verdict.classification === "interested") {
+      await deps.notifyLeadEvent({ kind: "interested_reply", accountId, leadId, snippet });
+    }
+  } catch {
+    // swallowed by design
+  }
+}
+
+type Conversation = NonNullable<InboundDeps["conversation"]>;
+
+/** Shown when a reply reads negative but not confidently a decline: stop, and let a person confirm. */
+export const SOFT_NO_NOTE = "This looked like a no — confirm before Vera continues.";
+
+/**
+ * Read the incoming reply against the lead's state as it stood BEFORE it (the reply row is already
+ * in the thread, so the fold stops just short of it), apply the deterministic opt-out floor, and
+ * persist the readout on the reply row. Null when there is no bundle to ground the read.
+ */
+async function readIncoming(
+  conv: Conversation,
+  store: InboundStore,
+  accountId: string,
+  lead: { id: string; campaignId: string | null },
+  replyId: string,
+  body: string,
+  receivedAt: Date,
+  persisted: Readout | null
+): Promise<{ bundle: ResponderBundle; readout: Readout } | null> {
+  // the incoming reply is excluded from the bundle's thread — the composer gets it as `incoming`
+  const bundle = await store.getResponderBundle(accountId, lead.id, lead.campaignId, { excludeReplyId: replyId });
+  if (!bundle) return null;
+  // A crashed run's retry reuses the readout it already persisted — re-reading now would read the
+  // turn against a state that may already include it.
+  if (persisted) return { bundle, readout: withOptOutFloor(persisted, body) };
+  const grounding = leadBlock({ lead: bundle.lead, insights: bundle.insights, context: bundle.context });
+  const before = await syncState(accountId, lead.id, bundle.lead, bundle.insights, grounding, conv.deps, undefined, {
+    stopBeforeRef: replyId,
+  });
+  const read = await conv.deps.readFn(before, { ref: replyId, role: "lead", text: body, at: receivedAt.toISOString() }, grounding);
+  const readout = withOptOutFloor(read, body);
+  await store.setReplyReadout(replyId, readout);
+  return { bundle, readout };
+}
+
+/** Rule 11 floor: an explicit removal request is an opt-out whatever the model read (readTurn folds
+ *  this in too; re-applied here so no injected reader can drop it). */
+function withOptOutFloor(readout: Readout, body: string): Readout {
+  if (!readout.explicitOptOut && preClassify(body)?.classification === "unsubscribe") {
+    return { ...readout, explicitOptOut: true, stance: "opt_out", intent: "opts_out" };
+  }
+  return readout;
+}
+
+/**
+ * The readout-driven twin of the classifier path (spec §6.4). The classifier's verdict still drives
+ * the inbox chip and the reply notifications; it never suppresses or stops the run on its own here.
+ *
+ *   explicitOptOut / opt_out stance / opts_out intent           → suppress (unsubscribe) + stop
+ *   negative ∧ confidence ≥ DECLINE_CONFIDENCE ∧ declines        → suppress (not_interested) + stop
+ *   any other negative                                          → stop + needs_human, NO suppression
+ *   booked (classifier)                                         → unchanged: stamp + stand down
+ *   OOO stand-down is the classifier's verdict only (handled before this); a readout-only "ooo" is a
+ *   normal reply.
+ *
+ * Routing: shadow ⇒ the core logs what it would do and the legacy responder still writes; live_replies
+ * / live ⇒ the core replaces the legacy responder.
+ */
+async function handleReadReply(
+  deps: InboundDeps,
+  conv: Conversation,
+  r: {
+    /** the deterministic floor already wrote the suppression — don't write it twice */
+    floorSuppressed: boolean;
+    accountId: string;
+    lead: { id: string; campaignId: string | null };
+    reply: { id: string; body: string; receivedAt: Date; ingestedAt: Date };
+    verdict: ReplyVerdict;
+    suppressionValues: string[];
+    now: Date;
+    bundle: ResponderBundle;
+    readout: Readout;
+  }
+): Promise<InboundSummary> {
+  const { accountId, lead, reply, verdict, readout, bundle, now } = r;
+  const { store } = deps;
+  const declines =
+    readout.stance === "negative" && readout.confidence >= DECLINE_CONFIDENCE && readout.intent === "declines";
+  // an opt_out stance/intent is by definition explicit — it suppresses even without the flag
+  const optOut = readout.explicitOptOut || readout.stance === "opt_out" || readout.intent === "opts_out";
+  const suppress = optOut || declines;
+  // OOO stand-down keys on the classifier's verdict alone (those never reach here); a readout-only
+  // "ooo" is handled as a normal reply, never a silent drop.
+  const softNo = !suppress && readout.stance === "negative";
+
+  // Rule 11 first: the legal effect never waits on (or is lost to) a later failure.
+  if (suppress && !r.floorSuppressed) {
+    const source = optOut ? "unsubscribe" : "not_interested";
+    for (const value of r.suppressionValues) {
+      await store.addSuppression(accountId, "linkedin", value, source, lead.id);
+    }
+  }
+
+  await applyGenuineReply(store, accountId, lead, verdict, now, suppress || softNo);
+  await notifyReplyEvent(deps, accountId, lead.id, verdict, reply.body);
+  if (softNo) {
+    await store.insertLeadNotification({ accountId, leadId: lead.id, kind: "needs_human", body: SOFT_NO_NOTE });
+    try {
+      await deps.notifyLeadEvent?.({ kind: "needs_human", accountId, leadId: lead.id, snippet: reply.body });
+    } catch {
+      // best-effort by design
+    }
+  }
+
+  let responded = false;
+
+  if (!suppress && !softNo && !verdict.booked) {
+    let outcome: DecideOutcome | null = null;
+    // the same stand-down guards as the legacy responder: a human driving, a stale replay, or a
+    // queued message newer than this reply (it already is the answer) — no policy turn
+    const fresh = now.getTime() - reply.receivedAt.getTime() <= RESPOND_MAX_REPLY_AGE_MS;
+    const answered =
+      bundle.newestUnsentMessageCreatedAt !== null && bundle.newestUnsentMessageCreatedAt > reply.ingestedAt;
+    const decide = (mode: Exclude<typeof conv.mode, "off">) =>
+      runConversationDecide(
+        {
+          accountId,
+          leadId: lead.id,
+          campaignId: bundle.campaignId,
+          trigger: { kind: "reply", replyId: reply.id, incoming: reply.body, receivedAt: reply.receivedAt, readout },
+          mode,
+          bundle,
+          sellerName: sellerNameFor(bundle, conv.sellerName),
+        },
+        conv.deps
+      );
+    const canDecide = fresh && !answered && !bundle.humanHandled;
+    if (conv.mode === "shadow") {
+      if (canDecide) {
+        try {
+          await decide("shadow");
+        } catch {
+          // shadow is log-only: a policy failure must never sink reply processing
+        }
+      }
+      responded = await maybeRespond(deps, accountId, lead, reply, verdict, r.suppressionValues, now);
+    } else if (canDecide && conv.mode !== "off") {
+      outcome = await decide(conv.mode);
+      responded = outcome.action === "drafted" || outcome.action === "exit";
+    }
+    // a graceful exit or a hand-off stopped the run — never re-arm it
+    if (outcome?.action !== "exit" && outcome?.action !== "hand_to_human") {
+      await store.reviveSequenceRun(lead.id, new Date(now.getTime() + CONVERSATION_NUDGE_GAP_DAYS * DAY_MS));
+    }
+  }
+  await store.setReplyClassification(reply.id, verdict);
   return { handled: true, action: `reply:${verdict.classification}${responded ? "+responded" : ""}` };
 }

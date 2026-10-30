@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, max, ne, or, sql } from "drizzle-orm";
 import { LIFECYCLE_ADMIN_EMAIL } from "./lifecycle-outreach";
+import { resolveLeadTimezone } from "./send-window";
 import { exemptFromTrialCaps, statusForTrialCaps } from "./trial-caps";
 import {
   accountDeletionRequests,
@@ -39,6 +40,10 @@ import {
   sequenceRuns,
   suppressionEntries,
   appSettings,
+  conversationDecisions,
+  conversationPriors,
+  conversationPriorsGlobal,
+  conversationStates,
   userProfiles,
   webhookEvents,
   optimizationPlaybook,
@@ -57,6 +62,12 @@ import type {
   LeadOutcomeFlags,
   StrategyGenome,
   StrategySource,
+  ConversationState,
+  PriorCell,
+  DecisionOutcome,
+  Move,
+  Phase,
+  Archetype,
 } from "@vantera/agent-brains";
 import {
   buildTargetingProfile,
@@ -135,11 +146,17 @@ import {
   type MeetingEventStore,
   type SendContext,
   type SendDispatchStore,
+  type AppSettingsStore,
   type SequenceRunPatch,
   type SequenceStore,
   type SequenceTouchStore,
   type StrategyStampStore,
+  type ConversationStore,
+  type ConversationLearnStore,
+  type ConversationMode,
+  type ScorableDecision,
 } from "./types";
+import { mergePriorTables, turnsFromRows } from "./conversation-store-pure";
 import type { ThreadSyncStore } from "./thread-sync";
 import { normalizeLinkedInUrl } from "./copy-draft";
 import { stampEnteredLead } from "./stamp";
@@ -550,7 +567,7 @@ async function fetchChampion(
 }
 
 /** Drizzle-backed store used by the Trigger.dev tasks (service-role DATABASE_URL). */
-export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & AgentRunStore & FastPassStore & StrategyStampStore & MeetingEventStore {
+export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerStore & RetentionStore & TrialStore & SendDispatchStore & OutreachSendStore & InboundStore & SequenceStore & SequenceTouchStore & ConversionStore & RefreshLeadStore & QualifyLeadStore & IntentScanStore & ConnectionSyncStore & AgentRunStore & FastPassStore & StrategyStampStore & MeetingEventStore & AppSettingsStore {
   async function upsertStrategy(accountId: string, genome: StrategyGenome, source: StrategySource): Promise<string> {
     const signature = genomeSignature(genome);
     const [row] = await db
@@ -1404,6 +1421,28 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         .where(eq(sequenceRuns.id, runId));
     },
 
+    async deferTouch(runId: string, patch: { touchNo: number; nextActionAt: Date; lastTouchAt: Date | null }) {
+      // A chosen policy `wait` returns the touch (spec §6.5): advanceSequence stamped touches_done =
+      // touchNo before the touch ran, so write it back ABSOLUTELY to touchNo - 1, guarded on the stamp
+      // still standing — a redelivered task (or a run a reply/booking/human moved) is a no-op.
+      // last_touch_at is restored to the last real delivery; never nulled when there is none.
+      await db
+        .update(sequenceRuns)
+        .set({
+          touchesDone: Math.max(patch.touchNo - 1, 0),
+          ...(patch.lastTouchAt !== null ? { lastTouchAt: patch.lastTouchAt } : {}),
+          nextActionAt: patch.nextActionAt,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(sequenceRuns.id, runId),
+            eq(sequenceRuns.status, "active"),
+            eq(sequenceRuns.touchesDone, patch.touchNo)
+          )
+        );
+    },
+
     async reviveSequenceRun(leadId: string, nextActionAt: Date) {
       // Conversation cadence (0044): the engaged lead's run goes back on the clock with one
       // touch of headroom — touches_done drops to (target-1)-equivalent by simply stepping
@@ -1449,6 +1488,18 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
 
     async getChampion(accountId) {
       return fetchChampion(db, accountId);
+    },
+
+    async getSetting(key) {
+      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, key));
+      return row?.value;
+    },
+
+    async setSetting(key, value) {
+      await db
+        .insert(appSettings)
+        .values({ key, value })
+        .onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: new Date() } });
     },
 
     async getBestOfN() {
@@ -1622,6 +1673,7 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           leadAssignedSenderId: leads.linkedinAccountId,
           leadLocation: leads.location,
           origin: scheduledSends.origin,
+          scheduledFor: scheduledSends.scheduledFor,
           createdAt: scheduledSends.createdAt,
         })
         .from(scheduledSends)
@@ -1698,6 +1750,21 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         if (await accountExemptFromTrialCaps(accountId)) exemptAccounts.add(accountId);
       }
 
+      // Lead timezone = timezoneForLocation(lead.location); when that resolves to nothing, fall
+      // back to the account's copy agent timezone (one batched query; the "UTC" column default
+      // counts as unset, so an agent nobody configured yields null = no quiet gate).
+      const agentTz = new Map<string, string>();
+      const needFallback = [
+        ...new Set(rows.filter((r) => resolveLeadTimezone(r.leadLocation, null) === null).map((r) => r.accountId)),
+      ];
+      if (needFallback.length > 0) {
+        const tzRows = await db
+          .select({ accountId: agents.accountId, timezone: agents.timezone })
+          .from(agents)
+          .where(and(inArray(agents.accountId, needFallback), eq(agents.kind, "copy")));
+        for (const t of tzRows) if (t.timezone && t.timezone !== "UTC") agentTz.set(t.accountId, t.timezone);
+      }
+
       return rows.map((r) => ({
         id: r.id,
         accountId: r.accountId,
@@ -1719,6 +1786,8 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         leadHasInFlightMessage: inFlightLeads.has(r.leadId),
         origin: r.origin as "sequence" | "reply_response" | "manual",
         leadLocation: r.leadLocation,
+        notBefore: r.status === "approved" ? r.scheduledFor : null,
+        leadTimezone: resolveLeadTimezone(r.leadLocation, agentTz.get(r.accountId)),
       }));
     },
 
@@ -2158,6 +2227,41 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
       await db.update(leads).set({ linkedinProviderRef: providerRef }).where(eq(leads.id, leadId));
     },
 
+    async setReplyOutreachSend(replyId: string, scheduledSendId: string | null) {
+      // replies.outreach_send_id references the outreach_sends audit row; resolve the delivered
+      // scheduled send to its newest audit row (null when unattributed or no audit row exists).
+      let outreachSendId: string | null = null;
+      if (scheduledSendId) {
+        const [row] = await db
+          .select({ id: outreachSends.id })
+          .from(outreachSends)
+          .where(eq(outreachSends.scheduledSendId, scheduledSendId))
+          .orderBy(desc(outreachSends.sentAt))
+          .limit(1);
+        outreachSendId = row?.id ?? null;
+      }
+      await db.update(replies).set({ outreachSendId }).where(eq(replies.id, replyId));
+    },
+
+    async lastDeliveredSendId(accountId: string, leadId: string, before: Date) {
+      const deliveredAt = sql<Date>`coalesce((select max(o.sent_at) from ${outreachSends} o where o.scheduled_send_id = ${scheduledSends.id}), ${scheduledSends.updatedAt})`;
+      const [row] = await db
+        .select({ id: scheduledSends.id })
+        .from(scheduledSends)
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            eq(scheduledSends.leadId, leadId),
+            eq(scheduledSends.status, "sent"),
+            inArray(scheduledSends.linkedinStage, ["invite", "message"]),
+            sql`${deliveredAt} <= ${before.toISOString()}::timestamptz`
+          )
+        )
+        .orderBy(desc(deliveredAt))
+        .limit(1);
+      return row?.id ?? null;
+    },
+
     async insertReply(r: {
       accountId: string;
       leadId: string;
@@ -2178,12 +2282,12 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           where: sql`provider_message_ref is not null`,
         })
         .returning({ id: replies.id, createdAt: replies.createdAt });
-      if (row) return { id: row.id, created: true, createdAt: row.createdAt, classified: false };
+      if (row) return { id: row.id, created: true, createdAt: row.createdAt, classified: false, readout: null };
       if (!r.providerMessageRef) throw new Error("failed to insert reply");
       // classified_at is the processed marker (runInbound writes it last): an existing row without
       // it belongs to a run that crashed mid-way, and the caller finishes it instead of deduping.
       const [existing] = await db
-        .select({ id: replies.id, createdAt: replies.createdAt, classifiedAt: replies.classifiedAt })
+        .select({ id: replies.id, createdAt: replies.createdAt, classifiedAt: replies.classifiedAt, readout: replies.readout })
         .from(replies)
         .where(
           and(
@@ -2193,7 +2297,13 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
         )
         .limit(1);
       if (!existing) throw new Error("failed to insert reply");
-      return { id: existing.id, created: false, createdAt: existing.createdAt, classified: existing.classifiedAt !== null };
+      return {
+        id: existing.id,
+        created: false,
+        createdAt: existing.createdAt,
+        classified: existing.classifiedAt !== null,
+        readout: (existing.readout as import("@vantera/agent-brains").Readout | null) ?? null,
+      };
     },
 
     async getLeadLinkedInUrl(accountId: string, leadId: string) {
@@ -2287,6 +2397,10 @@ export function createPgStore(db: Db): ScoutStore & CopyDraftStore & SchedulerSt
           .values({ accountId, campaignId, leadId, status: "paused_reply" })
           .onConflictDoNothing({ target: [sequenceRuns.campaignId, sequenceRuns.leadId] });
       }
+    },
+
+    async setReplyReadout(replyId: string, readout: import("@vantera/agent-brains").Readout) {
+      await db.update(replies).set({ readout }).where(eq(replies.id, replyId));
     },
 
     async setReplyClassification(replyId: string, verdict: import("@vantera/agent-brains").ReplyVerdict) {
@@ -4445,6 +4559,430 @@ export function createThreadSyncStore(db: Db): ThreadSyncStore {
 
     async markThreadSynced(leadId: string, at: Date) {
       await db.update(leads).set({ linkedinThreadSyncedAt: at }).where(eq(leads.id, leadId));
+    },
+  };
+}
+
+/**
+ * Conversation intelligence store (0074). Service role, cross-tenant by design like the other
+ * pipeline stores: every call carries its own accountId and every write re-states it.
+ */
+export function createConversationStore(db: Db): ConversationStore & ConversationLearnStore {
+  const MODES: readonly ConversationMode[] = ["off", "shadow", "live_replies", "live"];
+  type PriorRow = {
+    level: PriorCell["level"];
+    phase: string;
+    archetype: string;
+    move: string;
+    count: number;
+    n: number;
+    positives: number;
+    rewardSum: number;
+    rewardSq: number;
+  };
+  const toCell = (r: PriorRow, source: PriorCell["source"]): PriorCell => ({
+    level: r.level,
+    move: r.move as PriorCell["move"],
+    phase: r.phase as PriorCell["phase"],
+    archetype: r.archetype as PriorCell["archetype"],
+    source,
+    count: r.count,
+    n: r.n,
+    positives: r.positives,
+    rewardSum: r.rewardSum,
+    rewardSq: r.rewardSq,
+  });
+
+  return {
+    async getConversationPolicyMode() {
+      const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "conversation_policy"));
+      const v = row?.value;
+      return typeof v === "string" && (MODES as readonly string[]).includes(v) ? (v as ConversationMode) : "off";
+    },
+
+    async getConversationState(accountId, leadId) {
+      const [row] = await db
+        .select({ state: conversationStates.state, ref: conversationStates.lastMessageRef })
+        .from(conversationStates)
+        .where(and(eq(conversationStates.accountId, accountId), eq(conversationStates.leadId, leadId)));
+      return row ? { state: row.state as ConversationState, lastMessageRef: row.ref } : null;
+    },
+
+    async saveConversationState(accountId, leadId, state, lastMessageRef) {
+      await db
+        .insert(conversationStates)
+        .values({ accountId, leadId, state, lastMessageRef })
+        .onConflictDoUpdate({
+          target: conversationStates.leadId,
+          set: { state, lastMessageRef, updatedAt: new Date() },
+          setWhere: eq(conversationStates.accountId, accountId),
+        });
+    },
+
+    async listThreadTurns(accountId, leadId) {
+      // Agent touches ordered by DELIVERY time, as getResponderBundle does.
+      const sent = await db
+        .select({
+          id: scheduledSends.id,
+          body: scheduledSends.body,
+          stage: scheduledSends.linkedinStage,
+          at: sql<Date>`coalesce((select max(o.sent_at) from ${outreachSends} o where o.scheduled_send_id = ${scheduledSends.id}), ${scheduledSends.updatedAt})`.mapWith(scheduledSends.updatedAt),
+        })
+        .from(scheduledSends)
+        .where(
+          and(
+            eq(scheduledSends.accountId, accountId),
+            eq(scheduledSends.leadId, leadId),
+            inArray(scheduledSends.linkedinStage, ["invite", "message"]),
+            eq(scheduledSends.status, "sent")
+          )
+        );
+      const native = await db
+        .select({ id: nativeMessages.id, body: nativeMessages.body, at: nativeMessages.sentAt })
+        .from(nativeMessages)
+        .where(and(eq(nativeMessages.accountId, accountId), eq(nativeMessages.leadId, leadId)));
+      const got = await db
+        .select({ id: replies.id, body: replies.body, at: replies.receivedAt })
+        .from(replies)
+        .where(
+          and(
+            eq(replies.accountId, accountId),
+            eq(replies.leadId, leadId),
+            // auto-responders aren't conversation
+            or(isNull(replies.classification), ne(replies.classification, "out_of_office"))
+          )
+        );
+      return turnsFromRows(
+        sent.map((r) => ({ ...r, stage: r.stage as "invite" | "message" | null })),
+        native,
+        got
+      );
+    },
+
+    async insertDecision(d) {
+      const [row] = await db
+        .insert(conversationDecisions)
+        .values({
+          ...(d.id ? { id: d.id } : {}),
+          accountId: d.accountId,
+          leadId: d.leadId,
+          scheduledSendId: d.scheduledSendId,
+          mode: d.mode,
+          trigger: d.trigger,
+          phase: d.phase,
+          archetype: d.archetype,
+          move: d.move,
+          styleKey: d.styleKey,
+          propensity: d.propensity,
+          seed: d.seed,
+          // legal_moves is an object { moves, degraded } so the policy's degraded reason rides
+          // along without a new column; only the learner and the readout read the decision log.
+          legalMoves: { moves: d.legalMoves, degraded: d.degraded },
+          vetoes: d.vetoes,
+          stateSnapshot: d.stateSnapshot,
+          composedBody: d.composedBody,
+          policyVersion: d.policyVersion,
+          promptHash: d.promptHash,
+        })
+        .returning({ id: conversationDecisions.id });
+      return row!.id;
+    },
+
+    async insertScheduledSendReturningId(send) {
+      const [row] = await db
+        .insert(scheduledSends)
+        .values({ ...toRow(send), scheduledFor: send.notBefore ?? null })
+        .returning({ id: scheduledSends.id });
+      return row!.id;
+    },
+
+    async readPriors(accountId) {
+      const acct = await db.select().from(conversationPriors).where(eq(conversationPriors.accountId, accountId));
+      const glob = await db.select().from(conversationPriorsGlobal);
+      return mergePriorTables(
+        acct.map((r) => toCell(r, "real")),
+        glob.map((r) => toCell(r, r.source))
+      );
+    },
+
+    async upsertPriors(accountId, cells) {
+      const now = new Date();
+      const vals = (c: PriorCell) => ({
+        level: c.level,
+        phase: c.phase,
+        archetype: c.archetype,
+        move: c.move,
+        count: c.count,
+        n: c.n,
+        positives: c.positives,
+        rewardSum: c.rewardSum,
+        rewardSq: c.rewardSq,
+        updatedAt: now,
+      });
+      const replace = (c: PriorCell) => ({
+        count: c.count,
+        n: c.n,
+        positives: c.positives,
+        rewardSum: c.rewardSum,
+        rewardSq: c.rewardSq,
+        updatedAt: now,
+      });
+      await db.transaction(async (tx) => {
+        // scope replace: stale cells absent from the new rollup must not survive
+        if (accountId) {
+          await tx.delete(conversationPriors).where(eq(conversationPriors.accountId, accountId));
+        } else {
+          await tx.delete(conversationPriorsGlobal).where(eq(conversationPriorsGlobal.source, "real"));
+        }
+        for (const c of cells) {
+          if (accountId) {
+            await tx
+              .insert(conversationPriors)
+              .values({ accountId, ...vals(c) })
+              .onConflictDoUpdate({
+                target: [
+                  conversationPriors.accountId,
+                  conversationPriors.level,
+                  conversationPriors.phase,
+                  conversationPriors.archetype,
+                  conversationPriors.move,
+                ],
+                set: replace(c),
+              });
+          } else {
+            await tx
+              .insert(conversationPriorsGlobal)
+              .values({ ...vals(c), source: c.source })
+              .onConflictDoUpdate({
+                target: [
+                  conversationPriorsGlobal.level,
+                  conversationPriorsGlobal.phase,
+                  conversationPriorsGlobal.archetype,
+                  conversationPriorsGlobal.move,
+                  conversationPriorsGlobal.source,
+                ],
+                set: replace(c),
+              });
+          }
+        }
+      });
+    },
+
+    async listUnscoredDecisions(olderThan, limit) {
+      const rows = await db
+        .select({
+          id: conversationDecisions.id,
+          accountId: conversationDecisions.accountId,
+          leadId: conversationDecisions.leadId,
+          scheduledSendId: conversationDecisions.scheduledSendId,
+          decidedAt: conversationDecisions.decidedAt,
+          move: conversationDecisions.move,
+          phase: conversationDecisions.phase,
+          archetype: conversationDecisions.archetype,
+          propensity: conversationDecisions.propensity,
+          composedBody: conversationDecisions.composedBody,
+          sentBody: scheduledSends.body,
+          sentAt: sql<Date | null>`(select max(o.sent_at) from ${outreachSends} o where o.scheduled_send_id = ${conversationDecisions.scheduledSendId})`.mapWith(outreachSends.sentAt),
+          sendStatus: scheduledSends.status,
+          nextDecisionAt: sql<Date | null>`(select min(n.decided_at) from ${conversationDecisions} n where n.lead_id = ${conversationDecisions.leadId} and n.account_id = ${conversationDecisions.accountId} and n.mode = 'live' and n.decided_at > ${conversationDecisions.decidedAt})`.mapWith(conversationDecisions.decidedAt),
+        })
+        .from(conversationDecisions)
+        .leftJoin(scheduledSends, eq(scheduledSends.id, conversationDecisions.scheduledSendId))
+        .where(
+          and(
+            eq(conversationDecisions.mode, "live"),
+            isNull(conversationDecisions.scoredAt),
+            sql`coalesce((select max(o.sent_at) from ${outreachSends} o where o.scheduled_send_id = ${conversationDecisions.scheduledSendId}), ${conversationDecisions.decidedAt}) <= ${olderThan.toISOString()}::timestamptz`
+          )
+        )
+        .orderBy(asc(conversationDecisions.decidedAt))
+        .limit(limit);
+      return rows.map((r) => ({
+        ...r,
+        move: r.move as ScorableDecision["move"],
+        phase: r.phase as ScorableDecision["phase"],
+        archetype: r.archetype as ScorableDecision["archetype"],
+        sentAt: r.sentAt ?? null,
+        sendStatus: r.sendStatus ?? null,
+        nextDecisionAt: r.nextDecisionAt ?? null,
+      }));
+    },
+
+    async scoreDecision(id, outcome, reward) {
+      await db
+        .update(conversationDecisions)
+        .set({ outcome, reward, scoredAt: new Date() })
+        .where(eq(conversationDecisions.id, id));
+    },
+
+    async listScoredDecisions(accountId, limit, since) {
+      const rows = await db
+        .select({
+          accountId: conversationDecisions.accountId,
+          move: conversationDecisions.move,
+          phase: conversationDecisions.phase,
+          archetype: conversationDecisions.archetype,
+          propensity: conversationDecisions.propensity,
+          reward: conversationDecisions.reward,
+        })
+        .from(conversationDecisions)
+        .where(
+          and(
+            isNotNull(conversationDecisions.reward),
+            gte(conversationDecisions.decidedAt, since),
+            ...(accountId ? [eq(conversationDecisions.accountId, accountId)] : [])
+          )
+        )
+        .orderBy(desc(conversationDecisions.decidedAt))
+        .limit(limit);
+      return rows.map((r) => ({
+        accountId: r.accountId,
+        move: r.move as Move,
+        phase: r.phase as Phase,
+        archetype: r.archetype as Archetype,
+        propensity: r.propensity,
+        reward: r.reward as number,
+      }));
+    },
+
+    async hasGlobalPriors(source) {
+      const [row] = await db
+        .select({ n: count() })
+        .from(conversationPriorsGlobal)
+        .where(eq(conversationPriorsGlobal.source, source));
+      return (row?.n ?? 0) > 0;
+    },
+
+    async outcomeFor(d) {
+      // Outcome window [decidedAt, nextDecisionAt): events after the lead's next live decision belong
+      // to that decision. Without a next decision the window is 30 days.
+      const ws = d.decidedAt.toISOString();
+      const we = (d.nextDecisionAt ?? new Date(d.decidedAt.getTime() + 30 * 86_400_000)).toISOString();
+      const rows = (await db.execute(sql`
+        with send as (
+          select o.id from ${outreachSends} o
+          where o.account_id = ${d.accountId} and o.scheduled_send_id = ${d.scheduledSendId}
+        ),
+        direct as (
+          select r.id, r.received_at, r.readout from ${replies} r
+          where r.account_id = ${d.accountId} and r.lead_id = ${d.leadId}
+            and r.received_at >= ${ws}::timestamptz and r.received_at < ${we}::timestamptz
+            and ${d.move === "wait" ? sql`true` : sql`r.outreach_send_id in (select id from send)`}
+          order by r.received_at asc
+          limit 1
+        )
+        select
+          (select count(*) from direct)::int as replied,
+          (select readout->>'stance' from direct) as stance,
+          (select count(*) from ${replies} r2
+            where r2.account_id = ${d.accountId} and r2.lead_id = ${d.leadId}
+              and r2.received_at > (select received_at from direct)
+              and r2.received_at < ${we}::timestamptz
+              and (r2.classification is null or r2.classification <> 'out_of_office'))::int as further,
+          exists (select 1 from ${leads} l
+            where l.id = ${d.leadId} and l.account_id = ${d.accountId}
+              and l.meeting_booked_at >= ${ws}::timestamptz and l.meeting_booked_at < ${we}::timestamptz) as booked,
+          exists (select 1 from ${leads} l2
+            where l2.id = ${d.leadId} and l2.account_id = ${d.accountId}
+              and l2.meeting_booked_at >= ${we}::timestamptz) as booked_shared,
+          exists (select 1 from ${suppressionEntries} s
+            where s.account_id = ${d.accountId} and s.lead_id = ${d.leadId}
+              and s.created_at >= ${ws}::timestamptz and s.created_at < ${we}::timestamptz) as opt_out,
+          exists (select 1 from ${replies} r3
+            where r3.account_id = ${d.accountId} and r3.lead_id = ${d.leadId}
+              and r3.received_at >= ${ws}::timestamptz and r3.received_at < ${we}::timestamptz
+              and r3.readout->>'identitySuspicion' = 'true') as suspicion,
+          exists (select 1 from ${nativeMessages} n
+            where n.account_id = ${d.accountId} and n.lead_id = ${d.leadId}
+              and n.sent_at >= ${ws}::timestamptz and n.sent_at < ${we}::timestamptz) as takeover,
+          exists (select 1 from ${replies} r4
+            where r4.account_id = ${d.accountId} and r4.lead_id = ${d.leadId}
+              and r4.received_at >= ${ws}::timestamptz and r4.received_at < ${we}::timestamptz) as any_reply
+      `)) as unknown as {
+        replied: number;
+        stance: string | null;
+        further: number;
+        booked: boolean;
+        booked_shared: boolean;
+        opt_out: boolean;
+        suspicion: boolean;
+        takeover: boolean;
+        any_reply: boolean;
+      }[];
+      const r = rows[0];
+      const replied = (r?.replied ?? 0) > 0;
+      const stance = r?.stance;
+      return {
+        replied,
+        stance: stance === "positive" || stance === "neutral" || stance === "skeptical" || stance === "negative" || stance === "opt_out" ? stance : null,
+        furtherLeadTurns: replied ? (r?.further ?? 0) : 0,
+        booked: r?.booked ?? false,
+        bookedShared: r?.booked_shared ?? false,
+        optOut: r?.opt_out ?? false,
+        identitySuspicion: r?.suspicion ?? false,
+        humanTakeover: r?.takeover ?? false,
+        waitThenReply: d.move === "wait" && (r?.any_reply ?? false),
+      };
+    },
+
+    async listConnectedWithoutFirstMessage(limit, { includeParked, decidedSince }) {
+      // Every cheap exclusion lives in SQL, BEFORE the limit, so a stuck tail can never starve the
+      // batch (the core's in-memory skips — no bundle, human-handled, suppressed — are defence only).
+      // Guarantees, per returned lead:
+      //  - connected (linkedin_connected_at set), newest acceptance first, under a live Outreach agent;
+      //  - its NEWEST active sequence run supplies the campaign (one row per lead via the lateral join:
+      //    sequence_runs is only unique on (campaign_id, lead_id));
+      //  - no first_message decision at or after decidedSince (the cooldown: shadow and a live `wait`
+      //    leave no message row, so without it the lead would be re-decided every tick);
+      //  - the prospect has not spoken since our last delivered invite/message (non-OOO replies; the
+      //    reply path answers those);
+      //  - no message-stage row (excluding canceled) — or, with includeParked, none sent/sending, so
+      //    a parked legacy draft still gets its shadow decision.
+      const messageBlock = includeParked
+        ? sql`s.status in ('sent', 'sending')`
+        : sql`s.status <> 'canceled'`;
+      const rows = (await db.execute(sql`
+        select l.account_id, l.id as lead_id, sr.campaign_id
+        from ${leads} l
+        join lateral (
+          select r.campaign_id from ${sequenceRuns} r
+          where r.lead_id = l.id and r.account_id = l.account_id and r.status = 'active'
+          order by r.created_at desc
+          limit 1
+        ) sr on true
+        where l.linkedin_connected_at is not null
+          and not exists (
+            select 1 from ${scheduledSends} s
+            where s.account_id = l.account_id and s.lead_id = l.id and s.linkedin_stage = 'message'
+              and ${messageBlock}
+          )
+          and not exists (
+            select 1 from ${conversationDecisions} d
+            where d.account_id = l.account_id and d.lead_id = l.id and d.trigger = 'first_message'
+              and d.decided_at >= ${decidedSince.toISOString()}::timestamptz
+          )
+          and not exists (
+            select 1 from ${replies} rp
+            where rp.account_id = l.account_id and rp.lead_id = l.id
+              and (rp.classification is null or rp.classification <> 'out_of_office')
+              and rp.received_at > coalesce((
+                select max(coalesce(
+                  (select max(o.sent_at) from ${outreachSends} o where o.scheduled_send_id = ss.id),
+                  ss.updated_at
+                ))
+                from ${scheduledSends} ss
+                where ss.account_id = l.account_id and ss.lead_id = l.id and ss.status = 'sent'
+                  and ss.linkedin_stage in ('invite', 'message')
+              ), '-infinity'::timestamptz)
+          )
+          and exists (
+            select 1 from ${agents} a
+            where a.account_id = l.account_id and a.kind = 'copy' and a.status = 'live'
+          )
+        order by l.linkedin_connected_at desc
+        limit ${limit}
+      `)) as unknown as { account_id: string; lead_id: string; campaign_id: string }[];
+      return rows.map((r) => ({ accountId: r.account_id, leadId: r.lead_id, campaignId: r.campaign_id }));
     },
   };
 }

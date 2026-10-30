@@ -1,0 +1,81 @@
+{
+  "id": "prod-genuine-decline",
+  "lead": {
+    "firstName": "Gordon",
+    "lastName": "Hale",
+    "title": "Chief Executive Officer",
+    "companyName": "Summit Revenue Partners",
+    "industry": "Revenue consulting"
+  },
+  "insights": {
+    "summary": "CEO of Summit Revenue Partners in Nashville. CEO title is strong ICP fit, and company name suggests B2B revenue/sales consulting. Title and sector alignment are solid. No signal, but role and industry warrant outreach.",
+    "triggers": [],
+    "aha_moment": "Generate 10+ qualified consulting engagement opportunities per month by automating outreach to VP Sales and CRO targets.",
+    "motivations": [
+      "CEO status; B2B services implied by company name"
+    ],
+    "pain_points": [
+      "Client lead generation",
+      "Sales pipeline scaling"
+    ],
+    "value_angle": "Vantera can help them systematically find and engage prospective clients (executives in revenue/sales roles) on LinkedIn, turning their expertise into predictable client acquisition.",
+    "prospect_offering": "Revenue consulting or sales advisory services."
+  },
+  "context": {
+    "cta": "a short walkthrough of how Vantera books qualified meetings",
+    "accountName": "Vantera",
+    "accountIndustry": "LinkedIn outreach software",
+    "valueProp": "Vantera finds in-market prospects on LinkedIn, drafts personal messages, and books qualified meetings while the founder approves every send",
+    "websiteUrl": "https://www.vanterasystem.dev",
+    "bookingUrl": null,
+    "contentLinks": [],
+    "proofPoints": []
+  },
+  "turns": [
+    {
+      "ref": "t0",
+      "role": "agent",
+      "text": "Revenue consulting at the CEO level usually means you're carrying the pipeline yourself. Wanted to connect with someone doing that work.",
+      "at": "2026-10-23T10:43:44Z",
+      "stage": "invite"
+    },
+    {
+      "ref": "t1",
+      "role": "agent",
+      "text": "Running a revenue consulting practice means your own client pipeline is always the quieter priority. What's your current approach to finding new engagements?",
+      "at": "2026-10-23T23:35:09Z",
+      "stage": "message"
+    },
+    {
+      "ref": "t2",
+      "role": "lead",
+      "text": "Sam,\nThank you for the question.\nI am no longer generating any new business. Focused on investments.\nThanks",
+      "at": "2026-10-27T13:50:57Z"
+    }
+  ],
+  "expect": {
+    "readouts": [
+      {
+        "turn": "t2",
+        "stance": "negative",
+        "intent": "declines",
+        "explicitOptOut": false,
+        "confidence": 0.9
+      }
+    ],
+    "flaggedTurns": [],
+    "finalTrigger": "reply",
+    "finalLegal": [
+      "graceful_exit",
+      "hand_to_human"
+    ],
+    "finalVetoed": [
+      "ask_discovery",
+      "soft_ask",
+      "observe",
+      "propose_times"
+    ],
+    "suppression": "written"
+  },
+  "notes": "Control case: an explicit, high-confidence decline. Suppression is correct here."
+}

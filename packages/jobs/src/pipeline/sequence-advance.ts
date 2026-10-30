@@ -119,6 +119,7 @@ export function advanceSequence(ctx: SequenceTickContext): SequenceDecision {
       kind: "dispatch",
       stage,
       touchNo,
+      isLast,
       patch: {
         touchesDone: touchNo,
         lastTouchAt: ctx.now,

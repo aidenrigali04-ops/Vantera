@@ -2,6 +2,7 @@ import {
   describeViolations,
   buildSendRecipe,
   LINKEDIN_SYSTEM,
+  LINKEDIN_NOTE_SYSTEM,
   LINKEDIN_PAIR_MESSAGE_TYPE,
   bestOfN,
   leadBlock,
@@ -32,6 +33,10 @@ const DRAFT_CONCURRENCY = 4;
  * app-setting says, so a config typo can't blow up per-lead LLM spend.
  */
 export const MAX_BEST_OF_N = 5;
+
+/** What the best-of-N judge is told it is reading in note-only mode. */
+const NOTE_MESSAGE_TYPE =
+  "LinkedIn connection note: the only message before the request is accepted; no pitch, no CTA, no links";
 
 /** Hard ceiling on first-touch invite drafts per account per UTC day. */
 export const DAILY_FIRST_TOUCH_DRAFT_CAP = 15;
@@ -184,6 +189,53 @@ export async function runCopyDraft(
   const baseSkeletons = openerSkeletons([...ctx.avoidPhrases, ...(ctx.winningOpeners ?? [])]);
   const runSkeletons: string[] = [];
 
+  /**
+   * Note-only first touch (conversation mode on): best-of-N over the note text, the in-run skeleton
+   * collision check on the NOTE, then ONE invite row. The note brain lints itself (validateLinkedInNote
+   * inside draftLinkedInNote); there is no note fixer, so an automatic sender's flagged note waits in
+   * review. Caller has already passed the rule-11 suppression check.
+   */
+  const draftNoteOnly = async (input: DraftInput, strategy: CopyStrategy, leadId: string): Promise<void> => {
+    const configuredN = Math.min(Math.max(1, Math.floor(deps.bestOfN ?? 1)), MAX_BEST_OF_N);
+    const n = deps.judgeFn ? configuredN : 1;
+    const { chosen } = await bestOfN(
+      n,
+      () => deps.draftLinkedInNoteFn(input),
+      (d) => d.connectionNote,
+      { grounding: leadBlock(input), cta: input.context.cta, messageType: NOTE_MESSAGE_TYPE },
+      deps.judgeFn
+    );
+    let note = chosen;
+    // same synchronous check-then-push as the pair path: concurrent drafts can't both slip through
+    const identity = leadIdentity(input.lead);
+    if (!note.violations.some((v) => v.rule === "repeated-opener")) {
+      const repeat = findRepeatedOpener(note.connectionNote, runSkeletons, identity);
+      if (repeat.length > 0) note = { ...note, violations: [...note.violations, ...repeat] };
+    }
+    const mine = openerSkeleton(note.connectionNote, identity);
+    if (mine) runSkeletons.push(mine);
+    await deps.store.insertScheduledSend({
+      accountId,
+      campaignId,
+      leadId,
+      channel: "linkedin",
+      subject: null,
+      body: note.connectionNote,
+      status: draftStatus(ctx.agent.sendMode, note.violations),
+      linkedinStage: "invite",
+      styleFlags: note.violations.length > 0 ? describeViolations(note.violations) : null,
+      recipe: buildSendRecipe({
+        brain: "first_touch",
+        strategy,
+        playbookVersion: champion.version,
+        exemplars: (ctx.winningOpeners ?? []).length,
+        promptHash: LINKEDIN_NOTE_SYSTEM.hash,
+        modelId: getModelId(),
+        ...(n > 1 ? { bestOfN: n } : {}),
+      }),
+    });
+  };
+
   // Bounded concurrency: the per-lead LLM draft + writes used to run one lead at a time, so
   // wall-clock was N x draft latency. Drafting is the gate between "qualified" and "sendable",
   // so its throughput is the account's outreach volume. DRAFT_CONCURRENCY caps in-flight drafts.
@@ -233,6 +285,13 @@ export async function runCopyDraft(
         await deps.store.isSuppressed(accountId, "linkedin", normalizeLinkedInUrl(lead.linkedinUrl))
       ) {
         leadSuppressed += 1;
+      } else if (deps.conversationMode === "live") {
+        // Spec §7.2: under "live" the conversation core writes the first message at acceptance
+        // (first-message scan), from the live thread — so the first touch here is the note ONLY.
+        // shadow / live_replies keep the pair: the legacy follow-up is what actually gets sent there
+        // (the scan only logs a shadow decision against it), so a connected lead is never left silent.
+        await draftNoteOnly(input, strategy, lead.id);
+        leadDrafted += 1;
       } else {
         // suppression checked above; one draft call yields both the invite note and follow-up.
         // Best-of-N (Task 3, quality lever 2): absent judgeFn forces n=1 regardless of config —

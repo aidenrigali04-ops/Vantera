@@ -1,0 +1,54 @@
+name: Sim conversation
+
+# Regenerates the sim-seeded priors and sim eval fixtures with real models (needs the repo secret
+# ANTHROPIC_API_KEY) and commits them back to the calling branch. Manual only.
+on:
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: "Seeds per persona"
+        default: "6"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sim-conversation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run simulated conversations
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SIM_SEEDS: ${{ inputs.seeds }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::ANTHROPIC_API_KEY not set - the sim cannot run. Add the repo secret."
+            exit 1
+          fi
+          pnpm --filter @vantera/agent-brains sim:conversation
+
+      - name: Commit generated priors and fixtures
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/agent-brains/src/conversation/priors-sim.json packages/evals/fixtures/conversation/sim-*.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "chore(sim): regenerate sim priors + fixtures"
+          git pull --rebase
+          git push

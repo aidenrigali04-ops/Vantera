@@ -145,7 +145,7 @@ export type LinkedInStage = "invite" | "message";
  * `grounding` is the leadBlock ALONE: strategy, avoid, exemplar and steer blocks are prompt-only
  * and never add facts, so an old metric or a steer number can never whitelist a new claim.
  */
-function assemblePrompt(input: DraftInput, steer: string | null): { grounding: string; basePrompt: string } {
+export function assemblePrompt(input: DraftInput, steer: string | null): { grounding: string; basePrompt: string } {
   const grounding = leadBlock(input);
   const basePrompt = [
     grounding,

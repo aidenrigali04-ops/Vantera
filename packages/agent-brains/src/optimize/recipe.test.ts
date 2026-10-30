@@ -68,4 +68,28 @@ describe("buildSendRecipe", () => {
       ["brain", "exemplars", "experimentId", "modelId", "playbookVersion", "promptHash", "strategy", "v", "variant"].sort()
     );
   });
+
+  it("stamps v3 with the five conversation keys at top level when a conversation block is passed", () => {
+    const recipe = buildSendRecipe({
+      brain: "conversation_reply",
+      conversation: { move: "answer", styleKey: "short|q|none|m", policyVersion: 1, propensity: 0.4, decisionId: "dec-1" },
+    });
+    expect(recipe).toMatchObject({
+      v: 3,
+      brain: "conversation_reply",
+      move: "answer",
+      styleKey: "short|q|none|m",
+      policyVersion: 1,
+      propensity: 0.4,
+      decisionId: "dec-1",
+    });
+    expect(recipe).not.toHaveProperty("conversation");
+  });
+
+  it("stays v2 with no conversation keys when absent", () => {
+    const recipe = buildSendRecipe({ brain: "first_touch" });
+    expect(recipe.v).toBe(2);
+    expect(recipe).not.toHaveProperty("move");
+    expect(recipe).not.toHaveProperty("decisionId");
+  });
 });

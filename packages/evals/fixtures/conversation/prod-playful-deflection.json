@@ -1,0 +1,92 @@
+{
+  "id": "prod-playful-deflection",
+  "lead": {
+    "firstName": "Elena",
+    "lastName": "Kraus",
+    "title": "Tech Co-Founder",
+    "companyName": "Deepforge",
+    "industry": "Machine intelligence"
+  },
+  "insights": {
+    "summary": "Strong fit: tech founder building SaaS/AI product with classic founder-led sales challenge. Ideal candidate for Vantera if Deepforge sells high-ticket B2B software and needs to build pipeline fast.",
+    "triggers": [
+      "Launching or scaling SaaS/tech product",
+      "Building founder-led sales team"
+    ],
+    "aha_moment": "Landing a first qualified call with a target CIO or CTO by week two using Vantera's agent-driven LinkedIn approach.",
+    "motivations": [
+      "Reducing time to first qualified conversation",
+      "Improving prospect accuracy for technical fit",
+      "Scaling without traditional sales hire"
+    ],
+    "pain_points": [
+      "Building go-to-market motion for deep tech",
+      "Qualifying technical buyers and decision-makers",
+      "Managing enterprise sales cycles"
+    ],
+    "value_angle": "Vantera's AI-driven prospect fit scoring and personalized outreach can help Deepforge identify and message CTO/technical buyer personas with precision, critical for deep-tech sales.",
+    "prospect_offering": "Deepforge — develops or provides machine intelligence solutions, likely B2B software or AI/ML platform."
+  },
+  "context": {
+    "cta": "a short walkthrough of how Vantera books qualified meetings",
+    "accountName": "Vantera",
+    "accountIndustry": "LinkedIn outreach software",
+    "valueProp": "Vantera finds in-market prospects on LinkedIn, drafts personal messages, and books qualified meetings while the founder approves every send",
+    "websiteUrl": "https://www.vanterasystem.dev",
+    "bookingUrl": null,
+    "contentLinks": [],
+    "proofPoints": []
+  },
+  "turns": [
+    {
+      "ref": "t0",
+      "role": "agent",
+      "text": "Building machine intelligence for B2B buyers is a tough sell when the buyers themselves are deeply technical. Interested in how you're approaching that at Deepforge.",
+      "at": "2026-10-22T05:58:01Z",
+      "stage": "invite"
+    },
+    {
+      "ref": "t1",
+      "role": "agent",
+      "text": "Good to be connected, Elena. Scaling a deep-tech product means your first qualified conversations with the right technical buyers matter a lot. How are you identifying and reaching those folks right now?",
+      "at": "2026-10-22T13:33:48Z",
+      "stage": "message"
+    },
+    {
+      "ref": "t2",
+      "role": "lead",
+      "text": "Hello Sam,\nThose are trade secrets!\nElena",
+      "at": "2026-10-22T13:35:40Z"
+    },
+    {
+      "ref": "t3",
+      "role": "agent",
+      "text": "Hahaha I love it.",
+      "at": "2026-10-23T02:31:15Z",
+      "stage": "message"
+    }
+  ],
+  "expect": {
+    "readouts": [
+      {
+        "turn": "t2",
+        "stance": "skeptical",
+        "intent": "other",
+        "explicitOptOut": false
+      }
+    ],
+    "flaggedTurns": [],
+    "finalTrigger": "followup",
+    "finalLegal": [
+      "observe",
+      "wait"
+    ],
+    "finalVetoed": [
+      "propose_times",
+      "soft_ask",
+      "ask_discovery"
+    ],
+    "suppression": "none"
+  },
+  "notes": "'Those are trade secrets!' was classified not_interested and suppressed in production. It is a playful deflection: skeptical, not a decline. The seller answered manually with banter; one discovery question is already spent (budget ok) but the last agent move was a question, so another is vetoed."
+}

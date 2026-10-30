@@ -7,7 +7,7 @@ import type {
   DraftableLead,
   NewScheduledSend,
 } from "./types";
-import { LINKEDIN_SYSTEM, LINKEDIN_PAIR_MESSAGE_TYPE, buildTargetingProfile, leadBlock, rankByTilt, type CopyStrategy, type DraftInput, type JudgeFn, type LeadOutcomeFlags } from "@vantera/agent-brains";
+import { LINKEDIN_SYSTEM, LINKEDIN_NOTE_SYSTEM, LINKEDIN_PAIR_MESSAGE_TYPE, buildTargetingProfile, leadBlock, rankByTilt, type CopyStrategy, type DraftInput, type JudgeFn, type LeadOutcomeFlags } from "@vantera/agent-brains";
 import { getModelId } from "@vantera/ai";
 
 /** The follow-up part of the labeled pair the best-of-N judge reads (linkedinJudgeText). */
@@ -129,8 +129,17 @@ class FakeCopyStore implements CopyDraftStore {
   }
 }
 
+/** Conversation intelligence off: today's pair path. The note brain must never run here. */
+const OFF_MODE = {
+  conversationMode: "off" as const,
+  draftLinkedInNoteFn: async (): Promise<never> => {
+    throw new Error("note brain must not run when conversation_policy is off");
+  },
+};
+
 function makeDeps(store: FakeCopyStore): CopyDraftDeps {
   return {
+    ...OFF_MODE,
     store,
     draftLinkedInFn: async () => ({
       connectionNote: "note",
@@ -435,6 +444,7 @@ function makeCapturingDeps(store: FakeCopyStore): { deps: CopyDraftDeps; inputs:
   return {
     inputs,
     deps: {
+      ...OFF_MODE,
       store,
       draftLinkedInFn: async (input) => {
         inputs.push(input);
@@ -514,6 +524,7 @@ describe("runCopyDraft — Vera's winning-opener memory (Stage 0.5)", () => {
     store.context.avoidPhrases = ["saw your post on hiring sdrs", "Congrats on the new role"];
     const captured: DraftInput[] = [];
     const deps: CopyDraftDeps = {
+      ...OFF_MODE,
       store,
       draftLinkedInFn: async (input) => {
         captured.push(input);
@@ -534,6 +545,7 @@ describe("runCopyDraft — Vera's winning-opener memory (Stage 0.5)", () => {
     store.leads = [lead("l1")];
     const captured: DraftInput[] = [];
     const deps: CopyDraftDeps = {
+      ...OFF_MODE,
       store,
       draftLinkedInFn: async (input) => {
         captured.push(input);
@@ -637,7 +649,7 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
       followupMessage: "follow",
       violations: [],
     }));
-    const deps: CopyDraftDeps = { store, draftLinkedInFn };
+    const deps: CopyDraftDeps = { ...OFF_MODE, store, draftLinkedInFn };
 
     await runCopyDraft(PAYLOAD, deps);
 
@@ -653,7 +665,7 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
       followupMessage: "follow",
       violations: [],
     }));
-    const deps: CopyDraftDeps = { store, draftLinkedInFn, bestOfN: 5 };
+    const deps: CopyDraftDeps = { ...OFF_MODE, store, draftLinkedInFn, bestOfN: 5 };
 
     await runCopyDraft(PAYLOAD, deps);
 
@@ -670,7 +682,7 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
       violations: [],
     }));
     const judgeFn = vi.fn<JudgeFn>();
-    const deps: CopyDraftDeps = { store, draftLinkedInFn, bestOfN: 1, judgeFn };
+    const deps: CopyDraftDeps = { ...OFF_MODE, store, draftLinkedInFn, bestOfN: 1, judgeFn };
 
     await runCopyDraft(PAYLOAD, deps);
 
@@ -701,7 +713,7 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
       capturedInput = input;
       return draftLinkedInFn();
     };
-    const deps: CopyDraftDeps = { store, draftLinkedInFn: wrappedDraftFn, bestOfN: 3, judgeFn };
+    const deps: CopyDraftDeps = { ...OFF_MODE, store, draftLinkedInFn: wrappedDraftFn, bestOfN: 3, judgeFn };
 
     await runCopyDraft(PAYLOAD, deps);
 
@@ -734,7 +746,7 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
       violations: [],
     }));
     const judgeFn: JudgeFn = vi.fn(async () => ({ overall: 3 }));
-    const deps: CopyDraftDeps = { store, draftLinkedInFn, bestOfN: 999, judgeFn };
+    const deps: CopyDraftDeps = { ...OFF_MODE, store, draftLinkedInFn, bestOfN: 999, judgeFn };
 
     await runCopyDraft(PAYLOAD, deps);
 
@@ -753,7 +765,7 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
       violations: [],
     }));
     const judgeFn: JudgeFn = vi.fn(async () => ({ overall: 5 }));
-    const deps: CopyDraftDeps = { store, draftLinkedInFn, bestOfN: 3, judgeFn };
+    const deps: CopyDraftDeps = { ...OFF_MODE, store, draftLinkedInFn, bestOfN: 3, judgeFn };
 
     const summary = await runCopyDraft(PAYLOAD, deps);
 
@@ -786,7 +798,7 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
       followupMessage: "still dirty follow",
       violations: [{ rule: "banned-phrase", detail: 'remove "seamless"' }],
     }));
-    const deps: CopyDraftDeps = { store, draftLinkedInFn, bestOfN: 3, judgeFn, fixLinkedInFn };
+    const deps: CopyDraftDeps = { ...OFF_MODE, store, draftLinkedInFn, bestOfN: 3, judgeFn, fixLinkedInFn };
 
     await runCopyDraft(PAYLOAD, deps);
 
@@ -825,7 +837,7 @@ describe("runCopyDraft — best-of-N (Task 3, off by default)", () => {
       followupMessage: "fixed follow",
       violations: [],
     }));
-    const deps: CopyDraftDeps = { store, draftLinkedInFn, bestOfN: 3, judgeFn, fixLinkedInFn };
+    const deps: CopyDraftDeps = { ...OFF_MODE, store, draftLinkedInFn, bestOfN: 3, judgeFn, fixLinkedInFn };
 
     await runCopyDraft(PAYLOAD, deps);
 
@@ -848,7 +860,7 @@ describe("runCopyDraft — daily first-touch cap", () => {
     const draftLinkedInFn = vi.fn(async () => CLEAN);
     const summary = await runCopyDraft(
       { copyAgentId: "copy1", accountId: "acc1", leadIds: ["a", "b", "c"] },
-      { store, draftLinkedInFn }
+      { ...OFF_MODE, store, draftLinkedInFn }
     );
     expect(draftLinkedInFn).toHaveBeenCalledTimes(1);
     expect(summary).toMatchObject({ drafted: 1, deferred: 2, skipped: 0 });
@@ -866,7 +878,7 @@ describe("runCopyDraft — daily first-touch cap", () => {
     const draftLinkedInFn = vi.fn(async () => CLEAN);
     const summary = await runCopyDraft(
       { copyAgentId: "copy1", accountId: "acc1", leadIds: ["a"] },
-      { store, draftLinkedInFn }
+      { ...OFF_MODE, store, draftLinkedInFn }
     );
     expect(draftLinkedInFn).not.toHaveBeenCalled();
     expect(summary).toMatchObject({ drafted: 0, deferred: 1, skipped: 0 });
@@ -880,7 +892,7 @@ describe("runCopyDraft — daily first-touch cap", () => {
     const draftLinkedInFn = vi.fn(async () => CLEAN);
     await runCopyDraft(
       { copyAgentId: "copy1", accountId: "acc1", leadIds: ["low", "high"] },
-      { store, draftLinkedInFn }
+      { ...OFF_MODE, store, draftLinkedInFn }
     );
     expect(store.sends.map((s) => s.leadId)).toEqual(["high", "high"]);
   });
@@ -900,7 +912,7 @@ describe("runCopyDraft — daily first-touch cap", () => {
     const draftLinkedInFn = vi.fn(async () => CLEAN);
     await runCopyDraft(
       { copyAgentId: "copy1", accountId: "acc1", leadIds: ["vp", "founder"] },
-      { store, draftLinkedInFn }
+      { ...OFF_MODE, store, draftLinkedInFn }
     );
     expect(store.sends.map((s) => s.leadId)).toEqual(["founder", "founder"]);
   });
@@ -913,7 +925,7 @@ describe("runCopyDraft — daily first-touch cap", () => {
     const draftLinkedInFn = vi.fn(async () => CLEAN);
     await runCopyDraft(
       { copyAgentId: "copy1", accountId: "acc1", leadIds: ["low", "high"] },
-      { store, draftLinkedInFn }
+      { ...OFF_MODE, store, draftLinkedInFn }
     );
     expect(draftLinkedInFn).toHaveBeenCalledTimes(1);
     expect(store.sends.map((s) => s.leadId)).toEqual(["low", "low"]);
@@ -930,7 +942,7 @@ describe("runCopyDraft — daily first-touch cap", () => {
       seen.push(input);
       return CLEAN;
     });
-    await runCopyDraft({ copyAgentId: "copy1", accountId: "acc1", leadIds: ["w", "plain"] }, { store, draftLinkedInFn });
+    await runCopyDraft({ copyAgentId: "copy1", accountId: "acc1", leadIds: ["w", "plain"] }, { ...OFF_MODE, store, draftLinkedInFn });
     expect(seen.some((i) => i.lead.whyNow?.text === why.text)).toBe(true);
     expect(seen.filter((i) => i.lead.whyNow).length).toBe(1);
   });
@@ -945,6 +957,7 @@ describe("runCopyDraft — opener skeletons (copy-quality fix)", () => {
     store.context.avoidPhrases = ["saw your post on hiring sdrs", "Thanks for connecting. Curious how you run outbound?"];
     const captured: DraftInput[] = [];
     const deps: CopyDraftDeps = {
+      ...OFF_MODE,
       store,
       draftLinkedInFn: async (input) => {
         captured.push(input);
@@ -967,6 +980,7 @@ describe("runCopyDraft — opener skeletons (copy-quality fix)", () => {
     const captured: DraftInput[] = [];
     let call = 0;
     const deps: CopyDraftDeps = {
+      ...OFF_MODE,
       store,
       draftLinkedInFn: async (input) => {
         captured.push(input);
@@ -987,5 +1001,134 @@ describe("runCopyDraft — opener skeletons (copy-quality fix)", () => {
     expect(store.sends.filter((s) => s.leadId === flagged[0]!.leadId).every((s) => s.status === "pending_review")).toBe(true);
     const clean = messages.find((m) => !m.styleFlags);
     expect(clean?.status).toBe("approved");
+  });
+});
+
+describe("runCopyDraft — first touch by conversation mode (spec §7.2)", () => {
+  it("copy-draft mode off: inserts the invite+message pair via the pair brain (unchanged)", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    const draftLinkedInFn = vi.fn(async () => ({ connectionNote: "note", followupMessage: "follow", violations: [] }));
+    const draftLinkedInNoteFn = vi.fn(async () => ({ connectionNote: "n", violations: [] }));
+
+    await runCopyDraft(PAYLOAD, { store, conversationMode: "off", draftLinkedInFn, draftLinkedInNoteFn });
+
+    expect(draftLinkedInFn).toHaveBeenCalledTimes(1);
+    expect(draftLinkedInNoteFn).not.toHaveBeenCalled();
+    expect(store.linkedInCallKinds).toEqual(["pair"]);
+    expect(store.sends.map((s) => [s.linkedinStage, s.body])).toEqual([
+      ["invite", "note"],
+      ["message", "follow"],
+    ]);
+    expect(store.sends[0]!.recipe?.promptHash).toBe(LINKEDIN_SYSTEM.hash);
+  });
+
+  for (const mode of ["shadow", "live_replies"] as const) {
+    it(`copy-draft mode ${mode}: keeps the pair path (the legacy follow-up is what gets sent)`, async () => {
+      const store = new FakeCopyStore();
+      store.leads = [lead("l1")];
+      const draftLinkedInFn = vi.fn(async () => ({ connectionNote: "note", followupMessage: "follow", violations: [] }));
+      const draftLinkedInNoteFn = vi.fn(async () => ({ connectionNote: "n", violations: [] }));
+
+      await runCopyDraft(PAYLOAD, { store, conversationMode: mode, draftLinkedInFn, draftLinkedInNoteFn });
+
+      expect(draftLinkedInFn).toHaveBeenCalledTimes(1);
+      expect(draftLinkedInNoteFn).not.toHaveBeenCalled();
+      expect(store.linkedInCallKinds).toEqual(["pair"]);
+      expect(store.sends.map((s) => s.linkedinStage)).toEqual(["invite", "message"]);
+      expect(store.sends[0]!.recipe?.promptHash).toBe(LINKEDIN_SYSTEM.hash);
+    });
+  }
+
+  for (const mode of ["live"] as const) {
+    it(`copy-draft mode ${mode}: inserts only the invite from the note brain; no message row`, async () => {
+      const store = new FakeCopyStore();
+      store.leads = [lead("l1")];
+      store.champion = { strategy: {}, version: 7 };
+      const draftLinkedInFn = vi.fn(async () => ({ connectionNote: "pair note", followupMessage: "follow", violations: [] }));
+      const draftLinkedInNoteFn = vi.fn(async () => ({ connectionNote: "Saw the Series A, Dana.", violations: [] }));
+
+      const summary = await runCopyDraft(PAYLOAD, { store, conversationMode: mode, draftLinkedInFn, draftLinkedInNoteFn });
+
+      expect(summary.drafted).toBe(1);
+      expect(draftLinkedInFn).not.toHaveBeenCalled();
+      expect(draftLinkedInNoteFn).toHaveBeenCalledTimes(1);
+      expect(store.linkedInCallKinds).toEqual(["single"]);
+      expect(store.sends).toHaveLength(1);
+      const invite = store.sends[0]!;
+      expect(invite).toMatchObject({ linkedinStage: "invite", body: "Saw the Series A, Dana.", status: "pending_review", styleFlags: null });
+      expect(store.sends.some((s) => s.linkedinStage === "message")).toBe(false);
+      expect(invite.recipe?.brain).toBe("first_touch");
+      expect(invite.recipe?.promptHash).toBe(LINKEDIN_NOTE_SYSTEM.hash);
+      expect(invite.recipe?.playbookVersion).toBe(7);
+      expect(invite.recipe?.modelId).toBe(getModelId());
+      expect(store.campaignLeads.get("l1")).toBe("queued");
+      expect(store.leadStatuses.get("l1")).toBe("in_campaign");
+    });
+  }
+
+  it("note mode: a suppressed profile gets no draft and no row (rule 11)", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    store.suppressedValues.add(`linkedin:${normalizeLinkedInUrl("https://linkedin.com/in/l1")}`);
+    const draftLinkedInNoteFn = vi.fn(async () => ({ connectionNote: "n", violations: [] }));
+
+    const summary = await runCopyDraft(PAYLOAD, { ...OFF_MODE, store, draftLinkedInFn: vi.fn(), conversationMode: "live", draftLinkedInNoteFn });
+
+    expect(summary.suppressed).toBe(1);
+    expect(draftLinkedInNoteFn).not.toHaveBeenCalled();
+    expect(store.sends).toHaveLength(0);
+  });
+
+  it("note mode: automatic sender auto-approves a clean note; a flagged note waits in review", async () => {
+    const store = new FakeCopyStore({ linkedin: true }, "automatic");
+    store.leads = [lead("l1"), lead("l2", { firstName: "Sam", companyName: "Globex" })];
+    const draftLinkedInNoteFn = vi.fn(async (input: DraftInput) =>
+      input.lead.firstName === "Dana"
+        ? { connectionNote: "Clean note, Dana.", violations: [] }
+        : { connectionNote: "Flagged note.", violations: [{ rule: "no-links", detail: "no links", part: "invite" as const }] }
+    );
+
+    await runCopyDraft({ ...PAYLOAD, leadIds: ["l1", "l2"] }, { store, conversationMode: "live", draftLinkedInFn: vi.fn(), draftLinkedInNoteFn });
+
+    const byLead = new Map(store.sends.map((s) => [s.leadId, s]));
+    expect(byLead.get("l1")?.status).toBe("approved");
+    expect(byLead.get("l2")?.status).toBe("pending_review");
+    expect(byLead.get("l2")?.styleFlags).toContain("no-links");
+  });
+
+  it("note mode: in-run skeleton collision runs on the NOTE text", async () => {
+    const store = new FakeCopyStore({ linkedin: true }, "automatic");
+    store.leads = [lead("l1"), lead("l2", { firstName: "Sam", companyName: "Globex" })];
+    const draftLinkedInNoteFn = vi.fn(async (input: DraftInput) => ({
+      connectionNote: `Three new reps at once, ${input.lead.firstName}, is a lot.`,
+      violations: [],
+    }));
+
+    await runCopyDraft({ ...PAYLOAD, leadIds: ["l1", "l2"] }, { store, conversationMode: "live", draftLinkedInFn: vi.fn(), draftLinkedInNoteFn });
+
+    expect(store.sends).toHaveLength(2);
+    const flagged = store.sends.filter((s) => s.styleFlags?.includes("repeated-opener"));
+    expect(flagged).toHaveLength(1);
+    expect(flagged[0]!.status).toBe("pending_review");
+  });
+
+  it("note mode: best-of-N ranks note candidates with the judge reading the note text", async () => {
+    const store = new FakeCopyStore();
+    store.leads = [lead("l1")];
+    let call = 0;
+    const draftLinkedInNoteFn = vi.fn(async () => ({ connectionNote: `note ${++call}`, violations: [] }));
+    const judged: string[] = [];
+    const judgeFn: JudgeFn = vi.fn(async (draft) => {
+      judged.push(draft.text);
+      return { overall: draft.text === "note 2" ? 9 : 1 };
+    });
+
+    await runCopyDraft(PAYLOAD, { store, conversationMode: "live", draftLinkedInFn: vi.fn(), draftLinkedInNoteFn, judgeFn, bestOfN: 3 });
+
+    expect(draftLinkedInNoteFn).toHaveBeenCalledTimes(3);
+    expect(judged.sort()).toEqual(["note 1", "note 2", "note 3"]);
+    expect(store.sends[0]!.body).toBe("note 2");
+    expect(store.sends[0]!.recipe?.bestOfN).toBe(3);
   });
 });
