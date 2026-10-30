@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { alertOnce, classifyProviderError, withProviderAlert, type ProviderAlertDeps } from "./provider-alert";
 
 function makeDeps(start = new Date("2026-10-28T00:00:00Z")) {
@@ -9,6 +9,7 @@ function makeDeps(start = new Date("2026-10-28T00:00:00Z")) {
     store: { getSetting: async (k) => settings.get(k), setSetting: async (k, v) => void settings.set(k, v) },
     send: async (a) => void sent.push(a),
     now: () => t,
+    recipient: "ops@example.com",
   };
   return { deps, sent, settings, advance: (ms: number) => (t = new Date(t.getTime() + ms)) };
 }
@@ -46,6 +47,18 @@ describe("alertOnce", () => {
     await alertOnce("billing", m.deps);
     expect(await alertOnce("auth", m.deps)).toBe(true);
     expect(m.sent[1]!.body).toContain("Rotate the AI API key in Trigger.dev + Vercel");
+  });
+});
+
+describe("alertOnce without a recipient", () => {
+  it("logs an error, sends nothing, returns false", async () => {
+    const m = makeDeps();
+    m.deps.recipient = null;
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await alertOnce("billing", m.deps)).toBe(false);
+    expect(spy).toHaveBeenCalledWith("provider alert: no admin recipient configured", { kind: "billing" });
+    expect(m.sent).toHaveLength(0);
+    spy.mockRestore();
   });
 });
 

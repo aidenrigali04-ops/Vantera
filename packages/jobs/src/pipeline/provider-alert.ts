@@ -31,6 +31,8 @@ export interface ProviderAlertDeps {
   };
   send: (alert: { subject: string; body: string }) => Promise<void>;
   now: () => Date;
+  /** the platform admin recipient; null/empty = none configured (alert is logged, not sent) */
+  recipient: string | null;
 }
 
 const COPY: Record<ProviderErrorKind, { subject: string; body: string }> = {
@@ -46,6 +48,10 @@ const COPY: Record<ProviderErrorKind, { subject: string; body: string }> = {
 
 /** Sends at most one alert per kind per 24 h. Returns true when an alert was sent. */
 export async function alertOnce(kind: ProviderErrorKind, deps: ProviderAlertDeps): Promise<boolean> {
+  if (!deps.recipient) {
+    console.error("provider alert: no admin recipient configured", { kind });
+    return false;
+  }
   const key = `provider_alert:${kind}`;
   const now = deps.now();
   const last = await deps.store.getSetting(key);
