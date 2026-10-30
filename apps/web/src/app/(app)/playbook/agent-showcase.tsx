@@ -122,8 +122,8 @@ function AgentDetails({ agent }: { agent: ShowcaseAgent }) {
       )}
 
       {/* run-summary panel */}
-      <div className={cn(PANEL_SURFACE, "w-full space-y-5 p-6 text-left")}>
-        <div className="flex gap-8">
+      <div className={cn(PANEL_SURFACE, "w-full min-w-0 space-y-5 p-6 text-left")}>
+        <div className="flex flex-wrap gap-x-8 gap-y-3">
           {agent.stats.map((s) => (
             <div key={s.label}>
               <p className="font-data text-3xl font-semibold tabular-nums">{s.value}</p>

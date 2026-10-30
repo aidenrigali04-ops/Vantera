@@ -179,9 +179,11 @@ export default async function AgentsPage({
           </Button>
         </Panel>
       ) : (
-        // All three agents in one row — sourcing, intent, and outreach side by side (the full
-        // system at a glance) rather than split across stacked sections.
-        <div className="grid gap-4 lg:grid-cols-3">
+        // All three agents in one row on wide screens — sourcing, intent, and outreach side by
+        // side (the full system at a glance). Two columns between 768 and 1280px so a card never
+        // drops below ~360px; `min-w-0` lets long names and run lines wrap instead of bleeding
+        // under the next card.
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
           {scout ? (
             <AgentCard
               agent={scout}
